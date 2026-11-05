@@ -149,7 +149,7 @@ def test_smallstep_fixture_builder_and_kernel_receipt_hashes():
 #:   * source-extension.json (sealed): strict base (2.8.9 cd336e62d) versus tip replay on
 #:     an RTX 5090, acoustic 132 arrays / 305,632 words, 0 differing;
 #:   * acoustic-oracle-replay-edc822ca509.json: tools/assembled_legacy_replay.py --family
-#:     acoustic at integrate/2.9.3 120ff11c03f under GPUWM_NUMERICS=strict on V51's RTX PRO
+#:     acoustic at integrate/2.9.3 120ff11c03f under GPUWM_NUMERICS=strict on test host's RTX PRO
 #:     6000 Workstation Edition (NVRTC 12.9), 132 arrays / 305,632 words, 0 differing.
 #: The sealed f66 proof itself stays immutable.
 ORACLE_REPLAY_SHA = "2984c4fcebaee6d91075737d4a4af8cfbd04cb2e7e191742f48eef8452415d67"

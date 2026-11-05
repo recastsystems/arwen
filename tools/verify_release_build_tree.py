@@ -64,7 +64,7 @@ PINS_RELATIVE = "gpuwm/data/bridges/bridge-pins.json"
 #: at the root, a scratch directory) stays out of the artifacts and is not
 #: this gate's business.
 PACKAGED_ROOTS = ("gpuwm", "tools", "tilestream", "configs", "docs",
-                  "mpas_cycle_bridge", "gpuwm-data")
+                  "mpas_cycle_bridge", "gpuwm-data", "gpuwm-kernels", "gpuwm-kernels-startup")
 
 #: The two platforms a release pins; kept in step with
 #: ``gpuwm.bridge_assets.SUPPORTED_PLATFORMS`` by the test, not by import,

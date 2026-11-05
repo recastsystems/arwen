@@ -1,4 +1,6 @@
 {
-  "gpuwm": 10000000000,
-  "gpuwm-data": 10000000000
+  "gpuwm": 10737418240,
+  "gpuwm-data": 10737418240,
+  "gpuwm-kernels": 10737418240,
+  "gpuwm-kernels-startup": 10737418240
 }

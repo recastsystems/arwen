@@ -1,4 +1,4 @@
-# rw-libm verification, node-2: ldd (Ubuntu GLIBC 2.43-2ubuntu2.4) 2.43, Intel(R) Core(TM) Ultra 7 270K Plus, 2026-10-02T18:39Z
+# rw-libm verification, a test host: ldd (Ubuntu GLIBC 2.43-2ubuntu2.4) 2.43, Intel(R) Core(TM) Ultra 7 270K Plus, 2026-10-02T18:39Z
 # columns: rust = rw-libm; cref = CORE-MATH C at 284b3b0 built -ffp-contract=off (nofma) and -O3 -march=native (fma);
 # glibc = the running libm.so.6; mpfr = MPFR 4.2.2, consulted on every disagreement and on every worst case
 glibc 2.43 threads 24

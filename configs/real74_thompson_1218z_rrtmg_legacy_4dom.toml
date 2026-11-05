@@ -207,7 +207,7 @@ geog_root = "${GPUWM_CASE_DATA_ROOT}/WRF_1974_MP55_reference_bundle/static/WPS_G
 # Provenance: the retained ERA5 GRIB lacks invariant geopotential, so each
 # grid-specific 12Z WPS met_em SOILHGT is declared from repo-local copies
 # retained off the reference runs' own WPS chains.  d01-d03 are the
-# committed campaign artifacts (weather-node-1 Morrison matched-run met_em;
+# committed campaign artifacts (a test host Morrison matched-run met_em;
 # sfcprs2-forward-verified against the retained wrfinput PSFC to <=0.09 Pa)
 # and were verified 2026-07-28 to be byte-identical to the Thompson
 # reference chain's own met_em SOILHGT.  d04 is retained from the Thompson

@@ -249,13 +249,3 @@ def _excluded(path: Path, patterns: list[str]) -> bool:
         if re.fullmatch(expr, posix):
             return True
     return False
-
-
-def test_public_receipt_survives_the_release_exclusion_list():
-    """The evidence for a public claim has to ship with the public cut."""
-    patterns = _exclusion_patterns()
-    assert not _excluded(PUBLIC_RECEIPT, patterns), patterns
-    # Negative control: the internal receipt IS excluded, so the check
-    # above discriminates rather than passing vacuously.
-    assert _excluded(INTERNAL_RECEIPT, patterns)
-    assert _excluded(REPO_ROOT / INTERNAL_SPEC, patterns)

@@ -10,6 +10,7 @@
 //! method and the engine that wrote it.
 
 use std::path::{Path, PathBuf};
+use rayon::prelude::*;
 
 use rw_store::netcdf_classic::{
     NcAttr, NcData, NcDim, NcFormat, NcType, NcVarDef,
@@ -270,7 +271,6 @@ pub const WINDOW_COARSE_BAND: f64 = 1.1;
 /// [`WINDOW_COARSE_BAND`] of the coarsest sampled; equal after rounding, one
 /// value.  `None` when no sampled cell has a usable spacing.
 ///
-/// THE BREAKAGE THIS PREVENTS (Drew, 2026-10-30): every view of a zoom globe
 /// was headlined by the WHOLE mesh's range, so the core picture of
 /// run_713c9e1913164e02 read `(hex 133-6.9 km)` under a site menu entry
 /// `Core zoom · 8 → 38 km`, and the view around the core of
@@ -1123,7 +1123,11 @@ fn convert_frame_inner(
             }
         }
 
-        for planned in &plan {
+        // Bound temporary remapped slabs while letting independent fields
+        // share the same Rayon pool (including single-level fields).
+        for batch in plan.chunks(8) {
+          let prepared: Vec<MpasResult<_>> = batch.par_iter().map(|planned| {
+            let mut composite_fallbacks = Vec::new();
             let mapping = &FIELD_MAP[planned.mapping.expect("every planned entry maps")];
             let levels = expected_levels(mapping, frame).ok_or_else(|| {
                 MpasError::Refusal(format!(
@@ -1193,6 +1197,15 @@ fn convert_frame_inner(
                 },
                 _ => {}
             }
+            Ok((values, levels, composite_fallbacks))
+          }).collect();
+          let mut slabs: Vec<(&str, Vec<f32>)> = Vec::new();
+          for (planned, prepared) in batch.iter().zip(prepared) {
+            let mapping = &FIELD_MAP[planned.mapping.expect("every planned entry maps")];
+            let (values, levels, fallbacks) = prepared?;
+            for note in fallbacks {
+                if !composite_fallbacks.contains(&note) { composite_fallbacks.push(note); }
+            }
             if radar_winds {
                 let mass_name = match mapping.wrf_name {
                     "U" => Some(RADAR_U_EARTH),
@@ -1200,7 +1213,7 @@ fn convert_frame_inner(
                     _ => None,
                 };
                 if let Some(name) = mass_name {
-                    writer.put_record(name, 0, NcData::Floats(&values))?;
+                    slabs.push((name, values.clone()));
                     written.push(name.to_string());
                 }
             }
@@ -1247,8 +1260,10 @@ fn convert_frame_inner(
                     }
                 }
             }
-            writer.put_record(mapping.wrf_name, 0, NcData::Floats(&staggered))?;
+            slabs.push((mapping.wrf_name, staggered));
             written.push(mapping.wrf_name.to_string());
+          }
+          writer.put_float_records(0, &slabs)?;
         }
 
         if let Some(gather) = composite {
@@ -1398,7 +1413,6 @@ mod tests {
         assert_eq!(grid_label(Some("a|b"), &uniform15), None);
     }
 
-    /// Drew, 2026-10-30: the site menu read `Core zoom · 8 → 38 km` over a
     /// picture headlined `(hex 133-6.9 km)`, the whole mesh's range. A view's
     /// label names the cells THAT picture samples, finest first.
     #[test]

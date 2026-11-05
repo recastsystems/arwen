@@ -1,6 +1,6 @@
 {
  "what": "Download and preparation wall times of real runs, with the request each downloaded, for the time estimate in estimate_times.py",
- "machine": "node-4, RTX 5070 Ti (16 GB), 24 CPU cores, its own network link",
+ "machine": "test-machine-4, RTX 5070 Ti (16 GB), 24 CPU cores, its own network link",
  "how": "each run's fetch and prepare stage_finished events (wall_seconds), and the bytes its fetch reported, entered before the run folders were deleted; cells are the 3-D grid cells of all its grids",
  "preparation_scales_with": {
   "prepared:hrrr": {"driver": "download_bytes", "why": "the HRRR preparation decodes every native file it downloaded, about 1.2 GB per forcing time: the 162 by 162 and 352 by 342 point grids took 6.4 and 6.1 s per forcing time, while their cells differ 4.6 times"},

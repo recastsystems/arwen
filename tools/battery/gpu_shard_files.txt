@@ -65,7 +65,7 @@
 # ---------------------------------------------------------------------------
 # ORDER (2.8.5): the ensemble blocks below run FIRST in the leg's one pytest
 # process.  Placed after the dycore and physics files (at 7c9883668 on
-# node-4's 16 GB RTX 5070 Ti) the card already held 8.9 GB when the 4- and
+# a test host's 16 GB RTX 5070 Ti) the card already held 8.9 GB when the 4- and
 # 10-member real-input arms started, and four of them ran out of memory
 # although each passes in an ensemble-only process.  Within the blocks the
 # native decline gate stays the first ensemble device file in this process.
@@ -122,7 +122,7 @@
 #   (entry MB 0, 382, 1002, 1622 at the base), and the microphysics ring
 #   and Noah device tables grew by 27,648 B per forecast.  The pool at each
 #   member's entry must equal the second member's entry, to the byte.
-# Both read GPUWM_TEST_WRF_REAL_DIRECTORY (SHARD 1w names node-4's copy)
+# Both read GPUWM_TEST_WRF_REAL_DIRECTORY (SHARD 1w names a test host's copy)
 # and skip without it, so the leg must export it.
 tests/test_ensemble_native_decline_gpu.py
 tests/test_ensemble_member_release_gpu.py
@@ -151,7 +151,7 @@ tests/test_ensemble_batch_member_sources_gpu.py
 # member's rows reaching another's.  Found by the 2.8.5 ensemble review: 105
 # ensemble test files were on no list, so these identity proofs gated
 # nothing, and 21 device tests were red at the staging tip unseen.
-# MEASURED on node-4 (RTX 5070 Ti, 16 GB) at 75950cec9, SHARD 1w, 1x and
+# MEASURED on a test host (RTX 5070 Ti, 16 GB) at 75950cec9, SHARD 1w, 1x and
 # 1y together in one process under the leg's marker expression, with the
 # four inputs below exported: 2,713 passed, 73 skipped by design, 0 failed
 # in 421 s with the kernel cache warm.  From an empty kernel cache the same
@@ -671,7 +671,7 @@ tests/test_radar_staging_gpu.py
 # device-resident path equal to the path it replaced word for word, and
 # those comparisons need a card.  The lanes appended all of these to
 # tools/battery/stage1_files.txt, where under GPUWM_NO_LOCAL_GPU=1 and the
-# leg's marker expression they collected, MEASURED on node-4 at 74a4374af
+# leg's marker expression they collected, MEASURED on a test host at 74a4374af
 # one list at a time:
 #
 #   whole files, moved off stage 1 (0 CPU rows each):

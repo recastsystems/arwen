@@ -696,7 +696,7 @@ fn rings_from_faces(n: usize, faces: &[[u32; 3]]) -> MpasResult<Rings> {
 // nothing moved, and this is the machinery that discovers the same thing by
 // repairing what it already has.
 //
-// THE MEASUREMENT THAT JUSTIFIES IT (profile lane, 2026-08-29, node-4): a
+// THE MEASUREMENT THAT JUSTIFIES IT (profile lane, 2026-08-29, a test host): a
 // rebuild costs 88.1 ms on a 54,247-cell graded mesh and 234.9 ms at 159,898,
 // against 0.93 ms and 2.13 ms for one Lawson pass over the previous
 // triangulation at the moved positions -- 95x and 110x -- and the pass finds

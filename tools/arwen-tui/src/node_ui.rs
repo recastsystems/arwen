@@ -1074,7 +1074,7 @@ mod tests {
             &std::env::temp_dir().join(format!("arwen-ui-test-{}-{}", crate::remote::stamp(), NEXT_SCRATCH.fetch_add(1, std::sync::atomic::Ordering::Relaxed))),
         );
         let mut node = Node::blank();
-        node.host = "weather-node".into();
+        node.host = "test-host".into();
         node.workspace = "/srv/weather".into();
         node.config = "/srv/weather/storm.toml".into();
         node.last_job = Some("job-1".into());

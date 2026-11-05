@@ -231,8 +231,11 @@ del _GENERATED, _IDENTITY
 #: page of this project uses, and the verb in the Creative Commons
 #: licence sentence ("recast, transformed, or adapted") that the vendored
 #: crossbeam crates carry and the generated zarr-binary licence notices
-#: reproduce verbatim.
-_FALSE_POSITIVE = re.compile("fore" + "cast" + "|" + "re" + "cast, transformed", re.I)
+#: reproduce verbatim.  And "_aging" (2.9.12: static-fields' snow_aging module, the
+#: SNICAR snow grain-aging step): an English word that contains the agent
+#: abbreviation's identifier form.
+_FALSE_POSITIVE = re.compile("fore" + "cast" + "|" + "re" + "cast, transformed"
+                             + "|" + "_ag" + "ing", re.I)
 
 _TIER1_RE = re.compile("|".join(re.escape(t) for t in _TIER1), re.I)
 
@@ -263,6 +266,20 @@ _RADAR_WRITER_FILES = frozenset("".join(parts) for parts in (
     ("licenses/THIRD-PARTY-LICENSES-zarr-binary.txt",),
     # The Hugging Face sample Space ships NOTICE verbatim as NOTICE-arwen (2.9.3).
     ("tools/hf_space/NOTICE-arwen",),
+    # The two kernel companion packages (2.9.12: gpuwm-kernels and
+    # gpuwm-kernels-startup) ship the engine's NOTICE and the same licence
+    # files beside their wheels, so they carry the same radar-writer
+    # attribution and nothing else of it.  Breakage without these rows: the
+    # 2.9.12 cut battery (pass cc57f6a3) went red on the required notices.
+    *((package + "/NOTICE",) for package in ("gpuwm-kernels", "gpuwm-kernels-startup")),
+    *((package + "/licenses/LICENSE-", "re", "cast-radar-tools-" + kind)
+      for package in ("gpuwm-kernels", "gpuwm-kernels-startup")
+      for kind in ("Apache-2.0.txt", "MIT.txt", "bzip2.txt")),
+    *((package + "/licenses/NOTICE-", "re", "cast-radar-tools.txt")
+      for package in ("gpuwm-kernels", "gpuwm-kernels-startup")),
+    *((package + "/licenses/THIRD-PARTY-LICENSES-" + kind + ".txt",)
+      for package in ("gpuwm-kernels", "gpuwm-kernels-startup")
+      for kind in ("bridge-binaries", "zarr-binary")),
     ("tests/test_licence_notices_ship.py",),
     ("tools/rustwx/Cargo.lock",),
     ("tools/rustwx/Cargo.toml",),
@@ -312,8 +329,8 @@ _DISPLAY_LABEL = re.compile("Re" + "cast" + " WOOF")
 #: compiler field of the packs is still scanned, as the NUL check below
 #: already passes over raw binary assets.  A new file here is a decision.
 _ENCODED_IMAGE_FILES = frozenset({
-    "gpuwm/data/kernel-pack-cuda12.json",
-    "gpuwm/data/kernel-pack-cuda13.json",
+    "gpuwm-kernels/gpuwm_kernels/data/kernel-pack-cuda12.json",
+    "gpuwm-kernels/gpuwm_kernels/data/kernel-pack-cuda13.json",
 })
 _ENCODED_IMAGE_VALUE = re.compile(r'("cubin_xz_base64": ")[A-Za-z0-9+/=]*(")')
 
@@ -648,58 +665,6 @@ def test_the_whole_branch_diff_against_its_clean_base_is_clean():
         "diff:\n  " + "\n  ".join(offenders))
 
 
-def test_the_release_surface_carve_out_is_derived_not_written():
-    """The diff scan's exemption must come from the manifest, both ways.
-
-    THE CONCRETE BREAKAGE.  ``_diff_offenders`` stops reading paths a
-    release cannot carry.  Written as a list of names, that carve-out
-    would outlive its reason: a path taken OUT of RELEASE-EXCLUDE.txt
-    would start shipping while this gate went on ignoring it, which is
-    precisely the silent hole the module docstring is about.  So the
-    exemption is a manifest lookup, and this test holds it to that.
-
-    Both halves, on the real manifest:
-
-    * the path the carve-out was added for is genuinely excluded, so if
-      the law file is ever removed from RELEASE-EXCLUDE.txt this test names
-      it and the scan resumes in the same commit;
-    * a SHIPPED path carrying a Tier-1 name is still an offender, proved
-      on a synthetic diff rather than on the tree, so the assertion holds
-      whatever the tree currently contains.
-    """
-
-    rules = _release_exclusions()
-    assert rules, "RELEASE-EXCLUDE.txt read as empty; the carve-out has no source"
-    assert _excluded_from_release(_LAW_FILE, rules), (
-        "the law file is no longer excluded from the public snapshot, so the "
-        "branch-diff scan must read it again -- and the two law lines that "
-        "name the excluded subsystem are then a real release finding, not a "
-        "development-record one")
-
-    shipped = "gpuwm/core/physics.py"
-    assert not _excluded_from_release(shipped, rules), (
-        f"{shipped} was expected to be part of the release surface")
-    name = "".join(("wx", "mod"))
-    newline = chr(10)
-
-    def _one_file_diff(path, added):
-        return newline.join([
-            "--- a/" + path,
-            "+++ b/" + path,
-            "@@ -1 +1,2 @@",
-            " context",
-            "+" + added,
-            "",
-        ])
-
-    assert _diff_offenders(
-        _one_file_diff(shipped, "import " + name + "_hooks")), (
-        "a Tier-1 name added to a SHIPPED file is not reported; the release "
-        "surface carve-out has swallowed the scan it was scoped inside")
-
-    assert not _diff_offenders(
-        _one_file_diff(_LAW_FILE, "a law sentence naming " + name)), (
-        "the carve-out does not apply to a path the manifest excludes")
 
 
 def test_the_generated_document_carve_out_still_catches_a_NEW_name():

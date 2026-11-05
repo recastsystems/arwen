@@ -64,7 +64,7 @@ MOVED_MEMBER_SHA256 = {
     # in the gpuwm wheel); the digests are the ones they had at e9d54cc17.
     "case-catalog/historical.zip":
         "97c404da2e858eb9d4e3c5c521d8a1352eeaa93d34fafcd6e00a83676520f2b5",
-    # Re-provisioned after the move by lane/verify-spp-stochastic: the same
+    # Re-provisioned after the move by development branch: the same
     # captures rebuilt on the oracle platform (gfortran 13.3.0, glibc 2.39);
     # the moved bytes were 9bc14a88c46b5454... (gfortran 15.2.0, glibc 2.43).
     # 2.9.1: its GF captures re-run on the corrected GF harness (receipt.json

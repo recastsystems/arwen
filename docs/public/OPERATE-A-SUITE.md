@@ -41,7 +41,7 @@ shipped rate table. Until every row binds, `run` and `rehearse` refuse with one
 message that names each row and what it lacks (`suite_execution_unbound`,
 `suite_launcher_missing`). Operation across two hosts is refused with
 `suite_transport_unbound`. See
-[the binding contract](../suite-runtime-bindings.md) for prepared authority,
+the binding contract for prepared authority,
 member placement, CPU stages and queue configuration. An explicit
 `gpuwm.suite.runtime-fixture.v1` JSON plan is for door qualification only.
 

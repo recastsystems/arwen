@@ -215,7 +215,7 @@ fn run_case(name: &str, directory: PathBuf, prefix: &str, suffix: &str, limit: O
         // produced through a TRANSCENDENTAL quotes an array digest whose
         // last bits are the box's libm.  Both showed up as red here, in
         // that order -- first between two worktrees of the same commit
-        // (paths), then between the Windows desktop and weather-node-1:
+        // (paths), then between the Windows desktop and a test host:
         // three of 38 netCDF arrays at most 3 ULP apart from the two
         // `exp`-based humidity derivations, and all four Lambert wind
         // components from the `sin`/`cos` rotation.  So the digest

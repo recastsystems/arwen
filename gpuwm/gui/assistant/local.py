@@ -91,7 +91,7 @@ def gpu_memory_of(pid: int) -> float | None:
     """GiB the process holds on the card, from nvidia-smi; None when it cannot say."""
 
     try:
-        done = subprocess.run(["nvidia-smi", "--query-compute-apps=pid,used_memory",
+        done = subprocess.run([*__import__('gpuwm.gpu_smi', fromlist=['command']).command(), "--query-compute-apps=pid,used_memory",
                                "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10,
                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0)
     except (OSError, subprocess.TimeoutExpired):

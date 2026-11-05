@@ -74,7 +74,14 @@ def test_the_six_doors_are_bundled_on_demand_and_not_in_the_wheel():
         | {"rw_icechunk", "rw_mpas_init_v831", "rw_mpas_gsl_oro"}
         # 2.9.11 (PyPI per-file limit): opt-in simulated radar, ML export, the wind-farm
         # table decoder and the opt-in hydro door's payload library.
-        | {"rw_simradar", "rw_mlexport", "rw-wind-table", "nextgen_hydrofabric"})
+        | {"rw_simradar", "rw_mlexport", "rw-wind-table", "nextgen_hydrofabric"}
+        # 3.0: opt-in FDDA, waves and TC verification doors; SIZE-01 (PyPI per-file limit):
+        # opt-in history GRIB2, ODIM, TC and aerosol tools and the gpuwm-hex-side MPAS tools.
+        | {"rw_fddaobs", "rw_waves_data", "rw_waves_coupled_prepare", "rw_tc_rmw_score", "tc-verify",
+                "rw_history_grib2", "rw_odim", "rw_mpas_static", "rw_mpas_lbc",
+                "rw_mpas_convert", "rw_mpas_geometry", "rw_mpas_mesh",
+                "rw_storm_merge", "rw_tc_vitals", "public-aerosol-build",
+                "aerosol-grid"})
 
 
 def test_every_stream_with_a_door_names_a_bundled_artifact():

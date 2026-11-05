@@ -95,9 +95,9 @@ _PROVIDERS: dict[str, tuple[str, ...]] = {
     "rustmatrix": ("rustmatrix",),
     "PIL": ("pillow",),
     "affine": ("affine",),
-    "cupy": ("cupy-cuda12x", "cupy-cuda13x"),
-    "cupy_backends": ("cupy-cuda12x", "cupy-cuda13x"),
-    "cupyx": ("cupy-cuda12x", "cupy-cuda13x"),
+    "cupy": ("cupy-cuda12x", "cupy-cuda13x", "cupy-rocm-7-0"),
+    "cupy_backends": ("cupy-cuda12x", "cupy-cuda13x", "cupy-rocm-7-0"),
+    "cupyx": ("cupy-cuda12x", "cupy-cuda13x", "cupy-rocm-7-0"),
     "cuda": ("cuda-pathfinder",),
     "huggingface_hub": ("huggingface_hub",),
     "jsonschema": ("jsonschema",),
@@ -121,6 +121,14 @@ _PROVIDERS: dict[str, tuple[str, ...]] = {
     # It carries the RRTMGP and Thompson table directories; gpuwm pins it
     # `==` and gpuwm.data_assets resolves through it.
     "gpuwm_data": ("gpuwm-data",),
+    # The 3.0 kernel-pack companions (SIZE-01 split the precompiled packs out
+    # of the engine wheel): gpuwm pins both `==` and gpuwm.kernel_aot resolves
+    # its default packs through them.
+    "gpuwm_kernels": ("gpuwm-kernels",),
+    "gpuwm_kernels_startup": ("gpuwm-kernels-startup",),
+    # NO public distribution provides this: the site's storm-tracker hook,
+    # imported only under WOOF_TC_TRACKER -- see _OPTIONAL_BY_DESIGN.
+    "woof_tools_tc_tracker": (),
     # NO distribution provides this: it is the repository's own mapped
     # parity battery (tests/test_mapped_engine_parity.py), and tests/ does
     # not ship.  The two decode instruments that import it are
@@ -238,6 +246,12 @@ _EARTH2_INTERPRETER = (
 )
 
 _OPTIONAL_BY_DESIGN: dict[str, str] = {
+    "woof_tools_tc_tracker": (
+        "gpuwm/runtime.py and gpuwm/prepared_single_domain_forecast.py import it "
+        "only when WOOF_TC_TRACKER is set, as the site's storm-tracker hook on "
+        "each committed history frame; no engine door sets it and a bare run "
+        "never imports it."
+    ),
     "rustmatrix": (
         "tools/build_radar_scattering_tables.py (labs/radar-bands, 2.9.11) is the "
         "maintainer build that regenerates the shipped C/X-band scattering tables "
@@ -844,6 +858,12 @@ def test_all_covers_every_extra_a_forecast_user_needs(declaration, pyproject):
     aggregates = {"all", "all-cu12", "all-cu13", "gpu"}
     excused = {
         "dev": "the test suite, not a runtime capability",
+        "rocm": "the experimental AMD (ROCm/HIP) backend's CuPy build. "
+                "cupy-rocm-7-0 and cupy-cuda12x/13x all install the one "
+                "`cupy` package, so an aggregate carrying both would pip "
+                "one over the other; CUDA is the default and `--backend "
+                "amd` is the explicit selection (project ruling 2026-11-01: "
+                "an AMD backend from the same kernel source).",
         "publish": "maintainer-only mirror publishing, needs credentials "
                    "on a dataset repository no user has",
         "geog": "the PARITY FALLBACK for the high-resolution warp, not "

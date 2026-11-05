@@ -19,7 +19,7 @@ def clone_workflows(tmp_path):
 
 def test_every_workflow_job_has_a_rehearsal_and_every_contract_file_exists():
     rows = routes.census()
-    assert len(rows) == 17
+    assert len(rows) == 18
     assert {row["workflow"] for row in rows} == {"ci.yml", "publish.yml"}
     assert all((ROOT / path).is_file() for path in routes.CONTRACT_FILES)
     by_job = {(row["workflow"], row["job"]): row for row in rows}

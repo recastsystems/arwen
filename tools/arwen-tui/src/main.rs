@@ -6586,7 +6586,7 @@ mod tests {
             assert!(screen.contains("R Nodes"), "{screen}");
             click_hit(&mut app, |hit| matches!(hit, Hit::Nodes));
             let mut node = remote::Node::blank();
-            node.host = "weather-node".into();
+            node.host = "test-host".into();
             node.workspace = "/srv/weather".into();
             node.config = "/srv/weather/Storm case.toml".into();
             node.last_job = Some("recorded-job".into());
@@ -6694,7 +6694,7 @@ mod tests {
             let text = render_at(&mut app, width, height);
             capture_screen("nodes-invalid-save", width, height, &mut app);
             assert!(text.contains("SSH host must be"), "{text}");
-            assert_eq!(app.nodes.store.selected().unwrap().host, "weather-node");
+            assert_eq!(app.nodes.store.selected().unwrap().host, "test-host");
             app.node_intent(node_ui::Intent::Select(None));
             assert_eq!(app.plot_spec().unwrap().split(',').count(), 26);
             assert_eq!(fs::read_to_string(&local).unwrap(), original);

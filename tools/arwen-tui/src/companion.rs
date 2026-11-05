@@ -1172,7 +1172,7 @@ mod downscale_requests {
 
         // A node has neither input on its disk, and the refusal says which.
         let mut remote = payload(&parent, &out);
-        remote["target"] = json!({"kind":"ssh","node_id":"node-1","connection_sha256":"a".repeat(64)});
+        remote["target"] = json!({"kind":"ssh","node_id":"test-host-1","connection_sha256":"a".repeat(64)});
         let refusal = parse(&remote).unwrap_err();
         assert!(refusal.contains("this computer's disk") && refusal.contains("gpuwm downscale"), "{refusal}");
 
@@ -1421,7 +1421,7 @@ mod tests {
     #[test]
     fn compact_viewer_request_keeps_explicit_target_exact_frame_and_prefetch(){
         let mut value=serde_json::json!({"schema":"arwen.companion-request.v1","session_id":"s","id":"compact-1","action":"sync_processed_frame_v2",
-            "target":{"kind":"ssh","node_id":"node-2","connection_sha256":"a".repeat(64)},"job_id":"job-1","domain":2,"sequence":42,
+            "target":{"kind":"ssh","node_id":"test-host-2","connection_sha256":"a".repeat(64)},"job_id":"job-1","domain":2,"sequence":42,
             "profile":"viewer-2d-v1","products":["mslp_10m_winds"],"expected_run_id":"run-1","reader_leases":true,"prefetch_sequences":[43,44]});
         assert!(matches!(super::parse_request(&value,"compact-1","s").unwrap().action,super::Action::SyncProcessedFrameV2{domain:2,sequence:Some(42),reader_leases:true,..}));
         value["prefetch_sequences"]=serde_json::json!([1,2,3,4,5,6,7,8,9]);assert!(super::parse_request(&value,"compact-1","s").is_err());
@@ -1429,7 +1429,7 @@ mod tests {
     }
     fn viewer_request(products:serde_json::Value)->serde_json::Value{
         serde_json::json!({"schema":"arwen.companion-request.v1","session_id":"s","id":"compact-1","action":"sync_processed_frame_v2",
-            "target":{"kind":"ssh","node_id":"node-2","connection_sha256":"a".repeat(64)},"job_id":"job-1","domain":2,"products":products})
+            "target":{"kind":"ssh","node_id":"test-host-2","connection_sha256":"a".repeat(64)},"job_id":"job-1","domain":2,"products":products})
     }
     #[test]
     fn compact_viewer_request_takes_any_positive_cache_budget(){
@@ -1485,7 +1485,7 @@ mod tests {
     #[test]
     fn ssh_review_launch_and_stop_require_explicit_complete_bindings(){
         let path=env::temp_dir().join("saved-map-plan.json");
-        let target=json!({"kind":"ssh","node_id":"node-1","connection_sha256":"a".repeat(64)});
+        let target=json!({"kind":"ssh","node_id":"test-host-1","connection_sha256":"a".repeat(64)});
         let mut value=json!({"schema":"arwen.companion-request.v1","session_id":"s","id":"request-1",
             "action":"review_plan","plan_path":path,"plan_sha256":"b".repeat(64),"config_sha256":"c".repeat(64),"target":target});
         let request=parse_request(&value,"request-1","s").unwrap();
@@ -1508,7 +1508,7 @@ mod tests {
         assert!(matches!(parse_request(&focus,"focus-1","s").unwrap().action,Action::FocusSetup));
         focus["target"]=json!({"kind":"local"});assert!(parse_request(&focus,"focus-1","s").is_err());
         let mut request=json!({"schema":"arwen.companion-request.v1","session_id":"s","id":"frame-1","action":"sync_artifacts",
-            "job_id":"job-1","target":{"kind":"ssh","node_id":"node-1","connection_sha256":"a".repeat(64)}});
+            "job_id":"job-1","target":{"kind":"ssh","node_id":"test-host-1","connection_sha256":"a".repeat(64)}});
         assert!(matches!(parse_request(&request,"frame-1","s").unwrap().action,Action::SyncArtifacts{domain:1,..}));
         request["domain"]=json!(2);assert!(matches!(parse_request(&request,"frame-1","s").unwrap().action,Action::SyncArtifacts{domain:2,..}));
         request["domain"]=json!(true);assert!(parse_request(&request,"frame-1","s").is_err());
@@ -1517,7 +1517,7 @@ mod tests {
     #[test]
     fn artifact_timeline_and_exact_frame_requests_keep_bounded_selectors_and_lease_opt_in(){
         let mut value=json!({"schema":"arwen.companion-request.v1","session_id":"s","id":"index-1","action":"artifact_index",
-            "job_id":"job-1","domain":3,"after_sequence":256,"target":{"kind":"ssh","node_id":"node-1","connection_sha256":"a".repeat(64)}});
+            "job_id":"job-1","domain":3,"after_sequence":256,"target":{"kind":"ssh","node_id":"test-host-1","connection_sha256":"a".repeat(64)}});
         assert!(matches!(parse_request(&value,"index-1","s").unwrap().action,Action::ArtifactIndex{domain:3,after_sequence:256,..}));
         for bad in [json!(-1),json!(true),json!(u64::MAX)]{
             value["after_sequence"]=bad;assert!(parse_request(&value,"index-1","s").is_err());
@@ -1536,7 +1536,7 @@ mod tests {
         assert!(parse_request(&value,"target-1","s").is_err());
         value["target"]=json!({"kind":"local"});
         assert!(matches!(parse_request(&value,"target-1","s").unwrap().action,Action::SelectTarget));
-        value["target"]=json!({"kind":"ssh","node_id":"node-1","connection_sha256":"b".repeat(64)});
+        value["target"]=json!({"kind":"ssh","node_id":"test-host-1","connection_sha256":"b".repeat(64)});
         assert!(parse_request(&value,"target-1","s").is_ok());
         value["config_path"]=json!("/unexpected.toml");assert!(parse_request(&value,"target-1","s").is_err());
     }
@@ -1550,7 +1550,7 @@ mod tests {
             opted_in["enable_local_da"]=invalid;
             assert!(parse_request(&opted_in,"open-1","s").is_err());
         }
-        for (key,extra) in [("target",json!({"kind":"local"})),("target",json!({"kind":"ssh","node_id":"node-1","connection_sha256":"a".repeat(64)})),
+        for (key,extra) in [("target",json!({"kind":"local"})),("target",json!({"kind":"ssh","node_id":"test-host-1","connection_sha256":"a".repeat(64)})),
                             ("config_path",json!("/saved.toml")),("job_id",json!("job-1")),("plan_sha256",json!("a".repeat(64)))] {
             let mut other=value.clone();other[key]=extra;
             assert!(parse_request(&other,"open-1","s").is_err(),"{key}");
@@ -1710,7 +1710,7 @@ mod tests {
         viewer.publish(json!({"state":"ready"}),true).unwrap();
         // The state a viewer's own end publishes before it removes itself.
         viewer.publish(json!({"state":"closed"}),true).unwrap();
-        let frames=session.join("remote-artifacts").join("node-2").join("job-1").join("objects");
+        let frames=session.join("remote-artifacts").join("test-host-2").join("job-1").join("objects");
         fs::create_dir_all(&frames).unwrap();
         let frame=frames.join("frame.wrf");fs::write(&frame,b"raw").unwrap();
         // A native reader that does not share delete access holds the file on

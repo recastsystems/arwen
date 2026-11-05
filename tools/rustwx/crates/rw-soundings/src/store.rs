@@ -5,7 +5,6 @@
 //!   `temperature_native` K, `dewpoint_native` K, `u_native`/`v_native` m/s
 //!   (earth-relative), `omega_native` Pa/s on model levels (level code
 //!   1000 - k), plus the 2-D surface anchors.
-//! * `iso` (Drew's rw-ui / rusty-weather ingest): `temperature_iso`,
 //!   `dewpoint_iso` | `rh_iso`, `u_iso`, `v_iso`, `height_iso` on isobaric
 //!   levels, plus the same surface anchors (or their `approx_*` names).
 //!

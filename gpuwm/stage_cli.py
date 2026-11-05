@@ -1371,6 +1371,8 @@ def register_cli(subparsers) -> None:
                     "yourself.")
     from gpuwm.output_formats import add_arguments
     add_arguments(sim)
+    from gpuwm.ocean.settings import add_arguments as add_wave_arguments
+    add_wave_arguments(sim)
     sim.add_argument("prepared_root", type=Path, metavar="PREPARED_ROOT",
                      help="a prepared tree written by `gpuwm prep "
                           "--output-root`, by the rw-wps console script, "

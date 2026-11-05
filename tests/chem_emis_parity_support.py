@@ -130,9 +130,9 @@ def replay(process):
     # memory, so the replay allocates from a pool of its own.  CuPy's default
     # pool is process-wide: in a gate lane it still caches the freed blocks of
     # every earlier GPU test, and how many depends on the card.  In the 2.8.9
-    # cut gate (a1388eae7, node-2 lane 2) the AFWA replay ran right after
+    # cut gate (a1388eae7, a test host lane 2) the AFWA replay ran right after
     # test_cam_ozone.py, which leaves the default pool at 2.39 GB on the
-    # 32 GB RTX 5090 (1.21 GB on node-4's 16 GB 5070 Ti; 405 MB of it live on
+    # 32 GB RTX 5090 (1.21 GB on a test host's 16 GB 5070 Ti; 405 MB of it live on
     # both), so a bare total_bytes() failed a bound the replay meets alone at
     # 30 KB.  A baseline subtracted from the shared pool is not the fix
     # either: it reads 0 there, because the replay's blocks come out of

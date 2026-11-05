@@ -88,6 +88,7 @@ COMPONENT_ADAPTERS: dict[str, tuple[tuple[str, str], ...]] = {
         ("gpuwm.core.rrtm_lw", "RRTMDudhiaRadiation"),
         ("gpuwm.core.analytic_radiation", "AnalyticClearSkyRadiation"),
     ),
+    "wrf-cam3": (("gpuwm.core.cam3", "Cam3Radiation"),),
     "kain-fritsch": (("gpuwm.core.kf", "KainFritsch"),),
     # The two cumulus closures that entered the TEMPLATE walk when audit
     # R-067 gave each of them a named suite.  Both were selectable before
@@ -97,10 +98,13 @@ COMPONENT_ADAPTERS: dict[str, tuple[tuple[str, str], ...]] = {
     # registry value with no adapter class is an unaudited scheme, and
     # these two now go through the same twinning proof as the rest.
     "grell-freitas": (("gpuwm.core.gf", "GrellFreitas"),),
+    "grell-devenyi": (("gpuwm.core.gf", "GrellDevenyi"),),
     "new-tiedtke": (("gpuwm.core.ntiedtke", "NewTiedtke"),),
     # New SAS is a row of the column-cumulus table, installed through the
     # one table-driven adapter (gpuwm.core.physics, cu_physics = 96).
     "new-sas": (("gpuwm.core.column_cumulus", "ColumnCumulus"),),
+    "old-gfs-sas": (("gpuwm.core.column_cumulus_r8", "ColumnCumulus"),),
+    "wrf-rrtm-dudhia": (("gpuwm.core.rrtm_lw", "RRTMDudhiaRadiation"),),
     "off": (),
 }
 
@@ -250,10 +254,11 @@ def test_the_default_suites_radiation_is_the_one_that_needed_a_recipe():
                  if not isinstance(resolved, ModuleNotFoundError)
                  and streaming.twin_support(resolved)
                  == streaming.TWIN_BY_RECIPE}
+    # CAM3 also needs its table root and spectral policy carried to tiles.
     # The second entry is the column-cumulus table's adapter (New SAS,
     # cu_physics = 96), whose constructor requires its row's cu_physics; this
     # audit caught it the day its suite joined the template walk.
-    assert by_recipe == {"RRTMGLegacyRadiation", "ColumnCumulus"}, (
+    assert by_recipe == {"RRTMGLegacyRadiation", "ColumnCumulus", "Cam3Radiation"}, (
         f"recipes now cover {sorted(by_recipe)}; every other shipped adapter "
         "is a dataclass or empty-constructible, and a new entry here is a "
         "new scheme that could not be rebuilt without one")

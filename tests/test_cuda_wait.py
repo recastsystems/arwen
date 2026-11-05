@@ -146,7 +146,7 @@ def _smi(stdout, returncode=0):
 
 
 def test_a_multi_card_preparation_with_no_mask_takes_the_least_busy_card(monkeypatch, capsys):
-    """Breakage: every unmasked GFS preparation on V8X held a context on card 0, another lane's."""
+    """"""
     from gpuwm.ingest import preprocess_backend as pb
 
     monkeypatch.setattr(pb, "_cuda_not_yet_initialized", lambda: True)

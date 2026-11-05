@@ -30,7 +30,7 @@ from gpuwm.core.fp32_ulp import (  # noqa: E402
     fp32_ulp_distance,
 )
 
-DEFAULT_FIXTURE_DIR = REPO_ROOT / "gpuwm" / "data" / "morrison" / "oracle"
+DEFAULT_FIXTURE_DIR = REPO_ROOT / "tests" / "data" / "oracles" / "morrison" / "oracle"
 
 LEVEL_INPUTS = (
     "theta", "qv", "qc", "qr", "qi", "qs", "qg",

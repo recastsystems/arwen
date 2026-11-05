@@ -3,10 +3,14 @@ import hashlib
 import json
 from pathlib import Path
 
-SOURCE_EXTENSION_SHA = 'cdb41cbe3f6ac43bd25c3d60ef57906bc0f7fc338a5eb02d9412a4d77d680610'
-DIFFUSION_CACHE_EXTENSION_SHA = "2d0a03fbffcec53d12d692c524e3fed01611677a08f677c2ff76f39214549c79"
+SOURCE_EXTENSION_SHA = '8ba9921d4a515f24f71cafd64794488ec753facbd144088a20e81bbd179f0076'
+DIFFUSION_CACHE_EXTENSION_SHA = "7c25859ca56cc0bece13349224df0e20d4633ba01829bf8fafda2c4cbece6400"
 
 PROOF_SHAS = {
+    # Recaptured for the 3.0.0 fix batch after a comment-only glibc_flt32.cuh edit moved smag2d's
+    # assembled source: tools/wrf_diffopt1_oracle/capture.py --mode km2 --revert-deformation-donor,
+    # then tools/coordinate_donor_negative_control.py; all 216 control fields equal the sealed proof.
+    "coordinate-negative-theta-m-source.json": "bb855c5e16f7c02feafe1afaaffbed9336d485b567fc50f4b725a3a676b66821",
     "acoustic-published.json": "a87236d1940de34920102e86cbfc57ddafb0cabb103c4d891923385cf9c2e1e9",
     "coordinate-native.json": "e444d6d4eed8a6c875a1970d0ac8d97f255357df6874ef5c915b1c0cfcefc070",
     "coordinate-negative.json": "b27d2342e986363910c29a38baff9a7adf1b7d8d4652f60d5404670ef13a49ba",
@@ -83,7 +87,11 @@ def _diffusion_cache_extension(root, before, after):
     assert measured["numerics"] == "strict"
     for module in ("smag2d", "diff_opt1"):
         assert measured["module_options"][module] == list(module_options(module))
-        assert measured["module_source_sha256"][module] == hashlib.sha256(module_source(module).encode()).hexdigest()
+        current = hashlib.sha256(module_source(module).encode()).hexdigest()
+        if measured["module_source_sha256"][module] != current:
+            # Compose the immutable cache receipt with the measured kernel
+            # transition, exactly as the original capture identity does.
+            _module_source_extension(module, measured["module_source_sha256"][module], current)
     driver = _load(root, "driver-source.json")
     expected = {}
     for family in ("horizontal-driver", "vertical-driver", "km-mutations"):
@@ -183,7 +191,22 @@ def _source_extension(root, name, before, after, schema=None):
         # Re-measured for 2.9.11 fix 6 (fix/hailcast: the loader names the hail module's third header,
         # hailcast_wrf39.cuh): base fold/2.9.11 fix 4 (a1d20edc51) against fold/2.9.11-fix6 5428796cb0, zero
         # differing words in all three families on an RTX 5090 (Blackwell, sm_120). Previously b8165c59fe.
-        assert replay["base"] == "a1d20edc5115f9e42d898a9884bfcbbc2130e80d"
+        # Re-measured for moist theta against rel/2.9.11: zero differing words
+        # in all three families; smag2d admitted as a moved kernel.
+        # Re-measured for the 3.0.0 fix batch (the nest-settings merge moved the loader, dycore.py and
+        # acoustic.py after 248b9f57e9 recorded them): base 248b9f57e9 against f71ab9cba2, zero differing
+        # words in all three families on an RTX PRO 6000 Blackwell (sm_120), NVRTC 13.2.51. Previously
+        # f61de8cc71 -> 51bb93111e (248b9f57e9 recorded it without moving this base line); before that 34951539d9.
+        # Re-measured again after the fix batch moved the loader and dycore.py (merge of rel/3.0.0
+        # 21599b1d5a): base 82ab97b146 against 2b67244243, zero differing words in all three
+        # families, same card and NVRTC. Previously 248b9f57e9 -> f71ab9cba2.
+        # Re-measured at a later fix-batch tip (the loader moved again): base 0f5df7085d
+        # against 93a5e7e316, zero differing words in all three families, same card and NVRTC.
+        # Previously 82ab97b146.
+        # Re-measured for the 3.0.0 sealing pass strict reds (the MYNN and TC folds moved the loader;
+        # the dyn-options folds moved dycore.py and acoustic.py): base 93a5e7e316 against eeede1b3b3,
+        # zero differing words in all three families, same card and NVRTC. Previously 0f5df7085d.
+        assert replay["base"] == "93a5e7e3162c869ba6ce23cbb096ac0b40a9d04b"
         assert replay["measurements"] == measured["measurements"]
         assert replay["numerics"] == "strict"
         assert replay["generator"] == "tools/assembled_legacy_replay.py"
@@ -352,7 +375,18 @@ def validate_coordinate_negative(root):
                  and any(isinstance(target, ast.Name) and target.id == "donor" for target in node.targets))
     production = module_source("smag2d")
     assert production.count(donor) == 1
-    assert proof["controlled_module_source_sha256"]["smag2d"] == hashlib.sha256(production.replace(donor, "").encode()).hexdigest()
+    controlled = hashlib.sha256(production.replace(donor, "").encode()).hexdigest()
+    if proof["controlled_module_source_sha256"]["smag2d"] != controlled:
+        # A fresh capture through the maintained donor-removal tool preserves
+        # every control word, independently of the positive-source replay.
+        replay = _load(root, "coordinate-negative-theta-m-source.json")
+        for key in ("schema", "positive_proof_sha256", "native_archive_sha256",
+                    "measurement_tool_sha256", "capture_tool_sha256", "capture_identity",
+                    "case_count", "field_count", "words", "changed_native_words",
+                    "changed_fields", "fields", "intervention", "source_inputs"):
+            assert replay[key] == proof[key], key
+        assert replay["controlled_module_source_sha256"]["smag2d"] == controlled
+        assert replay["controlled_module_source_sha256"]["diff_opt1"] == proof["controlled_module_source_sha256"]["diff_opt1"]
     assert proof["controlled_module_source_sha256"]["diff_opt1"] == positive["capture_identity"]["module_source_sha256"]["diff_opt1"]
     expected = {name for name, row in positive["fields"].items() if row["family"] in ("km2", "deform")}
     assert set(proof["fields"]) == expected

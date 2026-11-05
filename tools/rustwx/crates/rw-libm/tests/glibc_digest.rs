@@ -10,7 +10,7 @@
 //! platform the gate runs on, to the exact outputs of the reference:
 //!
 //! * binary32 sinf, cosf, tanf, atanf, expf, logf, log10f, powf, atan2f:
-//!   glibc 2.43 itself (Ubuntu 2.43-2ubuntu2.4, x86-64 with FMA, node-2);
+//!   glibc 2.43 itself (Ubuntu 2.43-2ubuntu2.4, x86-64 with FMA, a test host);
 //! * binary64 asin, acos: CORE-MATH's C cr_asin / cr_acos (glibc's own are
 //!   IBM's LGPL code, not correctly rounded, and not transcribed).
 //!

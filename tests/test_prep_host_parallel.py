@@ -1,7 +1,6 @@
 """The GFS preparation's bulk host passes run on host threads with byte-identical results.
 
 Breakage it prevents: ``gpuwm.gfs_direct`` at PREPARING_INITIALIZE_ALL_TIMES held one core at
-98-101 % for 70-190 s per 3 km nest while 200+ cores sat idle (ml-probs T1 on V8X, 2026-10-27).
 Profiled: the decoded-lead reads, the snapshot's defensive field copy, the decoded-array and GRIB
 hashes and the CPU mixed-phase RH conversion were serial passes (gpuwm/ingest/host_parallel.py).
 Each test holds the threaded result to the serial one bit for bit.
@@ -146,3 +145,15 @@ def test_a_column_helper_block_runs_on_the_shared_threads_and_waits_for_its_task
     with real._column_pool(4) as executor:
         executor.submit(task, 0).result()
     assert all(name.startswith("gpuwm-host") for name in seen)
+
+
+
+def test_a_running_block_survives_a_larger_pool_being_made():
+    """OK-WOFS 2026-11-02 20:40Z: a shared_executor block held the shared pool while another caller asked for more
+    threads; the old pool was shut and the block's next submit raised 'cannot schedule new futures after shutdown'."""
+    from gpuwm.ingest import host_parallel as H
+    with H.shared_executor(2) as ex:
+        first = ex.submit(lambda: 1)
+        H._shared_pool(H._pool_size + 8)          # another caller grows the pool mid-block
+        second = ex.submit(lambda: 2)             # the block's pool must still take work
+    assert (first.result(), second.result()) == (1, 2)

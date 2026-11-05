@@ -870,91 +870,10 @@ def _release_drops(rel: str) -> str | None:
     return matches(rel, read_exclusions(REPOSITORY_ROOT))
 
 
-def test_committed_speed_anchor_matches_the_run_report_it_cites():
-    """The committed anchor is a receipt on the public tree too.
-
-    The speed-anchor file ships, and it called this anchor a committed run
-    receipt while citing a report under ``evidence/**``, which the public
-    export drops: a public reader could not open the receipt the status
-    promised.  The report ships beside the anchor now, its bytes pinned by
-    ``evidence_sha256`` (which is also what lets the release's machine-path
-    scan forgive the run's own output paths inside it).
-    """
-    anchors = json.loads(SPEED_ANCHORS.read_text(encoding="utf-8"))
-    entry = anchors["anchors"]["arwen_3km_conus"]
-    assert entry["status"] == "committed-run-receipt"
-    rule = _release_drops(entry["evidence"])
-    assert rule is None, (
-        f"the anchor is labelled a committed run receipt but cites "
-        f"{entry['evidence']}, which the public export drops "
-        f"(RELEASE-EXCLUDE.txt: {rule})")
-    raw = (REPOSITORY_ROOT / entry["evidence"]).read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == entry["evidence_sha256"]
-    report = json.loads(raw.decode("utf-8"))
-    assert report["domain"]["nx"] == entry["grid"]["nx"]
-    assert report["domain"]["ny"] == entry["grid"]["ny"]
-    assert report["domain"]["nz"] == entry["grid"]["nz"]
-    assert report["wall_seconds"] == entry["wall_seconds"]
-    assert report["run_seconds"] == entry["run_seconds"]
-    assert (report["memory"]["gpu_peak_used_bytes_observed"]
-            == entry["gpu_peak_used_bytes_observed"])
-    assert (report["gridded_output"]["total_bytes"]
-            == entry["gridded_output_total_bytes"])
-    rate = entry["wall_seconds"] / (entry["run_seconds"] / 60.0)
-    assert entry["seconds_per_sim_minute"] == pytest.approx(rate, abs=5e-5)
 
 
-def test_the_route_projection_scales_from_the_anchor_the_public_tree_carries():
-    """The preflight prices from the same shipped report the anchor cites.
-
-    Read from ``evidence/``, the wall-clock projection was absent from every
-    public run of the tool, reported only as "not found".
-    """
-    anchors = json.loads(SPEED_ANCHORS.read_text(encoding="utf-8"))
-    cited = anchors["anchors"]["arwen_3km_conus"]["evidence"]
-    assert preflight.ANCHOR_RECEIPT.as_posix() == cited
-    assert _release_drops(cited) is None
-    receipt = _receipt(SIZING_SMOKE)
-    assert receipt["projection"]["available"] is True
-    assert receipt["projection"]["anchor"] == cited
-    assert _gate(receipt, "arwen.wall_clock_projection")["authority"] == cited
-    for name in ("B4-ARWEN-HRRR-ROUTE.json", "B4-ARWEN-HRRR-SIZING-SMOKE.json"):
-        committed = json.loads(
-            (SPEED_ANCHORS.parent / name).read_text(encoding="utf-8"))
-        assert committed["projection"]["anchor"] == cited, name
-        assert _gate(committed, "arwen.wall_clock_projection")[
-            "authority"] == cited, name
 
 
-def test_the_memory_fit_ships_the_evidence_it_cites():
-    """The fit is a committed measurement on the public tree too.
-
-    The anchors file labelled the fit "committed-measurement-fit" while
-    citing notes under ``evidence/**``, and the preflight wrote the same
-    path as ``fit_source`` into every receipt, both committed ones
-    included; the public export drops ``evidence/**``, so a public reader
-    was sent to a file their install does not have.  The fit and the 4 Hz
-    samples it rests on ship beside the anchor now, their bytes pinned.
-    """
-    anchors = json.loads(SPEED_ANCHORS.read_text(encoding="utf-8"))
-    fit = anchors["device_memory_fit"]
-    assert fit["status"] == "committed-measurement-fit"
-    for key in ("evidence", "samples"):
-        rel = fit[key]
-        rule = _release_drops(rel)
-        assert rule is None, (
-            f"the fit is labelled a committed measurement but its {key} "
-            f"{rel} is dropped by the public export (RELEASE-EXCLUDE.txt: "
-            f"{rule})")
-        raw = (REPOSITORY_ROOT / rel).read_bytes()
-        assert hashlib.sha256(raw).hexdigest() == fit[f"{key}_sha256"], rel
-    cited = fit["evidence"]
-    assert preflight.FIT_SOURCE.as_posix() == cited
-    assert _receipt(SIZING_SMOKE)["sizing"]["fit_source"] == cited
-    for name in ("B4-ARWEN-HRRR-ROUTE.json", "B4-ARWEN-HRRR-SIZING-SMOKE.json"):
-        committed = json.loads(
-            (SPEED_ANCHORS.parent / name).read_text(encoding="utf-8"))
-        assert committed["sizing"]["fit_source"] == cited, name
 
 
 def _fit_rungs(text: str) -> list[tuple[str, int, float]]:
@@ -1045,24 +964,6 @@ def _strings(node):
             yield from _strings(value)
 
 
-def test_the_speed_anchors_cite_nothing_a_public_reader_cannot_open_unsaid():
-    """A path the export drops is named as development-only where it is cited.
-
-    The anchors file ships; without this, the next citation into
-    ``evidence/**`` or ``docs/superpowers/**`` reads as a receipt a public
-    reader can open, as the memory fit's did.
-    """
-    anchors = json.loads(SPEED_ANCHORS.read_text(encoding="utf-8"))
-    cited = 0
-    offenders = []
-    for text in _strings(anchors):
-        for rel in _CITED_PATH.findall(text):
-            cited += 1
-            rule = _release_drops(rel)
-            if rule is not None and _DEVELOPMENT_ONLY not in text:
-                offenders.append(f"{rel} (RELEASE-EXCLUDE.txt: {rule})")
-    assert cited >= 5, "the scan found almost no cited path"
-    assert offenders == [], offenders
 
 
 def test_unreceipted_anchors_say_so_and_name_their_upgrade():

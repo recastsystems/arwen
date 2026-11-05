@@ -30,9 +30,8 @@ number without its conditions is a different claim.
 **Citations.** Every quantitative claim in this manual carries a bracketed source.
 Bare paths (`docs/public/PHYSICS.md`, `tests/test_run_stamp.py`) are repo-relative
 files in the `gpuwm` repository; tests are behavioral receipts held green by the
-suite. Paths prefixed `receipt:` are measurement reports delivered to
-`%USERPROFILE%\Downloads\`. Paths prefixed `gallery:` are evidence artifacts under
-`%USERPROFILE%\Downloads\evidence-gallery\`. A claim with no bracket is a definition
+suite. Paths prefixed `receipt:` name external measurement reports. Paths prefixed
+`gallery:` name external evidence artifacts. A claim with no bracket is a definition
 or a description of code behavior, not a measurement.
 
 **Figures.** Weather-field figures referenced here are existing artifacts of the real

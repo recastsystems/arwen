@@ -1,7 +1,7 @@
 """Per-card GPU pins: which committed capture describes THIS card.
 
 A bitwise pin of a GPU result is a property of the card as well as of the
-code.  Measured 2026-09-17 on node-1 (receipts under
+code.  Measured 2026-09-17 on a test host (receipts under
 tests/data/receipts/pin-gates/): the phase-2 step builders at one commit
 differ between an RTX 5070 Ti (compute capability 12.0) and an RTX 4090
 (8.9) in 25 of 27 entries, while an RTX 3080 (8.6) and the 4090 agree bit

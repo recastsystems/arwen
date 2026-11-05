@@ -727,7 +727,7 @@ def physics_components():
             settings.update(option.get("constraints", {}).get("required_settings", {}))
             # A conditional rule whose settings clause holds at the
             # registry's own defaults asks, of the option as offered, what
-            # a required setting asks: lane/282-namelist-tolerance moved the
+            # a required setting asks: development branch moved the
             # 1.5-order TKE closure's bl_pbl_physics = 0 out of
             # required_settings into a diff_opt = 2 rule, and without this
             # the option stopped carrying it, so choosing TKE on a PBL

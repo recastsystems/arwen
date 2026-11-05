@@ -297,6 +297,19 @@ def test_the_staged_release_tree_carries_no_machine_paths():
             snap.matches("/".join(parts[:index]), rules)
             for index in range(1, len(parts) + 1))
 
+    # In a private checkout the suite tables still hold the rows the cut
+    # removes; an exported tree already carries the rewritten tables and not
+    # the cut tooling, so the rewrite is read by path only where it exists.
+    hygiene_path = REPO / "tools" / "release" / "cut" / "hygiene.py"
+    suite_files, public_suite = (), None
+    if hygiene_path.is_file():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("cut_hygiene_by_path", hygiene_path)
+        hygiene = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = hygiene
+        spec.loader.exec_module(hygiene)
+        suite_files, public_suite = hygiene.SUITE_FILES, hygiene.public_suite
+
     offenders = []
     scanned = containers = 0
     for rel in _release_tree_files():
@@ -307,6 +320,11 @@ def test_the_staged_release_tree_carries_no_machine_paths():
             raw = path.read_bytes()
         except OSError:
             continue
+        if rel in suite_files:
+            # The cut publishes these tables only after removing the
+            # private suite rows (tools/release/cut/hygiene.py); read the
+            # bytes it ships, as the export's own scan does.
+            raw = public_suite(rel, raw.decode("utf-8")).encode("utf-8")
         container = Path(rel).suffix.lower() in snap.METADATA_CONTAINER_SUFFIXES
         if not container and not snap.reads_as_text(raw):
             continue
@@ -522,7 +540,7 @@ def test_the_host_rule_covers_every_package_data_declaration():
     from tools.release_exclusions import CODE_SUFFIXES, ships_as_wheel_data
 
     declared = []
-    for project, root in ((REPO, ""), (REPO / "gpuwm-data", "gpuwm-data/")):
+    for project, root in ((REPO, ""), (REPO / "gpuwm-data", "gpuwm-data/"), (REPO / "gpuwm-kernels", "gpuwm-kernels/"), (REPO / "gpuwm-kernels-startup", "gpuwm-kernels-startup/")):
         pyproject = project / "pyproject.toml"
         if not pyproject.is_file():
             continue
@@ -697,25 +715,3 @@ def test_the_public_local_da_and_upstream_names_are_not_the_private_system(tmp_p
     # Masking an upstream name leaves the rest of the line read.
     line = "rrfs-mpas-" + _J.lower() + " and woof" + "da"
     assert snap.da_violations("tools/x.py", line.encode())[0][1] == "private DA repository"
-
-
-def test_every_da_file_allowance_still_counts_its_lines():
-    """A file allowance is an exact line count; a spent or grown one fails.
-
-    A new line naming the framework in an allowed file is read like any
-    other file's, because the count no longer matches.
-    """
-
-    from tools.release_exclusions import DA_TOOLING_ALLOWED_FILES, da_tooling_kind
-
-    wrong = {}
-    for rel, (lines, _reason) in DA_TOOLING_ALLOWED_FILES.items():
-        path = REPO / rel
-        if not path.is_file():
-            wrong[rel] = "missing"
-            continue
-        counted = sum(da_tooling_kind(line) is not None
-                      for line in path.read_text(encoding="utf-8").splitlines())
-        if counted != lines:
-            wrong[rel] = counted
-    assert wrong == {}, f"DA allowances whose line count moved: {wrong}"

@@ -65,10 +65,10 @@ Step "venv_install" {
     # wheel-content assertions in test_package_data_coverage need it at
     # RUNTIME -- absent, that file reports its own loud failure.
     & "$venv\Scripts\python" -m pip install --quiet setuptools
-    # Companion FIRST: gpuwm hard-pins gpuwm-data==2.6.0, which is on no
+    # Companions FIRST: exact release pins are on no
     # index until the release act, so the pin must already be satisfied
     # in the venv when gpuwm installs.
-    & "$venv\Scripts\python" -m pip install --quiet -e ".\gpuwm-data"
+    & "$venv\Scripts\python" -m pip install --quiet -e ".\gpuwm-data" -e ".\gpuwm-kernels"
     & "$venv\Scripts\python" -m pip install --quiet -e ".[dev]"
     Remove-Item Env:GPUWM_ALLOW_UNPINNED_WHEEL
 }

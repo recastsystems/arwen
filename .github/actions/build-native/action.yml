@@ -1,5 +1,5 @@
 name: Build the native forecast tools
-description: Build the four shipped Rust workspaces from their offline dependency closure.
+description: Build the shipped Rust workspaces the integration tests run, from their offline dependency closure.
 runs:
   using: composite
   steps:
@@ -13,6 +13,6 @@ runs:
     - name: build the native tools used by the Python integration tests
       shell: bash
       run: |
-        for workspace in tools/grib1_bridge tools/rustwx tools/region_global_dealias tools/rw_wps; do
+        for workspace in tools/grib1_bridge tools/rustwx tools/region_global_dealias tools/rw_wps tools/wind-table; do
           (cd "$workspace" && cargo build --release --locked --offline)
         done

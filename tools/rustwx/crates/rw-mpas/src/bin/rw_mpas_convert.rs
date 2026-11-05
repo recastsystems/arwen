@@ -838,7 +838,6 @@ fn run() -> Result<(), String> {
     // footprint pass already holds every cell's spacing.
     let mesh_grid_label =
         rw_mpas::convert::grid_label(args.model_label.as_deref(), &footprint_spacing.spacing_metres);
-    // A caller's --grid-label names THIS picture instead (Drew, 2026-10-30: the
     // core picture of run_713c9e1913164e02 read `(hex 133-6.9 km)` under the
     // site's `Core zoom · 8 → 38 km`); `{spacing}` is the cells the window
     // samples, read after the footprint and boundary rings are marked so a

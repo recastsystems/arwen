@@ -135,6 +135,13 @@ def apply(*, environ: Any = None, driver: Any = None) -> dict[int, str]:
     mode = requested(environ)
     if mode == "auto":
         return {}
+    from gpuwm.gpu_smi import is_amd
+    if driver is None and is_amd():
+        from gpuwm.hip_runtime import wait_mode
+        result = wait_mode(mode)
+        with _lock:
+            _applied.update(result)
+        return result
     cu = driver if driver is not None else _load_driver()
     if cu is None:
         return {}

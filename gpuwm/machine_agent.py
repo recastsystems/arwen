@@ -235,18 +235,18 @@ def spawn(argv: list[str], *, cwd: Path, log: Path, env: dict | None = None) -> 
 def cards() -> dict:
     """The machine's NVIDIA cards and compute processes, from nvidia-smi."""
 
-    smi = shutil.which("nvidia-smi")
+    smi = __import__('gpuwm.gpu_smi', fromlist=['executable']).executable()
     if smi is None:
         return {"devices": [], "processes": [], "cuda_major": None,
                 "error": "nvidia-smi is not on this machine's PATH"}
     try:
         rows = subprocess.run(
-            [smi, "--query-gpu=index,name,memory.total,memory.used,driver_version",
+            [*__import__('gpuwm.gpu_smi', fromlist=['command']).command(), "--query-gpu=index,name,memory.total,memory.used,driver_version",
              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=20).stdout
         apps = subprocess.run(
-            [smi, "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
+            [*__import__('gpuwm.gpu_smi', fromlist=['command']).command(), "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=20).stdout
-        header = subprocess.run([smi], capture_output=True, text=True, timeout=20).stdout
+        header = subprocess.run(__import__('gpuwm.gpu_smi', fromlist=['command']).command(), capture_output=True, text=True, timeout=20).stdout
     except (OSError, subprocess.SubprocessError) as error:
         return {"devices": [], "processes": [], "cuda_major": None, "error": str(error)}
     devices = []

@@ -492,7 +492,7 @@ def test_hosted_validation_stages_declared_external_tables_before_testing(lane):
     assert stage == "python -m gpuwm.cli fetch-tables"
     test_command = ("python tools/battery/run_must_run_gates.py" if lane == "oracles"
                     else "python tools/battery/run_stage1.py")
-    install = 'python -m pip install -e ./gpuwm-data -e ".[dev]"'
+    install = 'python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]"'
     assert job.index(install) < job.index(stage) < job.index(test_command)
     assert job.index("uses: ./.github/actions/build-native") < job.index(stage)
 
@@ -532,7 +532,7 @@ def test_rust_tests_run_the_battery_manifest_without_in_tree_target_mutation():
     assert "cargo test --locked --offline" in _step_run("native", "region-global dealiasing tests")
     # The TUI's Rust tests call the installed CLI from their crate cwd.
     job = "\n".join(_job("native"))
-    install = 'python -m pip install -e ./gpuwm-data -e ".[dev]"'
+    install = 'python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]"'
     assert install in job
     assert job.index(install) < job.index("tools/battery/run_cargo_gates.py")
 
@@ -544,7 +544,7 @@ def test_self_hosted_gpu_runs_require_an_explicit_trusted_default_branch_dispatc
                      "vars.GPUWM_SELF_HOSTED_GPU == '1'", "github.event.repository.default_branch"):
         assert required in condition
     assert "python -m venv --system-site-packages" in job
-    assert '"$environment/bin/python" -m pip install -e ./gpuwm-data -e ".[dev]"' in job
+    assert '"$environment/bin/python" -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]"' in job
     readiness = _step_run("gpu", "the device is present before anything claims to have used it")
     assert "getDeviceCount() > 0" in readiness
     assert "_cuda_headers_check" in readiness and "c.status == 'verified'" in readiness

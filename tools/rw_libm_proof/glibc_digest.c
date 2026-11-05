@@ -4,7 +4,7 @@
  * library's outputs: glibc's own sinf, cosf, tanf, atanf, expf, logf,
  * log10f, powf and atan2f, and CORE-MATH's cr_asin / cr_acos for the
  * binary64 pair.  Run on a glibc 2.43 x86-64 machine with FMA (the WPS
- * oracle's platform), node-2, Ubuntu GLIBC 2.43-2ubuntu2.4:
+ * oracle's platform), a test host, Ubuntu GLIBC 2.43-2ubuntu2.4:
  *
  *   gcc -O2 -ffp-contract=off -fno-builtin glibc_digest.c
  *       $B/cref/nofma_asin.o $B/cref/nofma_acos.o -lm -o glibc_digest

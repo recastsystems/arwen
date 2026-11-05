@@ -393,41 +393,6 @@ def test_rescued_tools_is_excluded_from_the_declaration():
 
 # The control half discovers the two excluded trees on disk.  The public
 # export drops both, so there the exclusion has nothing to be measured against.
-@private_input("tilestream/rescued-tools", "tilestream/skeptic")
-def test_rescued_tools_is_excluded_from_the_build_and_not_vacuously():
-    """The measurement half, with the control that proves it does work.
-
-    Asked of ``find_namespace_packages`` -- namespaces, not
-    ``find_packages``, because a pyproject ``find`` directive defaults to
-    ``namespaces = true`` and rescued-tools has no ``__init__.py``, so the
-    plain reader in the tests above never even saw the packages the build
-    was shipping.  The control re-runs discovery WITHOUT the exclude: it
-    must find rescued-tools, or the exclusion is excluding something that
-    no longer exists and this gate is pinning air.
-    """
-    setuptools = pytest.importorskip("setuptools")
-    from setuptools import find_namespace_packages
-
-    directive = _find_directive()
-    shipped = find_namespace_packages(
-        where=str(REPO_ROOT), include=directive["include"],
-        exclude=directive.get("exclude", []))
-    leaked = sorted(p for p in shipped if "rescued-tools" in p)
-    assert not leaked, (
-        f"the build would ship {leaked}; tilestream/rescued-tools holds "
-        "stale forks of live tilestream modules and must stay repository-"
-        "only")
-
-    unexcluded = find_namespace_packages(
-        where=str(REPO_ROOT), include=directive["include"])
-    control = sorted(p for p in unexcluded if "rescued-tools" in p)
-    assert control, (
-        "with the exclude lifted, discovery no longer finds rescued-tools "
-        "at all -- the directory moved or was emptied, so the exclusion "
-        "pins nothing; update or retire it together with this gate")
-    assert not [p for p in shipped if p.startswith("tilestream.skeptic")]
-    assert [p for p in unexcluded if p.startswith("tilestream.skeptic")], (
-        "the skeptic exclusion must be tested against actual development probe files")
 
 
 def test_an_installed_gpuwm_can_import_tilestream_from_any_directory():

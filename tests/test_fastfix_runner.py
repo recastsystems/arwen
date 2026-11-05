@@ -149,7 +149,9 @@ def test_installed_checks_refuse_tracked_or_untracked_development_source(
 
 
 def _source_probe_environment(tmp_path, monkeypatch):
-    for name, directory in [("gpuwm", "gpuwm"), ("gpuwm_data", "gpuwm-data/gpuwm_data")]:
+    for name, directory in [("gpuwm", "gpuwm"), ("gpuwm_data", "gpuwm-data/gpuwm_data"),
+                            ("gpuwm_kernels", "gpuwm-kernels/gpuwm_kernels"),
+                            ("gpuwm_kernels_startup", "gpuwm-kernels-startup/gpuwm_kernels_startup")]:
         module = ModuleType(name)
         module.__file__ = str(tmp_path / directory / "__init__.py")
         monkeypatch.setitem(sys.modules, name, module)
@@ -158,7 +160,7 @@ def _source_probe_environment(tmp_path, monkeypatch):
     monkeypatch.setattr(importlib.metadata, "distributions", lambda: [])
 
 
-@pytest.mark.parametrize("name", ["gpuwm", "gpuwm_data"])
+@pytest.mark.parametrize("name", ["gpuwm", "gpuwm_data", "gpuwm_kernels", "gpuwm_kernels_startup"])
 def test_source_probe_refuses_either_package_from_another_checkout(
         tmp_path, monkeypatch, name):
     _source_probe_environment(tmp_path, monkeypatch)
@@ -167,7 +169,7 @@ def test_source_probe_refuses_either_package_from_another_checkout(
         exec(runner().SOURCE_PROBE, {})
 
 
-@pytest.mark.parametrize("name", ["gpuwm", "gpuwm-data"])
+@pytest.mark.parametrize("name", ["gpuwm", "gpuwm-data", "gpuwm-kernels", "gpuwm-kernels-startup"])
 def test_source_probe_refuses_either_packages_wrong_metadata(tmp_path, monkeypatch, name):
     _source_probe_environment(tmp_path, monkeypatch)
     monkeypatch.setattr(importlib.metadata, "version", lambda key: "0.0.1" if key == name else "2.7.0")
@@ -182,3 +184,4 @@ def test_source_probe_accepts_matching_origins_and_metadata(tmp_path, monkeypatc
     assert result["version"] == "2.7.0"
     assert Path(result["engine"]) == tmp_path / "gpuwm/__init__.py"
     assert Path(result["companion"]) == tmp_path / "gpuwm-data/gpuwm_data/__init__.py"
+    assert Path(result["kernels"]) == tmp_path / "gpuwm-kernels/gpuwm_kernels/__init__.py"

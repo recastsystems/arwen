@@ -2,7 +2,7 @@
   "command": "python tools/update_tui_license_notice.py (shared registry maintenance: tools/rustwx/VENDOR.md)",
   "locks": {
     "arwen-launchpad": "336137f01e326f7c8baa0cf75d2334a29fbae444e6f5ed0d731ce38094b07e13",
-    "arwen-tui": "ecac4c037cdf13c24445c509e91b175819c2ce0ad89e7a76eb72d4cff172fc81"
+    "arwen-tui": "802e5ef577aa6fada0d1d97a0df57443dc56d61c0055993045be7516996e7f4e"
   },
   "packages": [
     {

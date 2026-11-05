@@ -1,4 +1,4 @@
-//! rw-libm verification harness (run on node-2, glibc 2.43; verification.log).
+//! rw-libm verification harness (run on a test host, glibc 2.43; verification.log).
 //!
 //! Build: a binary crate with this file as src/main.rs, depending on
 //! `rw-libm = { path = ".../tools/rustwx/crates/rw-libm" }`, and a build.rs

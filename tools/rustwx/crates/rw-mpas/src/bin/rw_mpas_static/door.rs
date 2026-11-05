@@ -143,6 +143,7 @@ fn usage() -> String {
          --maxsnowalbedo-data MODIS|NCEP\n\
          --no-gwd        build the static stage separately from GWD\n\
          --no-noahmp     omit the optional Noah-MP geography pass\n\
+         --preserve-lake-mask  add tc_lakemask from the with-lakes MODIS archive\n\
          --native-init   emit the native init_atmosphere static stream\n\
          --namelist FILE native init_atmosphere static options; explicit flags override\n\
          THE OUTPUT\n\
@@ -462,6 +463,14 @@ pub fn run(argv: Vec<std::ffi::OsString>) -> ExitCode {
     if argv.iter().any(|a| a=="--no-gwd") {cfg.stages.gwd=false;}
     if argv.iter().any(|a| a=="--no-noahmp") {cfg.stages.noahmp=false;}
     cfg.stages.native_init |= argv.iter().any(|a| a=="--native-init");
+    if argv.iter().any(|a| a == "--preserve-lake-mask") {
+        if !cfg.stages.native_init || terrain_only {
+            eprintln!("--preserve-lake-mask requires the native static stream");
+            return ExitCode::from(2);
+        }
+        cfg.stages.lake_mask_geog = Some(rw_mpas::static_builder::resolve_geog_dataset_dir(
+            &geog, "modis_landuse_20class_30s_with_lakes"));
+    }
     if cfg.stages.native_init && cfg.stages.landuse_label.is_none() {
         // MPAS: mpas_init_atm_static.F:369-393. The driver supplies this
         // label independently of the geoindex's lowercased character data.

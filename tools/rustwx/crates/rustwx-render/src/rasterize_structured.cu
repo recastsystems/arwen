@@ -159,7 +159,6 @@ void rasterize_structured(
     out[pixel] = color;
 }
 
-// Robinson inverse helpers seeded from Drew's production CUDA renderer.
 __device__ const double INV_R_EARTH = 6370000.0;
 __device__ const double INV_DEG2RAD = 3.14159265358979323846264338327950288 / 180.0;
 __device__ const double INV_RAD2DEG = 180.0 / 3.14159265358979323846264338327950288;

@@ -4,7 +4,7 @@
 # Framing matters here. gfortran seeds random_number from OS entropy when
 # RANDOM_SEED is never called, and WRF's ideal case never calls it, so two
 # em_les runs of one configuration on one node with one binary are already
-# different realisations. That is proven, not assumed: on node-2 two
+# different realisations. That is proven, not assumed: on a test host two
 # identical-config runs differ by 4.27 percent in the entrainment minimum.
 # It is therefore IMPOSSIBLE to isolate a compiler-flag effect from
 # realisation noise with a single pair of runs.

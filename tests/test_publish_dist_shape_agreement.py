@@ -1,4 +1,4 @@
-"""Every publication phase uses one exact six-file distribution contract."""
+"""Every publication phase uses one exact eight-file distribution contract."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -34,7 +34,9 @@ def row(name):
 def manifest():
     names = [f"gpuwm-{VERSION}-py3-none-any.whl", f"gpuwm-{VERSION}-py3-none-manylinux_2_28_x86_64.whl",
              f"gpuwm-{VERSION}-py3-none-win_amd64.whl", f"gpuwm-{VERSION}.tar.gz",
-             f"gpuwm_data-{VERSION}-py3-none-any.whl", f"gpuwm_data-{VERSION}.tar.gz"]
+             f"gpuwm_data-{VERSION}-py3-none-any.whl", f"gpuwm_data-{VERSION}.tar.gz",
+             f"gpuwm_kernels-{VERSION}-py3-none-any.whl", f"gpuwm_kernels-{VERSION}.tar.gz",
+             f"gpuwm_kernels_startup-{VERSION}-py3-none-any.whl", f"gpuwm_kernels_startup-{VERSION}.tar.gz"]
     carried = [row("gpuwm-carried-physics-v9.8.6-v9.8.7.json"),
                row("gpuwm-carried-physics-v9.8.6-v9.8.7.verification.json")]
     return {"schema": "arwen.publication-assets.v1", "engine_source_revision": COMMIT,
@@ -50,11 +52,13 @@ def test_one_manifest_defines_the_engine_four_and_companion_pair(publication, ma
     plan = publication.load_manifest(manifest, TAG, COMMIT, REPOSITORY)
     assert len(plan["pypi"]["gpuwm"]) == 4
     assert len(plan["pypi"]["gpuwm-data"]) == 2
+    assert len(plan["pypi"]["gpuwm-kernels"]) == 2
+    assert len(plan["pypi"]["gpuwm-kernels-startup"]) == 2
     assert {row["filename"] for rows in plan["pypi"].values() for row in rows} == {
         row["filename"] for row in manifest["pypi"]["artifacts"]}
 
 
-@pytest.mark.parametrize("missing", range(6))
+@pytest.mark.parametrize("missing", range(10))
 def test_every_distribution_is_required_at_capture(publication, manifest, missing):
     manifest["pypi"]["artifacts"].pop(missing)
     with pytest.raises(publication.PublicationError, match="exactly"):
@@ -82,10 +86,11 @@ def test_native_and_universal_phases_are_disjoint_and_cover_the_engine(publicati
 
 
 @pytest.mark.parametrize("phase", ["native", "pure"])
-def test_companion_pair_cannot_use_an_engine_phase(publication, manifest, phase):
+@pytest.mark.parametrize("project", ["gpuwm-data", "gpuwm-kernels", "gpuwm-kernels-startup"])
+def test_companion_pair_cannot_use_an_engine_phase(publication, manifest, phase, project):
     plan = publication.load_manifest(manifest, TAG, COMMIT, REPOSITORY)
     with pytest.raises(publication.PublicationError, match="only engine"):
-        publication.phase_rows(plan["pypi"]["gpuwm-data"], "gpuwm-data", phase)
+        publication.phase_rows(plan["pypi"][project], project, phase)
 
 
 def command(steps, operation, project, phase):
@@ -105,22 +110,29 @@ def command(steps, operation, project, phase):
 
 def test_index_visibility_gates_companion_then_native_then_universal_uploads():
     workflow = yaml.safe_load((ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8"))
-    steps = workflow["jobs"]["publish"]["steps"]
-    phases = [("data", "gpuwm-data", "all", "all"), ("native", "gpuwm", "native", "native"),
-              ("pure", "gpuwm", "pure", "all")]
-    previous_wait = -1
-    for identifier, project, stage_phase, wait_phase in phases:
-        stage = command(steps, "stage-missing", project, stage_phase)
-        assert steps[stage]["id"] == identifier
-        uploads = [i for i, step in enumerate(steps)
-                   if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
-                   and step.get("if") == f"steps.{identifier}.outputs.upload_required == 'true'"]
-        assert len(uploads) == 1
-        wait = command(steps, "wait-index", project, wait_phase)
-        assert previous_wait < stage < uploads[0] < wait
-        assert "if" not in steps[wait], "a retry with no new uploads must still prove the complete index"
-        previous_wait = wait
-    assert len([step for step in steps if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")]) == 3
+    jobs = workflow["jobs"]
+    # gpuwm-kernels-startup publishes from its own job (environment pypi-startup), which
+    # publish needs: every companion is indexed before the first engine wheel uploads.
+    needs = jobs["publish"]["needs"]
+    assert "publish_startup" in ([needs] if isinstance(needs, str) else needs)
+    for job, phases in (("publish_startup", [("startup", "gpuwm-kernels-startup", "all", "all")]),
+                        ("publish", [("data", "gpuwm-data", "all", "all"), ("kernels", "gpuwm-kernels", "all", "all"),
+                                     ("native", "gpuwm", "native", "native"), ("pure", "gpuwm", "pure", "all")])):
+        steps = jobs[job]["steps"]
+        previous_wait = -1
+        for identifier, project, stage_phase, wait_phase in phases:
+            stage = command(steps, "stage-missing", project, stage_phase)
+            assert steps[stage]["id"] == identifier
+            uploads = [i for i, step in enumerate(steps)
+                       if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
+                       and step.get("if") == f"steps.{identifier}.outputs.upload_required == 'true'"]
+            assert len(uploads) == 1
+            wait = command(steps, "wait-index", project, wait_phase)
+            assert previous_wait < stage < uploads[0] < wait
+            assert "if" not in steps[wait], "a retry with no new uploads must still prove the complete index"
+            previous_wait = wait
+        assert len([step for step in steps
+                    if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")]) == len(phases)
 
 
 def test_native_index_gate_allows_missing_universal_files_but_rejects_foreign_bytes(publication, manifest):

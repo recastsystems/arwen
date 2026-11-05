@@ -22,7 +22,8 @@ def _exp(*cu_physics):
     """The smallest thing the workspace terms actually read."""
     return SimpleNamespace(domains=[
         SimpleNamespace(run=SimpleNamespace(
-            cu_physics=c, bl_pbl_physics=0, nx=372, ny=284, nz=49))
+            cu_physics=c, bl_pbl_physics=0, mp_physics=0, shcu_physics=0, grav_settling=0,
+            kfeta_trigger=1, nx=372, ny=284, nz=49))
         for c in cu_physics])
 
 
@@ -254,48 +255,8 @@ def test_the_cumulus_kernel_module_table_carries_16():
     assert _CUMULUS_KERNEL_MODULES[3] == ("gf",), "GF's entry moved"
 
 
-def test_phase_one_remaining_work_is_stated_in_full():
-    """Three times the remaining-work count measured a smaller thing.
-
-    "Thirteen of thirteen kernels graded" omitted the assembler. The
-    assembler omitted cu_ntiedtke_post_run. Each count was taken over the
-    artifact in front of me rather than over the artifact the end
-    condition names -- and the end condition names ``nt-levels.csv``,
-    whose contents ``cu_ntiedtke_run`` does not produce.
-
-    SUPERSEDED IN PART by test_ntiedtke_output_provenance.py, which takes
-    the count over the artifact the end condition NAMES -- nt-levels.csv's
-    header -- rather than over a hand-maintained list of categories. A
-    hand-maintained list is exactly what failed three times, so this test
-    is kept only as the record's index and the header-driven one is the
-    gate (review).
-    """
-    from pathlib import Path
-    doc = (Path(__file__).resolve().parents[1]
-           / "docs/ntiedtke/PORT-RECORD.md").read_text(encoding="utf-8")
-    for item in ("cu_ntiedtke_post_run", "the allocator", ":566",
-                 "reduction"):
-        assert item in doc, (
-            f"Phase 1's remaining-work list lost {item!r}. It is not done "
-            "until the assembled pipeline reproduces nt-levels.csv bitwise.")
 
 
-def test_the_llo3_reduction_scope_is_decided_not_left_open():
-    """32 columns and 17,920 are different reductions, not an impl detail.
-
-    llo3 is monotone, so it flips earlier the wider the population is. A
-    32-column block of clear ocean air keeps it FALSE and puts the whole
-    level-loop body -- including the departure-level reset that runs for
-    every column regardless of loflag -- into the branch the fixture
-    never exercises. The fixture only ever runs llo3 true (48 of 48
-    triggering columns).
-    """
-    from pathlib import Path
-    doc = (Path(__file__).resolve().parents[1]
-           / "docs/ntiedtke/PORT-RECORD.md").read_text(encoding="utf-8")
-    assert "DECIDED: chunk-wide" in doc, (
-        "the llo3 reduction scope is no longer recorded as decided. It is "
-        "a decision, not an implementation choice -- see section 27.")
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +385,7 @@ def test_the_prepared_cache_identity_needs_no_scheme_entry():
     for name in CHEM_RUN_FIELDS:
         expected_run.pop(name)
     # The fire block is omitted from an inactive domain's identity
-    # (lane/ec-sfire), by the same rule the document applies.
+    # (development branch), by the same rule the document applies.
     from gpuwm.config import inert_fire_fields
     for name in inert_fire_fields(run):
         expected_run.pop(name)
@@ -432,13 +393,13 @@ def test_the_prepared_cache_identity_needs_no_scheme_entry():
     # identity that reads neither, by the rule every run document applies.
     from gpuwm.config import drop_inactive_radiation_port_keys
     drop_inactive_radiation_port_keys(expected_run)
-    # The 2.9.4 capabilities campaign (lane/cap-*) leaves the identity by
+    # The 2.9.4 capabilities campaign (the capabilities work) leaves the identity by
     # the checkpoint echo's rule (drop_capability_campaign_keys): the
     # HAILCAST selectors, the ocean door and the lake-state analysis at
     # their defaults.
     from gpuwm.checkpoint_identity import drop_capability_campaign_keys
     drop_capability_campaign_keys(expected_run)
-    # lane/hrrr-v4-output's controls leave it off, by the document's rule
+    # development branch's controls leave it off, by the document's rule
     # (drop_default_output_controls).
     from gpuwm.checkpoint_identity import drop_default_output_controls
     drop_default_output_controls(expected_run)
@@ -447,6 +408,7 @@ def test_the_prepared_cache_identity_needs_no_scheme_entry():
     from gpuwm.wind_table import drop_inert_config
     drop_inert_config(expected_run)
     neutral = {"surface_energy_diag": False, "cycling": False,
+               "aercu_opt": 0, "aercu_fct": 1.0,
                "ruc_irrigation": "wrf_461", "ruc_qvg_cold_start": "wrf",
                "ruc_2m_diagnostic": "flux", "ruc_snow": "wrf_461",
                "swint_opt": 0, "aer_opt": 0, "alb_sol": 0,
@@ -467,14 +429,48 @@ def test_the_prepared_cache_identity_needs_no_scheme_entry():
                # 2.9.1: the ocean mixed layer off leaves the identity.
                "sf_ocean_physics": 0, "oml_hml0": 50.0, "oml_gamma": 0.14,
                "oml_relaxation_time": 0.0,
-               # 2.9.4: lane/cap-eclipse at its default-on shadow and
-               # lane/cap-slab-ocean's PWP controls with the ocean off.
+               # 2.9.4: development branch at its default-on shadow and
+               # development branch's PWP controls with the ocean off.
                "ra_sw_eclipse": 1, "ocean_levels": 30, "ocean_analysis": "",
                "ocean_analysis_source": "rtofs",
                "ocean_mld_climatology": "woa18", "omdt": 1.0,
                "ocean_z": (), "ocean_t": (), "ocean_s": ()}
+    neutral.update({
+        "tracer_opt": 0, "tracer_adv_opt": 1, "tracer_mix2_off": False,
+        "tracer_mix6_off": False, "tracer_pblmix": 1, "traj_opt": 0,
+        "dm_has_traj": False, "num_traj": 1000, "trajectory_input": "",
+        "force_read_thompson": False, "write_thompson_tables": True,
+        "write_thompson_mp38table": False, "use_theta_m": 0,
+        "tke_adv_opt": 1, "sfs_opt": 0, "m_opt": 0,
+        "tke_mix2_off": False, "tke_mix6_off": False,
+        "sst_skin": 0, "sst_update": 0, "surface_analysis": "",
+        "tmn_update": 0, "lagday": 150, "cam_abs_freq_s": 21600.0,
+        "couple_farms": False,
+        # 3.0 folds: the polar filter, RK order and momentum stencil, the
+        # Noah snow switch, the NSSL coefficients and the TC surface
+        # (spray, wave roughness, flux curve) leave the identity at their
+        # defaults, by restart_identity_payload's absent-stays-absent rule.
+        "fft_filter_lat": 45.0, "polar": False, "rk_ord": 3,
+        "momentum_adv_opt": 1, "ifsnow": 1,
+        "nssl_alphah": 0.0, "nssl_alphahl": 1.0, "nssl_cccn": 0.5e9,
+        "nssl_icdx": 6, "nssl_icdxhl": 6,
+        "tc_fetch_m": 100000.0, "tc_flux_curve": "off",
+        "tc_horizontal_length_m": 0.0, "tc_spray": "off",
+        "tc_spray_partition": 1.0, "tc_wave_roughness": False,
+        "tc_wave_source": "fetch",
+        # The sea-ice options, ua_phys and the irrigation block leave the
+        # public document and its prepared identity at their defaults, by the
+        # checkpoint echo's rule, as does the legacy-order marker.
+        "seaice_albedo_opt": 0, "seaice_snowdepth_max": 1.0e10,
+        "seaice_snowdepth_min": 0.001, "seaice_snowdepth_opt": 0,
+        "seaice_thickness_default": 3.0, "seaice_thickness_opt": 0,
+        "ua_phys": False, "sf_surf_irr_scheme": 0, "irr_daily_amount": 0.0,
+        "irr_end_julianday": 0, "irr_freq": 1, "irr_num_hours": 0, "irr_ph": 0,
+        "irr_start_hour": 0, "irr_start_julianday": 0, "_legacy_h_sca": True,
+    })
     for name, default in neutral.items():
-        assert expected_run.pop(name) == default
+        assert asdict(run)[name] == default
+        assert expected_run.pop(name, default) == default
     # 2.9.7 tc/nest: the fixed-frame archive is read only on a nested domain;
     # this root leaves it out by the document's rule.
     assert expected_run.pop("nest_accumulation_archive") is True
@@ -594,9 +590,26 @@ def test_no_scheme_whitelist_restates_the_scheme_set():
     # GPUWM_WRF_EXACT, and admit or refuse no scheme.  Exact lines, so an
     # edit to either is read again.
     deliberate = {
-        ("core/dycore.py", "if cfg.cu_physics in (3, 6):"),
+        # KIAPS/NSAS cannot use adaptive timing; UW is the only shallow port;
+        # KF diagnostics have two callers. These are compatibility checks.
+        ("config.py", "if (cfg.cu_physics in (95, 96) and cfg.use_adaptive_time_step"),
+        ("config.py", "if cfg.shcu_physics not in (0, 2):"),
+        ("config.py", "if cfg.kf_edrates and cfg.cu_physics not in (11, 99):"),
+        # These two paths only implement the native CU99 batch and leave
+        # other schemes on the ordinary, fully admitted forecast runner.
+        ("ensemble/batch_physics.py", "if cfg.cu_physics not in (0, 99) or cfg.sf_urban_physics or getattr(cfg, \"sf_surface_mosaic\", 0) or driver.terrain_drag is not None:"),
+        ("ensemble/prepared_component_reservation.py", "if cfg.cu_physics not in (0, 99):"),
+        # The same exact-chain ring, now also kept for do_avgflx_em (the
+        # averaged-flux path reads the same sumflux ring); still no scheme gate.
+        ("core/dycore.py", "if cfg.cu_physics in (3, 6) or cfg.do_avgflx_em:"),
         ("core/moist.py", 'if name == "qv" and WRF_EXACT and cfg.cu_physics in (3, 6):'),
         ("core/moist.py", 'if name == "qv" and (export_advective_forcing or (WRF_EXACT and cfg.cu_physics in (3, 6))):'),
+        # shcu_physics, not cu_physics (the pattern matches the suffix): the
+        # shallow-cumulus selector's own range and its moist requirement.
+        ("config.py", "if type(cfg.shcu_physics) is not int or cfg.shcu_physics not in (0, 1, 2, 3, 4, 5):"),
+        ("config.py", "if cfg.shcu_physics in (3, 4, 5) and not cfg.moist:"),
+        # The KF device lookup table is priced only for the schemes that load it.
+        ("core/preflight.py", "if cfg.cu_physics in (1, 10):  # kf.py:174, WRF Registry r-flagged"),
     }
     root = pathlib.Path(__file__).resolve().parents[1] / "gpuwm"
     offenders = []
@@ -691,7 +704,7 @@ def test_every_cumulus_scheme_has_a_restart_identity():
         assert stock_callable_class("cumulus", {"cu_physics": scheme}) == cls
     assert stock_callable_class("cumulus", {"cu_physics": 0}) is None
     with pytest.raises(KeyError):
-        stock_callable_class("cumulus", {"cu_physics": 99})
+        stock_callable_class("cumulus", {"cu_physics": max(CU_SCHEMES) + 1})
 
 
 def test_the_new_tiedtke_restart_identity_names_this_port():

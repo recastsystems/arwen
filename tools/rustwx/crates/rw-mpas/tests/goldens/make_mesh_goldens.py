@@ -1,7 +1,7 @@
 """Extract mesh goldens from the two published MPAS grid files.
 
 NOT SHIPPED CODE. This is a test harness, run once against the real NCAR-generated
-grid files on node-2. The artifacts it emits (*.rwg + *.json) are what the Rust test
+grid files on a test host. The artifacts it emits (*.rwg + *.json) are what the Rust test
 consumes; this script exists so the extraction is reproducible and reviewable.
 
 WHAT A GOLDEN IS HERE

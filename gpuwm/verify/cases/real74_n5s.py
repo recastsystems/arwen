@@ -479,6 +479,10 @@ def _first(raw: Mapping[str, np.ndarray], names: Sequence[str], *,
 def _restore_active_moisture(state, raw: Mapping[str, np.ndarray], cfg,
                              array_module) -> None:
     """Restore the scheme-native moisture fields and their RK ``*0`` copies."""
+    # The door owns MP21's native cold fill for stock 4.7.1 input. Keep
+    # this compatibility adapter from restoring its retired QNCCN refusal.
+    if _door._nssl_cold_start_optional_moisture(cfg):
+        return _door._restore_active_moisture(state, raw, cfg, array_module)
     # The QNCLOUD exemption is Morrison's alone (WRF diagnoses cloud number
     # there).  For mp=28 QNCLOUD is the prognostic droplet number the whole
     # scheme turns on, and a wrfinput without it must fail here rather than
@@ -518,7 +522,7 @@ def _restore_active_moisture(state, raw: Mapping[str, np.ndarray], cfg,
     # restored field is zeros and an empty reservoir shuts off pcact/ncact
     # activation -- the source term WDM6's double-moment warm rain is built
     # on.  Restore-then-reflood is the order both WRF writes run in.
-    if cfg is not None and int(cfg.mp_physics) == 16:
+    if cfg is not None and int(cfg.mp_physics) in (14, 16, 26):
         state.nn[...] = array_module.float32(cfg.wdm6_ccn_conc)
 
     # DomainState owns RK-beginning copies only for prognostic fields.  Sync

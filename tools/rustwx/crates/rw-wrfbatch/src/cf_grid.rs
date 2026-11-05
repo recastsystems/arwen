@@ -326,6 +326,22 @@ impl CfGrid {
             order,
         })
     }
+    /// Keep coordinates and field indices together across a requested map seam.
+    pub fn recenter(&mut self, center: f64) {
+        self.lat.par_chunks_mut(self.nx)
+            .zip(self.lon.par_chunks_mut(self.nx))
+            .zip(self.order.par_chunks_mut(self.nx))
+            .for_each(|((lat, lon), order)| {
+                for x in lon.iter_mut() {
+                    *x = ((*x as f64 - center + 180.).rem_euclid(360.) - 180. + center) as f32;
+                }
+                if let Some(k) = lon.windows(2).position(|p| p[1] - p[0] < -180.) {
+                    lat.rotate_left(k + 1);
+                    lon.rotate_left(k + 1);
+                    order.rotate_left(k + 1);
+                }
+            });
+    }
     pub fn field(&self, name: &str, rows: &[ProductRow]) -> Result<(Vec<f32>, ProductRow), String> {
         let var = self
             .file
@@ -489,13 +505,19 @@ mod tests {
         wr.write_var(v, VarData::F32(&[0., 1., 2., 3., 4., 5., 6., 7.]))
             .unwrap();
         wr.finish().unwrap();
-        let grid = CfGrid::open(&path, Some(moment("2024-09-25T00:00:00Z").unwrap())).unwrap();
+        let mut grid = CfGrid::open(&path, Some(moment("2024-09-25T00:00:00Z").unwrap())).unwrap();
         assert_eq!(&grid.lon[..4], &[-180., -90., 0., 90.]);
         assert_eq!(&grid.lat[..4], &[90.; 4]);
         assert_eq!(grid.source, "diagnostic producer");
         let (values, _) = grid.field("fg10m", &product_rows(None).unwrap()).unwrap();
         assert!((values[0] - 2. * 1.9438445).abs() < 1e-5);
         assert!((values[4] - 6. * 1.9438445).abs() < 1e-5);
+        grid.recenter(180.);
+        assert_eq!(&grid.lon[..4], &[0., 90., 180., 270.]);
+        let (values, _) = grid.field("fg10m", &product_rows(None).unwrap()).unwrap();
+        for (i, value) in values.iter().enumerate() {
+            assert!((*value - i as f32 * 1.9438445).abs() < 1e-5);
+        }
         std::fs::remove_file(path).unwrap();
     }
     #[test]

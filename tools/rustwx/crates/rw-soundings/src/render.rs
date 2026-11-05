@@ -1000,7 +1000,6 @@ impl egui_kittest::TestRenderer for CpuRenderer {
 }
 
 /// Patches every rendered window carries: the two ECAPE cells are blanked,
-/// always (Drew: never ECAPE).
 pub fn base_patches() -> Vec<sharppyrs::NativeDiagnosticPatch> {
     vec![
         sharppyrs::NativeDiagnosticPatch::blank(DiagnosticTablePanelKind::Severe, "severe.ecape"),

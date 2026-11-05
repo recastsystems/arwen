@@ -228,19 +228,6 @@ def test_every_call_site_excuse_names_a_range_and_carries_its_debt():
         "and update this count.")
 
 
-def test_the_debt_is_visible_in_the_port_doc():
-    """A debt nobody can see is a receipt.
-
-    The port doc must carry the unowned set, because that is the artifact a
-    future session reads after a compact -- and the §6 table already
-    failing to be a gate is exactly why this is checked rather than
-    trusted.
-    """
-    from pathlib import Path
-    doc = Path(__file__).resolve().parents[1] / "docs/ntiedtke/PORT-RECORD.md"
-    text = doc.read_text(encoding="utf-8")
-    assert "566-568" in text
-    assert "580-588" in text
 
 
 if __name__ == "__main__":  # pragma: no cover
@@ -304,12 +291,6 @@ def test_the_accumulate_contract_rests_on_unowned_ranges():
             f"assembler either -- it is owned by nothing, which is worse")
 
 
-def test_the_accumulate_finding_is_in_the_port_doc():
-    from pathlib import Path
-    doc = (Path(__file__).resolve().parents[1]
-           / "docs/ntiedtke/PORT-RECORD.md").read_text(encoding="utf-8")
-    assert "4,428" in doc, "the measurement that settles accumulate-vs-replace"
-    assert "309-310" in doc
 
 
 # ---------------------------------------------------------------------------

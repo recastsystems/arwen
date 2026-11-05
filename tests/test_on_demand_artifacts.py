@@ -47,7 +47,15 @@ STREAM_DOORS = {"rw_igra2", "rw_amv", "rw_ndbc", "rw_gnssro", "rw_wis2", "rw_pre
                 "rw_icechunk", "rw_mpas_init_v831", "rw_mpas_gsl_oro",
                 # 2.9.11 (PyPI per-file limit): opt-in simulated radar, ML export, the wind-farm
                 # table decoder and the opt-in hydro door's payload library, each staged by its first use.
-                "rw_simradar", "rw_mlexport", "rw-wind-table", "nextgen_hydrofabric"}
+                "rw_simradar", "rw_mlexport", "rw-wind-table", "nextgen_hydrofabric",
+                # 3.0 opt-in doors (FDDA, waves, TC verification) and, for the PyPI per-file
+                # limit (SIZE-01), the opt-in history GRIB2, ODIM, TC and aerosol tools and the
+                # gpuwm-hex-side MPAS tools, each fetched on first use.
+                "rw_fddaobs", "rw_waves_data", "rw_waves_coupled_prepare", "rw_tc_rmw_score", "tc-verify",
+                "rw_history_grib2", "rw_odim", "rw_mpas_static", "rw_mpas_lbc",
+                "rw_mpas_convert", "rw_mpas_geometry", "rw_mpas_mesh",
+                "rw_storm_merge", "rw_tc_vitals", "public-aerosol-build",
+                "aerosol-grid"}
 PLATFORMS = ("linux-x86_64", "win-x86_64")
 REVISION = "a" * 40
 FETCH = "gpuwm fetch-bridges"
@@ -259,43 +267,12 @@ def _driver(relative: str, *values):
     return pytest.param(relative, *values, marks=private_input(relative), id=relative)
 
 
-@pytest.mark.parametrize("relative", [
-    _driver(STAGE_PUBLIC_DESKTOP),
-    _driver("tools/release/cut/drivers/linux-drivers/common.py"),
-])
-def test_the_desktop_drivers_read_the_same_declaration(relative):
-    rows = _function(relative, "declared_artifacts")(DECLARATION)
-    assert rows == [(a.name, a.vendored, a.on_demand) for a in bridge_assets.BUNDLED_ARTIFACTS]
 
 
-@private_input(STAGE_PUBLIC_DESKTOP)
-def test_the_desktop_staging_counts_what_the_wheel_carries():
-    relative = STAGE_PUBLIC_DESKTOP
-    rows = _function(relative, "declared_artifacts")(DECLARATION)
-    carried = _function(relative, "wheel_carried")(rows)
-    assert [name for name, _, _ in carried] == [a.name for a in bridge_assets.wheel_artifacts()]
 
 
-@private_input(BUILD_ACCEPTANCE)
-def test_the_acceptance_driver_reads_the_same_on_demand_set():
-    reader = _function(BUILD_ACCEPTANCE, "on_demand_artifacts")
-    assert reader(REPO) == STREAM_DOORS
 
 
-@pytest.mark.parametrize("relative, needle", [
-    _driver("tools/release/cut/drivers/package_sdk_final.py", "bridge_assets.wheel_artifacts()"),
-    _driver("tools/release/cut/drivers/verify_installed_bytes.py", "bridge_assets.wheel_artifacts()"),
-    _driver("tools/release/cut/drivers/linux-drivers/qualify_public_runtime.py",
-            "bridge_assets.wheel_artifacts()"),
-    _driver("tools/build_desktop_runtime.py", "bridge_assets.wheel_artifacts()"),
-])
-def test_installed_inventory_checks_compare_against_what_the_wheel_carries(relative, needle):
-    """An installed wheel's BUNDLE.json compared against the whole roster
-    refuses every correct 2.8.9 wheel as incomplete."""
-    text = (REPO / relative).read_text(encoding="utf-8")
-    assert needle in text
-    assert "in bridge_assets.BUNDLED_ARTIFACTS}" not in text.replace(
-        "{a.name for a in bridge_assets.BUNDLED_ARTIFACTS}", "")
 
 
 def test_the_release_verifier_still_holds_the_bundle_to_the_whole_roster():

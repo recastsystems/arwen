@@ -1,6 +1,5 @@
 """The decision on the nowcast heating arm, from the score tables and the eye.
 
-The rule is the one in Downloads/STORMSCOPE-HEATING-2026-10-06/
 cases-and-scoring.md ("Decision rule"), with the arm letters of DESIGN.md:
 A is the control, C the nowcast-heated arm, E the oracle.  C is promoted
 only if every rule holds:

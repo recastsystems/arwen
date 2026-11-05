@@ -49,7 +49,7 @@ not establish prognostic sea ice, ice-sheet runoff or seasonal ocean skill.
 The installed duration-default path was then run for the complete same
 72 hours with `sf_ocean_physics` omitted. Preparation was regenerated from
 the cached GFS inputs to preserve the exact-TOML source-manifest binding
-(215.34 s, 170% CPU on V58). All 8,640 steps and 25 frames passed on the
+(215.34 s, 170% CPU on the test host). All 8,640 steps and 25 frames passed on the
 shared RTX 5090. Command wall was 599.078 s, model wall 588.922 s, sampled
 peak 4,702 MiB within the 8,192 MiB pool reservation. No products were
 duplicated in this second run. Its canonical final-state digest, covering

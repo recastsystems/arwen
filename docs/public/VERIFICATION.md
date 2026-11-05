@@ -486,8 +486,7 @@ with one exception:
   `namelists/`, `met_em/`, `static/` and `wrfout_reference/` subtrees.
   The bundle is third-party output of several gigabytes, is not
   redistributable, and there is no `gpuwm fetch` for it. Point
-  `GPUWM_REAL74_REFERENCE_BUNDLE` at a directory holding it, or place it
-  at `~/Downloads/WRF_1974_MP55_reference_bundle`. Without it the case
+  `GPUWM_REAL74_REFERENCE_BUNDLE` at a directory holding it. Without it the case
   refuses by name and says the same thing.
 
 The two LES tornado cases are the module half of a case whose other half

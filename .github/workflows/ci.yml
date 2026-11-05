@@ -4,7 +4,6 @@
 # tools/promote_prepared_release.py). cpu, native and oracles run on every push
 # and nightly and do not gate: the same batteries run locally before every
 # push, and their hosted repeat made each release wait about two hours
-# (Drew, 2026-10-20). A red there is a defect for the next release.
 # The manual GPU job requires a trusted default-branch dispatch and a staged
 # WRF reference bundle. An unrun GPU job is not evidence of device correctness.
 name: ci
@@ -76,7 +75,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: install matching editable packages from this checkout
-        run: python -m pip install -e ./gpuwm-data -e ".[dev]"
+        run: python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]"
       - name: import every module the wheel ships
         run: python -m tools.import_sweep
         env:
@@ -110,7 +109,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: install matching editable packages from this checkout
-        run: python -m pip install -e ./gpuwm-data -e ".[dev]" numpy==${{ matrix.numpy }}
+        run: python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]" numpy==${{ matrix.numpy }}
       - uses: ./.github/actions/build-native
         if: matrix.platform == 'linux'
       # Every staged table and static asset is pin-checked by rw_fetch (its
@@ -177,7 +176,7 @@ jobs:
       # The float32 build profile is measured by the MYNN oracle fingerprint;
       # dependency upgrades require another measured row, not wider ULP limits.
       - name: install matching editable packages from this checkout
-        run: python -m pip install -e ./gpuwm-data -e ".[dev]" numpy==${{ matrix.numpy }}
+        run: python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]" numpy==${{ matrix.numpy }}
       - uses: ./.github/actions/build-native
       - name: stage the declared external Thompson tables
         run: python -m gpuwm.cli fetch-tables
@@ -212,7 +211,7 @@ jobs:
           python-version: "3.11"
       # TUI Cargo tests invoke the real CLI using this same interpreter.
       - name: install matching editable packages from this checkout
-        run: python -m pip install -e ./gpuwm-data -e ".[dev]"
+        run: python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]"
       - name: use the release Rust toolchain
         run: |
           rustup toolchain install 1.94.0 --profile minimal
@@ -264,7 +263,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: install the declared Python reference profile
-        run: python -m pip install -e ./gpuwm-data -e ".[dev]" numpy==2.2.6
+        run: python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]" numpy==2.2.6
       - name: use the release Rust toolchain
         run: |
           rustup toolchain install 1.94.0 --profile minimal
@@ -300,7 +299,7 @@ jobs:
         run: |
           environment="$RUNNER_TEMP/gpuwm-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           python -m venv --system-site-packages "$environment"
-          "$environment/bin/python" -m pip install -e ./gpuwm-data -e ".[dev]"
+          "$environment/bin/python" -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]"
           echo "$environment/bin" >> "$GITHUB_PATH"
       - uses: ./.github/actions/build-native
       - name: the device is present before anything claims to have used it

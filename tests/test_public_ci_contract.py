@@ -362,7 +362,9 @@ def test_numeric_hosted_jobs_pin_the_measured_platform_numpy_profiles(ci, job):
     strategy = ci["jobs"][job]["strategy"]["matrix"]
     assert {item["os"]: item["numpy"] for item in strategy["include"]} == {
         "ubuntu-24.04": "2.4.6", "windows-2025": "2.2.6"}
-    assert 'python -m pip install -e ./gpuwm-data -e ".[dev]" numpy==${{ matrix.numpy }}' in _runs(ci["jobs"][job])
+    # Both kernel companions are pinned at the engine's own version, so the numeric jobs install them too.
+    assert ('python -m pip install -e ./gpuwm-data -e ./gpuwm-kernels -e ./gpuwm-kernels-startup -e ".[dev]" '
+            'numpy==${{ matrix.numpy }}') in _runs(ci["jobs"][job])
 
 
 def test_every_oracles_entry_exists():

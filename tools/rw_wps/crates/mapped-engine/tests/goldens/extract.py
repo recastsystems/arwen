@@ -150,7 +150,7 @@ def _masked_header_digests(
 
 #: How far apart two boxes' libm-dependent values may be and still be the
 #: same answer.  MEASURED 2026-08-20, same bytes, Windows desktop (UCRT)
-#: against weather-node-1 (glibc): at most 3 ULP -- 4.1e-16 relative -- on
+#: against a test host (glibc): at most 3 ULP -- 4.1e-16 relative -- on
 #: the three arrays the two ``exp``-based humidity derivations produce,
 #: with every non-transcendental array bit-identical.  1e-12 sits four
 #: orders above that measurement and eleven below any change of formula,

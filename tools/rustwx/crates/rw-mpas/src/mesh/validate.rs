@@ -859,7 +859,7 @@ pub fn validate(mesh: &MpasMesh, limits: Limits) -> MpasResult<MeshReport> {
     // ------------------------------------------------ the coordination floor
     //
     // THE BREAKAGE THIS PREVENTS, MEASURED (2026-08-26; gpuwm-hex
-    // tree/evidence/graded-blowup-20260826/, node-2 RTX 5090). Registered
+    // tree/evidence/graded-blowup-20260826/, a test host RTX 5090). Registered
     // mesh `v16.66.195630` was emitted through this very function carrying one
     // 4-coordinated cell -- 195615, at 33.74N 117.65W, put there by
     // `surgery`'s S2 insertion -- and every check above passed it, because the

@@ -236,7 +236,7 @@ runner's receipt and is filed, not done.
 ## 4. Ready to smoke
 
 Both venues were occupied when this was written (the 5090 by the LES P3 lane,
-node-1 by LES P1), so nothing below has been executed. Run in order.
+test host 1 by LES P1), so nothing below has been executed. Run in order.
 
 ### Venue A — the RTX 5090, ArWen sizing smoke at battery shape
 

@@ -41,7 +41,7 @@ from _card_pins import (PIN_DIR, REFERENCE_CARD, device_compute_capability,  # n
                         device_name)
 
 #: The capture is a property of the card as well as of the code.  Measured
-#: 2026-09-17 on node-1 (receipts under tests/data/receipts/pin-gates/):
+#: 2026-09-17 on a test host (receipts under tests/data/receipts/pin-gates/):
 #: the same builders at the same commit fc639c51f differ between an RTX
 #: 5070 Ti (compute capability 12.0) and an RTX 4090 (8.9) in 25 of 27
 #: entries, dry_flat/mup by 2.274e-02 on an rms of 1.081e+01, while an RTX

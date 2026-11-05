@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.9.12 (2026-11-03)
+
+New:
+- More WRF 4.7.1 options on the GPU, each opt-in: cumulus schemes (BMJ, multi-scale Kain-Fritsch, old SAS and `cu_physics = 99`), the CAM5 suite (MP11, CU7, SHCU2), more microphysics, PBL, surface-layer and land options, and dynamics options such as more advection orders, `momentum_adv_opt = 3` and `rk_ord = 2`.
+- Moist potential temperature (`use_theta_m = 1`), the SMS-3DTKE closure (`km_opt = 5`) and history-window averaged fluxes (`do_avgflx_em = 1`), opt-in.
+- Opt-in hurricane line: HAFS starts, storm merge, cyclone surface exchange and storm-following nests.
+- Opt-in ocean waves coupled to the forecast: wave growth, transport and ocean feedback.
+- SPPT and SKEB stochastic physics, written from the published method (opt-in).
+- Starts from RRFS v1, and from ECCC HRDPS and RDPS with GFS donors for deep soil and upper air.
+- 0-1, 0-2 and 0-3 km updraft helicity maxima in history and on maps.
+- Public monthly aerosol forcing from NASA MERRA-2 for the aerosol-aware cumulus options (opt-in).
+- An experimental AMD (ROCm/HIP) backend, opt-in with `--backend amd`. CUDA stays the default.
+- Lossless GRIB2 history export on latitude-longitude, Lambert, Mercator and polar stereographic grids.
+- An ensemble maximum map beside the mean, spread, probability and paintball maps.
+
+Changed:
+- hrrrv5 preparation and the after-forecast tail use every core; the history write went from 85.5 s to 64.5 s.
+- Fast nested runs on four cards: the nest step went from 77.6 s to 53.5 s.
+- Map drawing and comparison sheets use every core (CONUS maps at 24 threads: 23.4 s to 3.9 s), and comparison sheets read only the fields their products need.
+- Ensemble maps import only the fields they draw: 18 members by 5 frames went from 582.7 s to 27.2 s.
+- The RRFS static walk takes 5 s instead of 453 s, and terrain preparation walks neighbouring mesh cells together.
+- Memory preflight prices spectral nudging buffers and FFT workspaces.
+
+Fixed:
+- Resuming a forecast keeps the checkpoint's HAILCAST stone model.
+- 48 h runs with `--hydro on` publish again.
+- A square first slab no longer stops a forecast split across cards.
+- Composite reflectivity draws from REFC when the frame holds parameterised convection.
+- Mapped regions use the mesh's real coverage, and a region past the source's edge gets one plain message.
+- Classic and aerosol Thompson use the same fetched tables.
+- A crashed start no longer blocks the next start.
+- Initial MYJ and QNSE surface wind diagnostics match native WRF.
+- Derived maps (CAPE, SRH, STP and shear) carry the run's own header, with the right start and lead times.
+- Build-machine paths are kept out of release binaries, and pinned physics tables keep their bytes through the export.
+
 ## 2.9.11 (2026-10-30)
 
 New:
@@ -12,7 +47,6 @@ New:
 - `gpuwm go --wind-farms uswtdb|PATH` runs Fitch wind-farm drag and turbine TKE inside the GPU MYNN step (opt-in; WRF `windfarm_opt = 1` imports too), with turbine and farm power, hub wind and TKE-source history.
 - `gpuwm go --smoke-radiation on|off` selects smoke-aware radiation explicitly; omitted keeps the recipe's setting.
 - Simulated radar supports C- and X-band (TDWR and C/X agency radars) with finite-particle scattering, melting, Kdp and beam-integrated attenuation, from the CLI, the forecast's `[simulated_radar]` table and the Python API; S-band output is unchanged.
-- Ocean waves: automatic preparation from public GFS winds, GFS-Wave spectra, ETOPO 2022 and the NDBC buoy registry, buoy scoring, and wave maps (Hs, Tp, Dp, wind sea and swell) in the normal render tree.
 - `GPUWM_WRF_LIBMVEC=1` makes WRF's original Tiedtke cumulus (`cu_physics = 6`) take the libmvec `expf` in the columns WRF's stock gfortran `-O2 -ftree-vectorize` build vectorizes, so it matches that build word for word. Unset, cu6 is unchanged.
 - `hailcast_version` (per domain) selects the HAILCAST stone model: `wrf_39_noaa`, the default, is the one NOAA's operational HRRR v4 runs; `wrf_461` is WRF 4.6.1's. HAILCAST is a diagnostic, so the forecast itself is unchanged.
 
@@ -676,6 +710,7 @@ Fixed:
 ## 2.8.7 (2026-10-07)
 
 New:
+- The GFS nonlocal boundary layer (`bl_pbl_physics = 3`, Hong-Pan) runs on the card with its GFS surface layer (`sf_sfclay_physics = 3`), with strict native module replay and fast arithmetic by default.
 - GRIB2 export is back, rebuilt clean-room under Apache-2.0. `gpuwm export-grib2`, `gpuwm go --grib2`, `run_options.grib2` and `gpuwm render --grib2-out` run the new `rw_grib2export` by default. Every product is computed by the WOOF post-processor (`rw-post`) from one shared column state, on a GPU when one has room (`--post-device auto`, the default, which takes the CPU on a machine with no NVIDIA driver; `gpu` or `cpu` forces a device), and packed as WMO GRIB2 (complex packing with spatial differencing by default, `--packing simple`). The CPU and GPU paths write byte-identical files. On a 600 x 353 x 50 CONUS 9 km WOOF frame, 279 messages (57 surface, 222 pressure-level) took 6.6 s with one RTX 5090 and 12.1 s on 8 CPU threads, most of it reading the history; ecCodes decodes every message to within half a packing step, with the parameter and level codes the manifest lists and every grid point within 1.2e-5 degrees of the history's own XLAT/XLONG.
 - The catalog is `woof-post/v1`: shelter and surface fields, pressure levels (100 to 1000 hPa by 25 by default), sea-level pressure, MAPS sea-level pressure, precipitable water, surface-based, mixed-layer, most-unstable and best-180 CAPE and CIN, LCL height, storm motion, helicity, shear, STP, EHI, PBL height, gust, 80 m wind, freezing and isotherm levels, 10 m wind and total precipitation since the start. `manifest.json` names each field's method and its published source, the device each group ran on, and every omitted field with its reason. Composite and 1 km reflectivity, low, middle and high cloud, cloud base, top and ceiling, and visibility are written from the model's own cloud fraction when the history carries it, otherwise from a diagnosed one; visibility is always written: with the history's aerosol extinction where it has one, otherwise from the hydrometeors and a clear-air haze baseline, and the manifest says which. Grids are encoded on WRF's own 6,370,000 m sphere, so a decoder places every point where WOOF put it. `--definitions upp` is accepted for this release as an alias of `woof` and says so.
 - `export-grib2` keeps `--definitions renderer|arwen`, `--extrema-interval-seconds` and `--upp-control srw|rapr`, rebuilt on the new exporter. `--definitions renderer` (or `arwen`) computes the fields the product maps draw with the renderer's own diagnostics, so the GRIB2 numbers match the maps; every other field stays WOOF's. `--extrema-interval-seconds 3600` adds hourly maximum and minimum updraft helicity and maximum 10 m wind from the running extremes in the history, built from every frame inside each hour (a 15-minute history gives true hourly extremes) and omitted, with the reason, when the frames cannot build the window. `--upp-control rapr` writes composite reflectivity on level 10 as RAP and HRRR files do.
@@ -4169,7 +4204,7 @@ New:
   interior sum and the outer ring of cells the next interval needs, drops
   the field, and runs the frames in parallel. Same pair: 440 decodes, 56
   opens.
-- Measured on a real two-arm WRF pair from the pinned node-1 build, seven
+- Measured on a real two-arm WRF pair from the pinned a test host build, seven
   frames per domain per arm staged on the registered four-domain ladder,
   6.0 GB of history, cache warm: all 61 distances are bit-identical to the
   Python scorer, and the comparison costs 16.7 s against the reference's
@@ -8015,7 +8050,7 @@ history files unchanged.
 - **Fixed:** every refusal `python -m gpuwm.gfs_direct` makes now reaches
   you as one sentence and exit code **2** -- what the 20CRv3 door already
   costs for the same class of refusal -- instead of a traceback. That
-  covers the two node-8 tracebacks on this path: the physics scoping
+  covers the two a test host tracebacks on this path: the physics scoping
   above, and a manifest hash-bound to a namelist that was since
   re-pointed. The gates are untouched; only how they arrive is.
 

@@ -69,7 +69,7 @@ takes about 1.5 GB off any RAM ceiling
 ## 8.3 Launch-to-first-step and fetch
 
 Prep scaling (single domain, GFS, 6 h forcing, wizard defaults, warm caches,
-cold download, weather-node-1): 15 s at 0.14 M cells, 37 s at 4.39 M, 79 s at
+cold download, test host 1): 15 s at 0.14 M cells, 37 s at 4.39 M, 79 s at
 12.6 M, 100 s at the largest card-resident 16.8 M, 373 s at a tile-streamed
 41.6 M; 24 h forcing at mid size +68%; a 3-domain tree 61 s for 13.3 M cells;
 first run on a box +31 s flat [receipt:ARWEN-PRESIM-SCALING-2026-08-16.md].

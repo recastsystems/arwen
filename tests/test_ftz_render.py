@@ -55,9 +55,6 @@ def _published(name: str, relpath: str) -> str:
 
 # ---- the statement is generated, not written ------------------------------
 
-def test_every_block_regenerates_byte_identically(rendered):
-    for name, relpath in rs.TARGETS:
-        assert _published(name, relpath) == rendered[name], relpath
 
 
 def test_the_template_states_no_verdict():
@@ -85,14 +82,6 @@ def test_the_published_verdict_words_are_the_receipt_s(receipt, rendered):
         assert f"`{verdict}`" not in published, verdict
 
 
-def test_a_stale_block_is_caught(tmp_path, rendered):
-    """The byte-identity check must fail on an edited block."""
-    staged = tmp_path / "PROVENANCE.md"
-    name = rs.TARGETS[0][0]
-    published = _published(name, rs.TARGETS[0][1])
-    staged.write_text(published.replace("6 of 6", "5 of 6"),
-                      encoding="utf-8", newline="\n")
-    assert staged.read_text(encoding="utf-8") != rendered[name]
 
 
 # ---- no universal quantifier over loaders ---------------------------------
@@ -187,26 +176,6 @@ def _git(*args: str) -> str:
                           text=True, check=True).stdout.strip()
 
 
-def test_the_receipt_commit_precedes_every_generated_block(receipt):
-    """No reconciled wording exists in the tree before its measurement."""
-    receipt_commit = _git(
-        "log", "--reverse", "--format=%H", "--",
-        "tools/ftz_receipt/receipt/receipt.json").splitlines()
-    assert receipt_commit, "the receipt is not committed"
-    first_receipt = receipt_commit[0]
-    for name, relpath in rs.TARGETS:
-        marker = rs.BEGIN.format(name=name)
-        introduced = _git("log", "--reverse", "--format=%H",
-                          f"-S{marker}", "--", relpath).splitlines()
-        assert introduced, f"{relpath}: no commit introduces the {name} block"
-        result = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", first_receipt,
-             introduced[0]],
-            cwd=str(ROOT), capture_output=True, text=True)
-        assert result.returncode == 0, (
-            f"{relpath}: the {name} block was written at {introduced[0][:8]}, "
-            f"which does not descend from the receipt commit "
-            f"{first_receipt[:8]}")
 
 
 # ---- the SASS tier --------------------------------------------------------

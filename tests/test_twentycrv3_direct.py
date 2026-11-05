@@ -196,7 +196,7 @@ def test_filename_member_rejects_unexpected_pdt_member() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Front-door guidance (node-8 quartet): a refusal is a sentence, and the
+# Front-door guidance (test host 8 quartet): a refusal is a sentence, and the
 # route that ran end to end now says how to run the forecast.
 # ---------------------------------------------------------------------------
 
@@ -205,7 +205,7 @@ def test_the_wizard_default_toml_is_refused_in_a_sentence(tmp_path, capsys):
 
     `gpuwm domain --source era5` (the wizard default) emits a
     `[case_data]` table.  The native 20CRv3 front door does not read it,
-    and `experiment.build_experiment` says so -- but a node-8 pilot met
+    and `experiment.build_experiment` says so -- but a test host 8 pilot met
     that as a raw traceback with no route to a config that works.
     """
     from gpuwm import twentycrv3_wrf

@@ -4,7 +4,7 @@ These files are the reference outputs of WRF v4.8.0's fast spectral bin microphy
 
 ## How they were made
 
-Compiler: GNU Fortran (Ubuntu 15.2.0-16ubuntu1) 15.2.0 on weather-node-1 (Intel(R) Core(TM) Ultra 7 270K Plus), 2026-09-24T20:45:34Z, CPU only. The whole harness ran in 186 seconds.
+Compiler: GNU Fortran (Ubuntu 15.2.0-16ubuntu1) 15.2.0 on a test host (Intel(R) Core(TM) Ultra 7 270K Plus), 2026-09-24T20:45:34Z, CPU only. The whole harness ran in 186 seconds.
 
 Two builds are packed. O64 promotes every default real to float64 (`-cpp -DBUILD_SBM_FAST=1 -DIWORDSIZE=4 -ffree-form -ffree-line-length-none -O0 -ffp-contract=off -freal-4-real-8`) and is the tight gate for the float64 host. O32 is WRF as it runs (`-cpp -DBUILD_SBM_FAST=1 -DIWORDSIZE=4 -ffree-form -ffree-line-length-none -O0 -ffp-contract=off`) and is compared through an envelope. A third build at WRF's production optimisation (`-O2 -ftree-vectorize -funroll-loops`) is evidence only and is never gated.
 
@@ -108,7 +108,7 @@ Evidence only: the native build at WRF's production flags does not give the -O0 
 
 ## Reproduction on a second compiler
 
-The same harness was run under WSL Ubuntu 24.04 on the desktop (CPU only) with GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0. 134 of 134 raw streams, including the production-flag evidence build, came out byte-identical to the node-1 streams. This is recorded, not gated.
+The same harness was run under WSL Ubuntu 24.04 on the desktop (CPU only) with GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0. 134 of 134 raw streams, including the production-flag evidence build, came out byte-identical to the a test host streams. This is recorded, not gated.
 
 Total packed size: 18149071 bytes (limit 20971520).
 

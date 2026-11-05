@@ -61,6 +61,10 @@ VERSION = re.compile(r"^\d+\.\d+\.\d+$")
 DECLARATIONS = (
     ("pyproject.toml", re.compile(r'^version = "(\d+\.\d+\.\d+)"$', re.M), 1),
     ("pyproject.toml", re.compile(r'"gpuwm-data==(\d+\.\d+\.\d+)"'), 1),
+    ("pyproject.toml", re.compile(r'"gpuwm-kernels==(\d+\.\d+\.\d+)"'), 1),
+    ("pyproject.toml", re.compile(r'"gpuwm-kernels-startup==(\d+\.\d+\.\d+)"'), 1),
+    ("gpuwm-kernels-startup/gpuwm_kernels_startup/VERSION", re.compile(r"^(\d+\.\d+\.\d+)\s*$"), 1),
+    ("gpuwm-kernels/gpuwm_kernels/VERSION", re.compile(r"^(\d+\.\d+\.\d+)\s*$"), 1),
     ("gpuwm-data/gpuwm_data/VERSION", re.compile(r"^(\d+\.\d+\.\d+)\s*$"), 1),
     ("tools/arwen-tui/Cargo.toml", re.compile(r'^version = "(\d+\.\d+\.\d+)"$', re.M), 1),
     ("tools/arwen-tui/Cargo.lock", re.compile(r'name = "arwen-tui"\nversion = "(\d+\.\d+\.\d+)"'), 1),

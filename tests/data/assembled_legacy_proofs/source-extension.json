@@ -1,7 +1,7 @@
 {
   "schema": "measured-legacy-source-extension-v1",
   "baseline": "cd336e62d6e6b6312c9636e0fdfff84801909b6a",
-  "measured_tip": "5428796cb07a5ae063b25a06baa4e4db1867a677",
+  "measured_tip": "d67185fb551b20583d3eb2a586a532cbb8e11bbe",
   "sources": {
     "gpuwm/core/acoustic.py": {
       "before": {
@@ -9,8 +9,8 @@
         "sha256": "2552a40bdf24715e611f5500786a4636a7fb77daac45a6e2bc4b04d6f6ca3384"
       },
       "after": {
-        "bytes": 43575,
-        "sha256": "7010561c033e3f2d7f8cb6160b63fc9e5302c82d2bebef2b279127b86a5a178b"
+        "bytes": 46006,
+        "sha256": "4e66f42ec5849dafc441f7941c4ddbe4cc0495a5f238fd57c108915fb4ac0d57"
       }
     },
     "gpuwm/core/constants.py": {
@@ -29,8 +29,8 @@
         "sha256": "d4cc20c6a23c94f169228d19937724bb678b51b4e597495af09a1672ce8c263b"
       },
       "after": {
-        "bytes": 256619,
-        "sha256": "00f2a3e054ee45fbf06d06eeb8cfe7524c33a0d06e7eb94ff6504c2d3561d6b2"
+        "bytes": 280442,
+        "sha256": "6bdbaa49041bc1739659e556113c88bc170bbff7b1733c4edf8d3ac2d3267925"
       }
     },
     "gpuwm/core/kernels/__init__.py": {
@@ -39,8 +39,8 @@
         "sha256": "e44a76e72880e6cbacee4a3cf299ab7e1a0b418e737355b3b64bfd60358b67cc"
       },
       "after": {
-        "bytes": 56314,
-        "sha256": "24ef95f1370e2fb0b20d55e4d920d0389cac01c3011c3d8a4d1053375bda8749"
+        "bytes": 94037,
+        "sha256": "172c1e61edce2fd7f9cc948636fed13aaa9e870452a1d98a060573554c7d19ff"
       }
     },
     "gpuwm/wrf_exact.py": {
@@ -59,8 +59,8 @@
         "sha256": "78c42865a01763a13d0349321699913de51ba2465508900bbfc4c64794e61134"
       },
       "after": {
-        "bytes": 14069,
-        "sha256": "5929748d63f633f1dcb26c281e52664a41b0e47203b45aecb762cd84bd6833c9"
+        "bytes": 14299,
+        "sha256": "4246d1b1e1299b3f56711be94e3cb61f4b7b4bb6617856c5b5e1ce05f246911f"
       }
     },
     "gpuwm/verify/smallstep_vertical_oracle.py": {
@@ -81,6 +81,16 @@
       "after": {
         "bytes": 107771,
         "sha256": "223f21d4f97e5ae74bb3ade52d3a45d0c3538bdd711753fd428eaf7318b6cda0"
+      }
+    },
+    "gpuwm/core/kernels/smag2d.cu": {
+      "before": {
+        "bytes": 140826,
+        "sha256": "731d7f64e86af2d17344be7328fda2a3ecfd4f2e22371f6093128ca2f3192500"
+      },
+      "after": {
+        "bytes": 142041,
+        "sha256": "db91a5f9f8dd5def67cd7ae2fb1c8f8e887c20c1deb470cd8ab394ca4d01ede9"
       }
     }
   },
@@ -142,13 +152,18 @@
   },
   "loader_slimming_replay": {
     "receipt": "slimming-loader-source-replay.json",
-    "sha256": "0ba296dbf21751789e1883562dfc1b0e612736fa67456ae87f77f23d71ab119a"
+    "sha256": "1701e4b6d8068622f53189dae96e63a5414bb783e8eccc114b4eb076caca04c6"
   },
   "module_sources": {
     "acoustic": {
       "before": "22704608360351a64d84bbf90ed1574e8e62edb5b06f5deea85376d93fca5cf8",
       "after": "116d49b68cb6a5215f2303d13d9b9320fc38c72a01d21f5f2a68e8ad788b9e08",
       "source": "gpuwm/core/kernels/acoustic.cu"
+    },
+    "smag2d": {
+      "before": "e0ddc6075c1da84434eea66c55f39340e40a273c1080ae32578540a706b8e270",
+      "after": "7dec200c373ce4a01684df3dca4d3797b511bba4c50c0c71465f979a2fb380a2",
+      "source": "gpuwm/core/kernels/smag2d.cu"
     }
   }
 }

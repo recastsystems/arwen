@@ -1,7 +1,6 @@
 //! Lossless storage for the render-frame schema: the DEFAULT container of
 //! every frame `rw_mpas_convert` writes.
 //!
-//! Drew 2026-10-28: "Lossless compression is the default", and 2026-10-27:
 //! Regional and hex get features together. ArWen's history frames became
 //! lossless NetCDF-4 in gpuwm 2.9.10 (`netcdf_writer::Nc4Writer`); hex's map
 //! frames are written here by the same writer. Only the container changes:
@@ -243,6 +242,22 @@ impl RenderFrameWriter {
             }
             Self::Deflated(w) => w.slab(key, Some(record), values),
         }
+    }
+
+    /// Independent classic slabs have fixed offsets. Compressed slabs must
+    /// retain submission order because that order defines their file bytes.
+    pub fn put_float_records(&mut self, record: u64, slabs: &[(&str, Vec<f32>)]) -> MpasResult<()> {
+        match self {
+            Self::Classic(w) => {
+                let jobs: Vec<_> = slabs.iter().map(|(name, _)| (*name, Some(record))).collect();
+                w.put_parallel(&jobs, |i| Ok(rw_store::netcdf_classic::NcSlab::Borrowed(
+                    NcData::Floats(&slabs[i].1))))?;
+            }
+            Self::Deflated(w) => {
+                for (name, values) in slabs { w.slab(name, Some(record), NcData::Floats(values))?; }
+            }
+        }
+        Ok(())
     }
 
     pub fn put_record_text(&mut self, key: &str, record: u64, value: &str) -> MpasResult<()> {

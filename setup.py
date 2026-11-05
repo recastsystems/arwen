@@ -512,6 +512,36 @@ def is_development_module(package: str, module: str) -> bool:
 DECLARATION_ONLY_DATA_PACKAGES: tuple[str, ...] = ("docs",)
 
 
+@functools.lru_cache(maxsize=None)
+def verify_oracle_trees() -> tuple[str, ...]:
+    """``gpuwm.data_assets.VERIFY_ORACLE_TREES``, read without importing gpuwm."""
+
+    import ast
+
+    source = _HERE / "gpuwm" / "data_assets.py"
+    for node in ast.parse(source.read_text(encoding="utf-8")).body:
+        if (isinstance(node, ast.AnnAssign)
+                and getattr(node.target, "id", None) == "VERIFY_ORACLE_TREES"):
+            return tuple(ast.literal_eval(node.value))
+    raise SystemExit("gpuwm/data_assets.py declares no VERIFY_ORACLE_TREES")
+
+
+def is_verify_oracle_file(path: str) -> bool:
+    """Is ``path`` inside a verification-oracle tree the gpuwm-kernels companion ships?
+
+    pyproject's exclude-package-data drops these trees from the wheel for
+    files the ``gpuwm`` package-data glob finds, but MANIFEST.in keeps them
+    in the sdist, and a wheel built FROM that sdist sees them as manifest
+    files of the PEP 420 namespace packages under gpuwm/data (``namespaces =
+    true``), where a ``gpuwm`` key cannot reach.  Measured before this
+    filter: the wheel built from the sdist carried all 713 oracle files
+    again.  Filtering on the path covers every package they could land in.
+    """
+
+    posix = "/" + Path(path).as_posix().lstrip("/")
+    return any(f"/gpuwm/data/{tree}/" in posix for tree in verify_oracle_trees())
+
+
 class _OperationalBuildPy(_BuildPy):
     """Copies every module of a package into the wheel EXCEPT the probes."""
 
@@ -520,6 +550,10 @@ class _OperationalBuildPy(_BuildPy):
                 if not is_development_module(row[0], row[1])]
 
     def find_data_files(self, package, src_dir):  # noqa: D102
+        return [path for path in self._declared_data_files(package, src_dir)
+                if not is_verify_oracle_file(path)]
+
+    def _declared_data_files(self, package, src_dir):
         if package not in DECLARATION_ONLY_DATA_PACKAGES:
             return super().find_data_files(package, src_dir)
         manifest = self.manifest_files

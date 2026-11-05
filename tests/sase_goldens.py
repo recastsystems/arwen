@@ -20,7 +20,7 @@ pair rather than failing for the card and not the code.  Any toolchain
 change that shifts a card's digits must arrive as a deliberate re-pin,
 mirroring the CPU golden-pin policy.
 
-READING, 2026-09-18, node-1's RTX 4090 (compute capability 8.9, driver
+READING, 2026-09-18, a test host's RTX 4090 (compute capability 8.9, driver
 610.57.04, CUDA runtime 13020, cupy 14.2.0, NVRTC 13.3.33): the 5090 pair
 below fails the rtol 1e-9 gate there in ``f`` by rel 1.481e-08 (abs
 1.381e-08) while ``c_nu`` holds at rel 4.844e-10; the 4090's own pair,
@@ -31,10 +31,10 @@ tests/data/receipts/pin-gates/extra-pin-readings-221f66f14-run1.json.
 
 RE-RECORDED for A146, 2026-10-01: the 5090 pair was the sm_120 build of
 sase.cu, whose five constant divisions NVRTC compiled as reciprocal
-multiplies.  With them spelled ``__fdiv_rn`` node-2's RTX 5090 (driver
+multiplies.  With them spelled ``__fdiv_rn`` a test host's RTX 5090 (driver
 13.3, cupy 14.2.0, NVRTC 13.4.92) reads exactly the 4090's pair, rel
 1.845e-07 (c_nu) and 1.039e-08 (f) from the FP64 authority, in two
-processes and in each process's repeat call; node-4's RTX 5070 Ti (driver
+processes and in each process's repeat call; a test host's RTX 5070 Ti (driver
 13.2, same NVRTC), which had no pair, reads the same pair the same way.
 So the pair is no longer per card on any card recorded here; it stays
 keyed by card because a card nobody has read can still differ.

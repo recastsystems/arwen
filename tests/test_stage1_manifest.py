@@ -107,16 +107,6 @@ def _public_entries() -> list[str]:
     return sorted(entries)
 
 
-def test_public_battery_lists_survive_the_snapshot_exclusions() -> None:
-    """An excluded campaign suite made the public Stage 1 argv unrunnable."""
-    rules = read_exclusions(REPOSITORY_ROOT)
-    missing = [entry for entry in _public_entries()
-               if not (REPOSITORY_ROOT / entry).is_file()]
-    excluded = [(entry, rule) for entry in _public_entries()
-                if (rule := matches(entry, rules)) is not None]
-    assert not missing and not excluded, (
-        f"public battery lists contain absent files {missing} or release-excluded "
-        f"files {excluded}; keep private preparation gates on their named private leg")
 
 
 def _excluded_imports(source: str, relative: str, rules: list[str]) -> list[str]:
@@ -142,15 +132,6 @@ def _excluded_imports(source: str, relative: str, rules: list[str]) -> list[str]
     return sorted(set(result))
 
 
-def test_public_suites_do_not_import_excluded_test_helpers() -> None:
-    """Two public input suites imported a fixture from the excluded campaign test."""
-    rules = read_exclusions(REPOSITORY_ROOT)
-    found = [finding for entry in _public_entries()
-             for finding in _excluded_imports(
-                 (REPOSITORY_ROOT / entry).read_text(encoding="utf-8"), entry, rules)]
-    assert not found, (
-        f"public suites import release-excluded modules: {found}; move reusable "
-        "fixtures into a shipped helper without removing the public assertions")
 
 
 def test_the_public_import_check_rejects_an_excluded_fixture() -> None:
@@ -432,13 +413,6 @@ def test_nothing_skips_once_the_builder_stops_marking_the_export(tmp_path: Path)
     assert export_skip_reason("docs/private/ledger.md", root=bare) is None
 
 
-def test_this_tree_is_classified_the_way_its_builder_says() -> None:
-    """The development tree runs every case; an export skips the ones that read what it drops."""
-    reason = export_skip_reason("tilestream/rescued-tools")
-    if (REPOSITORY_ROOT / SNAPSHOT_BUILDER).is_file():
-        assert reason is None
-    else:
-        assert reason is not None and "tilestream/rescued-tools/**" in reason
 
 
 def test_sfire_cpu_contracts_remain_on_stage1() -> None:

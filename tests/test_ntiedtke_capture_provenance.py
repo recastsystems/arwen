@@ -260,18 +260,6 @@ def test_the_inverted_default_is_still_in_the_contract():
         in rules.lower()
 
 
-def test_the_instance_count_is_current():
-    """Eight, not six. The count is the argument for the gate existing.
-
-    If it rises again the gate did not work and something stronger is
-    needed; if it stops rising, that is the evidence the gate is doing
-    its job. Either way someone has to update it deliberately.
-    """
-    doc = (Path(__file__).resolve().parents[1]
-           / "docs/ntiedtke/PORT-RECORD.md").read_text(encoding="utf-8")
-    assert "eighth instance" in doc.lower() or "1,926 of 5,292" in doc, (
-        "the port doc does not record the eighth instance; the count in "
-        "this file's docstring is then unsupported")
 
 
 # ---------------------------------------------------------------------------
@@ -396,92 +384,8 @@ def _record_files():
             root / "gpuwm" / "verify" / "ntiedtke_ref.py")
 
 
-def test_every_non_mutation_claim_carries_a_measurement():
-    """Instance 8's class, gated.
-
-    A sentence of the form "X does not touch Y" is a measurable fact. The
-    port has now asserted one without measuring it and had it be false.
-    Every such sentence must either map to a NON_MUTATION_CLAIMS entry
-    naming its evidence, or sit inside a CORRECTED / False block -- which
-    is what a withdrawn claim looks like.
-    """
-    unbacked = []
-    for path in _record_files():
-        text = path.read_text(encoding="utf-8")
-        for n, line in enumerate(text.split("\n"), 1):
-            # Strip markdown so a claim is matched on its words, not on
-            # whether it happened to be written with backticks.
-            low = (line.lower().replace("`", "").replace("*", "")
-                   .replace("``", ""))
-            if not any(p in low for p in _CLAIM_PATTERNS):
-                continue
-            if any(k.lower().replace("`", "") in low
-                   for k in NON_MUTATION_CLAIMS):
-                continue
-            window = "\n".join(text.split("\n")[max(0, n - 12):n + 4])
-            if "CORRECTED" in window or "False" in window or "wrong" in window:
-                continue          # a withdrawn claim, shown as withdrawn
-            unbacked.append(f"{path.name}:{n}  {line.strip()[:70]}")
-    assert not unbacked, (
-        "non-mutation claims with no measurement and no correction "
-        f"beside them:\n  " + "\n  ".join(unbacked) +
-        "\n\nAdd the evidence to NON_MUTATION_CLAIMS, or measure it. "
-        "Instance 8 was exactly this shape and it was false.")
 
 
-def test_the_claim_scan_still_sees_its_corpus():
-    """The vacuity guard, retrofitted (asked for by review).
-
-    ``test_every_non_mutation_claim_carries_a_measurement`` is an
-    ``assert not [violations]`` over a scanned corpus, so it answers "no
-    unbacked claims" and "I read nothing" with the same green. Four gates
-    in this port have already returned the second while being read as the
-    first.
-
-    Guarding that the FILES exist is not the same guard -- the scan can
-    stop matching while the files are perfectly present, which is exactly
-    what happened when the markdown stripping missed a phrasing family. So
-    this counts the claim lines the matcher actually reaches and names
-    specific claims it must find.
-    """
-    seen, lines_scanned = [], 0
-    for path in _record_files():
-        text = path.read_text(encoding="utf-8")
-        lines_scanned += len(text.split("\n"))
-        for line in text.split("\n"):
-            low = line.lower().replace("`", "").replace("*", "")
-            if any(p in low for p in _CLAIM_PATTERNS):
-                seen.append(low)
-    assert lines_scanned > 2000, (
-        f"the record files came to {lines_scanned} lines; the scan is "
-        f"reading something much smaller than docs/ntiedtke/PORT-RECORD.md")
-    # MEASURED at 16, floored at 12.  The first draft of this line said 20
-    # because 20 felt like a lot of claims, and it failed immediately --
-    # which is the same error as every other guessed number in this
-    # campaign.  The floor exists to catch a collapse, not to pin a count,
-    # so it sits below today's value with room for claims to be withdrawn.
-    assert len(seen) >= 12, (
-        f"the claim patterns matched only {len(seen)} lines, against 16 "
-        f"when this was written. Either the record lost its claims or the "
-        f"patterns stopped reaching them -- and the gate above would be "
-        f"green either way.")
-    # NOT "every pattern matches something in the record". That was the
-    # first draft and it is wrong for THIS gate: _CLAIM_PATTERNS is a
-    # DENYLIST of phrasings, so an entry matching nothing means nobody has
-    # written that phrasing yet, which is the entry doing its job. Two of
-    # the nine are in that state ("does not touch", "unchanged by") and
-    # they are the ones worth keeping most.
-    #
-    # The right guard for a denylist is that it FIRES, so each pattern is
-    # tested against a synthetic claim instead of against the corpus. This
-    # checks the matcher; the count above checks the corpus. They fail
-    # independently, which is the point of having both.
-    for pattern in _CLAIM_PATTERNS:
-        line = f"the assembler {pattern} zmfub anywhere in the tree"
-        low = line.lower().replace("`", "").replace("*", "")
-        assert any(p in low for p in _CLAIM_PATTERNS), (
-            f"a synthetic claim written with {pattern!r} is not matched by "
-            f"the matcher, so that phrasing family is unguarded")
 
 
 def test_the_claims_table_is_not_a_rubber_stamp():

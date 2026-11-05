@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gpuwm"
-version = "2.9.11"
+version = "2.9.12"
 description = "Native WRF preprocessing and GPU-native limited-area weather modeling"
 readme = "README.md"
 # The SPDX expression (PEP 639), not `{ file = "LICENSE" }`: the file
@@ -148,7 +148,7 @@ requires-python = ">=3.11"
 dependencies = ["numpy>=2.0", "netCDF4>=1.6", "matplotlib>=3.8",
                 "jsonschema>=4.0", "threadpoolctl>=3.1",
                 "scipy>=1.11", "pyshp>=2.3", "cdsapi>=0.7.7", "psutil>=5.9",
-                "gpuwm-data==2.9.11"]
+                "gpuwm-data==2.9.12", "gpuwm-kernels==2.9.12", "gpuwm-kernels-startup==2.9.12"]
 keywords = ["WRF", "WPS", "GRIB", "NetCDF", "weather", "CUDA"]
 # No `License ::` classifier: PEP 639 deprecates them outright and
 # setuptools >=77 refuses to combine one with the SPDX expression above.
@@ -225,6 +225,8 @@ Changelog = "https://github.com/FahrenheitResearch/arwen/blob/main/CHANGELOG.md"
 # and sit in exactly the broken state this line closes.
 gpu-cu12 = ["cupy-cuda12x[ctk]>=14.0"]
 gpu-cu13 = ["cupy-cuda13x[ctk]>=14.0"]
+# Experimental AMD backend; ROCm 7.0 wheel, see docs/amd-backend.md.
+rocm = ['cupy-rocm-7-0==14.2.0; sys_platform == "linux" and platform_machine == "x86_64"']
 gpu = ["gpuwm[gpu-cu12]"]
 # gpuwm render's mandated science core: derived quantities come from the
 # wrf package (pip distribution wrf-rust).  A RANGE, not an exact pin:
@@ -556,7 +558,7 @@ include = ["gpuwm", "gpuwm.*", "tools", "tilestream*", "configs*", "docs", "mpas
 # form, and a partial copy is worse than either whole answer: see the
 # measurement above and MANIFEST.in, which prunes the same directory out
 # of the sdist for the same reason.
-exclude = ["tilestream.rescued-tools*", "tilestream.skeptic*", "gpuwm-data*"]
+exclude = ["tilestream.rescued-tools*", "tilestream.skeptic*", "gpuwm-data*", "gpuwm-kernels*"]
 
 # Recursive globs, never an enumeration of filenames. The previous per-directory
 # enumeration had drifted 52 files behind the tree -- including parameter tables
@@ -566,11 +568,16 @@ exclude = ["tilestream.rescued-tools*", "tilestream.skeptic*", "gpuwm-data*"]
 # is both correct and incapable of going stale.
 # tests/test_package_data_coverage.py fails if any file lands outside these.
 [tool.setuptools.package-data]
-"gpuwm.spectral_nudging" = ["*.cu", "WRF-NOTICE.txt"]
-"gpuwm.ocean.waves" = ["*.cu", "*.json", "*.md", "native/*.rs", "native/*.sh", "native/NETCDF-COPYRIGHT", "examples/*.json"]
+"gpuwm.backend" = ["*.md"]
+"gpuwm.fddaobs" = ["*.cu", "WRF-NOTICE.txt"]
+"gpuwm.spectral_nudging" = ["*.cu", "*.json", "WRF-NOTICE.txt"]
+"gpuwm.ocean.waves" = ["*.cu", "*.json", "*.md", "backends/*.cu", "backends/*.md", "native/*.rs", "native/*.sh", "native/NETCDF-COPYRIGHT", "examples/*.json"]
 "gpuwm.ocean.waves.data" = ["*.json", "*.md"]
+"gpuwm.ocean.waves.validation" = ["*.json", "*.md"]
 "gpuwm.ocean.surge" = ["kernels/*.cu", "examples/*.json", "examples/*.py", "*.md", "tests/*.c"]
 "gpuwm.ocean.seaice" = ["*.cu", "README.md"]
+# The hurricane line (3.0, opt-in): its method notes ship beside the code.
+"gpuwm.tc" = ["*.md"]
 # Every hydro kernel (t-route Muskingum-Cunge and the runoff replay) with the
 # upstream notices beside them.
 "gpuwm.hydro" = ["kernels/*.cu", "kernels/t-route-LICENSE.txt", "kernels/t-route-TERMS.txt"]
@@ -578,9 +585,15 @@ exclude = ["tilestream.rescued-tools*", "tilestream.skeptic*", "gpuwm-data*"]
 # host, and its page.
 "gpuwm.native_step" = ["*.c", "README.md"]
 gpuwm = [
+    "hip_portable.h",
+    "hip_driver.cpp",
     "*.json",
+    "knobs/families/*.toml",
+    "knobs/WRF-NOTICE.txt",
+    "knobs/native_wrf461.json",
     "hydro/*.json",
     "ocean/*.json",
+    "ocean/*.md",
     "timeline/*.json",
     "authorities/**/*",
     "data/**/*",
@@ -619,7 +632,9 @@ gpuwm = [
 # tests/test_kernel_source_freeze_per_module.py, so an in-file comment
 # header would move a frozen digest.  The notice sits beside them instead,
 # and this glob is what puts it in the wheel.
-"gpuwm.core.kernels" = ["**/*.cu", "**/*.cuh", "*.cpp", "LICENSE-third-party.txt", "**/NOTICE-*.txt"]
+# CAM's generated column ABI is read by the installed allocation/preflight path.
+"gpuwm.core" = ["*.json"]
+"gpuwm.core.kernels" = ["**/*.cu", "**/*.cuh", "**/*.cpp", "**/*.json", "LICENSE-third-party.txt", "**/NOTICE-*.txt"]
 # Resident Noah-OWP kernels, their field layout, and upstream redistribution notices.
 "gpuwm.hydro.noahowp" = ["*.cu", "schema.json", "LICENSE", "UPSTREAM-TERMS.md", "NOTICE", "parameters/*.TBL"]
 "gpuwm.ocean.mixed_layer" = ["*.cu", "*.md", "WRF-NOTICE.txt"]
@@ -631,7 +646,7 @@ gpuwm = [
 # The FTZ claim census is a shipped register, not a development artifact: a
 # reader who installs the wheel and finds an FTZ sentence in the docs needs
 # the record that says which measured cell backs it.
-"gpuwm.verify" = ["*.json"]
+"gpuwm.verify" = ["*.json", "*.cpp"]
 # The capsule schema ships with the code that emits against it: a capsule a
 # reader cannot validate is a receipt they have to take on trust.
 "gpuwm.certify" = ["*.json"]
@@ -672,8 +687,9 @@ configs = ["**/*"]
 # exactly this file, and no sibling.
 docs = ["mpas-seam.md"]
 
-# NOTHING is excluded from this wheel any more, and the empty table is the
-# statement.  Both exclusion classes named files under `gpuwm/data/rrtmgp`
+# Through 2.9.x NOTHING was excluded from this wheel, and an empty table was
+# the statement; 3.0.0 adds exactly one class, the verification oracles
+# (see the entry below).  Both exclusion classes named files under `gpuwm/data/rrtmgp`
 # and `gpuwm/data/thompson/tables`, and BOTH DIRECTORIES MOVED: since 2.5.0
 # they ship in the `gpuwm-data` companion distribution (gpuwm-data/), whose
 # pyproject.toml carries the two lists verbatim, for the same two reasons,
@@ -709,7 +725,42 @@ docs = ["mpas-seam.md"]
 # for it without also flipping
 # thompson_aerosol_contract.AEROSOL_ASSET_REDISTRIBUTED back.
 [tool.setuptools.exclude-package-data]
-gpuwm = []
+# 3.0.0: the verification oracles (gpuwm.data_assets.VERIFY_ORACLE_TREES) ship
+# in the gpuwm-kernels companion, copied in by gpuwm-kernels/setup.py from this
+# same tree.  This wheel measured 109,246,370 bytes against the release's
+# 100,000,000-byte per-file gate with them; gpuwm-data had 1.37 MB of room.
+# The forecast reads none of them (ruc/oracle and urban/oracle, which it does
+# read, stay here).  One entry per tree, in VERIFY_ORACLE_TREES order;
+# tests/test_package_data_coverage.py pins the two lists equal.  fnmatch's `*`
+# crosses `/`, so each entry covers its whole tree.  MANIFEST.in keeps them in
+# the sdist (this table would otherwise drop them there too).
+gpuwm = [
+    "data/fogdes/oracle/*",
+    "data/gbmpbl/oracle/*",
+    "data/gecros/oracle/*",
+    "data/gfs_pbl/oracle/*",
+    "data/keps/oracle/*",
+    "data/lake/oracle/*",
+    "data/mrf/oracle/*",
+    "data/mynn/oracle/*",
+    "data/noah/oracle/*",
+    "data/noah/seaice_oracle/*",
+    "data/noah/ua_oracle/*",
+    "data/nssl2/driver-oracle/*",
+    "data/nssl2/fused-gs-oracle/*",
+    "data/nssl2/oracle/*",
+    "data/pxlsm/oracle/*",
+    "data/pxsfclay/oracle/*",
+    "data/ruc/oracle_fork/*",
+    "data/ruc/spp_oracle/*",
+    "data/sbu_ylin/oracle/*",
+    "data/shinhong/oracle/*",
+    "data/terrain_drag/oracle/*",
+    "data/thompson/oracle/*",
+    "data/thompson/oracle-aero/*",
+    "data/thompson/oracle-hail/*",
+    "data/ysu/oracle/*",
+]
 
 [tool.pytest.ini_options]
 markers = ["gpu: requires a CUDA GPU + cupy",

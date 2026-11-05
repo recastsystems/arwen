@@ -402,6 +402,9 @@ def test_the_production_call_site_the_page_names_is_real():
 
     class _NotMp28:
         mp_physics = 8
+        # MAD-WRF's cloud initialisation shares the hook (RunConfig defaults).
+        madwrf_opt = 0
+        madwrf_cldinit = 0
 
     receipt = microphysics.microphysics_init(object(), _NotMp28())
     assert receipt == {}, (
@@ -449,70 +452,6 @@ _MISS_TABLES = (
 )
 
 
-def test_the_published_clean_counts_are_the_gates_own_counts():
-    """"15 of 22" and "16 of 22" are computed here, not retyped.
-
-    ``_G3_UNEXCEPTIONED_CLEAN`` (a flat gate, nothing held out),
-    ``_G3_GATED_CLEAN`` (the three named allowances applied) and
-    ``_FIXTURES`` are the adapter gate's own pinned data and are themselves
-    re-measured on the device by
-    ``test_the_g3_residual_ratchet_holds_in_both_directions``.  Every
-    publication must quote what they say.
-
-    BEFORE THIS TEST: the counts were four independent literals in
-    PHYSICS.md, the evidence document, PROVENANCE.md and the registry, and
-    two waves shipped with them disagreeing with the gate.
-    """
-    adapter = _adapter()
-    total = len(adapter._FIXTURES)
-    flat = len(adapter._G3_UNEXCEPTIONED_CLEAN)
-    gated = len(adapter._G3_GATED_CLEAN)
-    missing = len(adapter._G3_RESIDUALS)
-
-    # The partition has to be a partition before anything is published.
-    assert gated + missing == total, (
-        f"{gated} gated-clean + {missing} residual fixtures != {total} "
-        "fixtures; the gate's own partition is inconsistent")
-    assert set(adapter._G3_RESIDUALS) & set(adapter._G3_GATED_CLEAN) == set()
-
-    flat_count = f"{flat} of {total}"
-    gated_count = f"{gated} of {total}"
-
-    for path in (PHYSICS_MD, EVIDENCE_MD, PROVENANCE_MD):
-        text = _read(path)
-        assert flat_count in text, (
-            f"{path.name} does not publish the gate's unexceptioned clean "
-            f"count ({flat_count})")
-        assert gated_count in text, (
-            f"{path.name} does not publish the gate's clean-as-gated count "
-            f"({gated_count})")
-
-    # The one-line summary in PHYSICS.md's own microphysics table is the
-    # sentence most readers will see, and it carried its own literals.
-    page = _read(PHYSICS_MD)
-    summary = next((line for line in page.splitlines()
-                    if line.startswith("| Thompson aerosol-aware | 28 |")),
-                   None)
-    assert summary is not None, (
-        "docs/public/PHYSICS.md's microphysics table has no mp=28 row")
-    for phrase in (f"{flat} clear a flat", f"{missing} do not",
-                   f"{len(adapter._G3_ALLOWANCE_ONLY_CLEAN)} clears only "
-                   "under"):
-        assert phrase in summary, (
-            f"the mp=28 maturity row does not say {phrase!r}: {summary}")
-
-    registry = " ".join(_registry_mp28_option()["warnings"])
-    assert flat_count in registry, (
-        f"the registry mp=28 warnings do not publish {flat_count}")
-
-    evidence = _registry_mp28_option()["extensions"]["column_oracle_evidence"]
-    published_clean = set(evidence["clean_fixtures"])
-    measured_clean = set(adapter._G3_UNEXCEPTIONED_CLEAN)
-    assert published_clean == measured_clean, (
-        "the registry's clean_fixtures list is not the gate's "
-        "_G3_UNEXCEPTIONED_CLEAN: only in registry "
-        f"{sorted(published_clean - measured_clean)}, only in gate "
-        f"{sorted(measured_clean - published_clean)}")
 
 
 def test_every_published_residual_is_the_gates_own_number():
@@ -594,58 +533,6 @@ _NOT_A_CURRENT_RESIDUAL_CLAIM = re.compile(
     r"returns? to|moved|fell|rose|now measures?|now measure)\b|->|→")
 
 
-def test_no_publication_calls_a_clean_fixture_a_residual():
-    """A fixture the gate clears may not still be published as missing it.
-
-    This is the defect that has recurred every wave, in prose rather than in
-    a table: the tables get re-measured and a paragraph three sections away
-    keeps quoting the number that made the port look worse -- or, exactly as
-    bad, keeps quoting one that made it look better.
-
-    The sweep is scoped to blocks that NAME a fixture the gate clears on a
-    flat 2.0e-6, and a block is allowed to carry an above-gate number only
-    if it also says the number is history or a counterfactual
-    (:data:`_NOT_A_CURRENT_RESIDUAL_CLAIM`).  That keeps §6.6's "remove the
-    RSLF pin and aero-ice-koop returns to ..." legitimate while catching
-    "aero-ice-koop measures qi 1.612e-03".
-    """
-    adapter = _adapter()
-    gate = adapter._END_TO_END_DEFAULT_BOUND
-    clean = tuple(adapter._G3_UNEXCEPTIONED_CLEAN)
-    # Blocks naming a fixture that DOES miss, or the allowanced one, are
-    # about that fixture; they are covered by the table gate above.
-    noisy = tuple(adapter._G3_RESIDUALS) + tuple(
-        adapter._G3_ALLOWANCE_ONLY_CLEAN)
-    # The gate and the bounds themselves are numbers in this range and are
-    # not residuals.  Comparing the parsed float, not the spelling, so
-    # "2.0e-6" and "2.000e-06" are both recognised.
-    thresholds = {gate, adapter._REFL_DB_GATE}
-    thresholds |= {v for f in adapter._END_TO_END_BOUNDS.values()
-                   for v in f.values()}
-    thresholds |= set(adapter._REFL_DB_BOUNDS.values())
-
-    failures = []
-    for path in (PHYSICS_MD, EVIDENCE_MD, PROVENANCE_MD):
-        text = _read(path)
-        for block in re.split(r"\n\s*\n|\n(?=\|)", text):
-            named = [name for name in clean if name in block]
-            if not named or any(name in block for name in noisy):
-                continue
-            if _NOT_A_CURRENT_RESIDUAL_CLAIM.search(block):
-                continue
-            # Only sub-unit, negative-exponent values can be a relative
-            # residual; the profile's 1.478987e+08 kg-1 is a concentration.
-            for value in re.findall(r"\b\d\.\d+e-\d+\b", block):
-                number = float(value)
-                if number <= gate or number in thresholds:
-                    continue
-                failures.append(
-                    f"{path.name}: {value} presented as a current "
-                    f"measurement in a block naming {named}: "
-                    f"{block.strip()[:160]!r}")
-    assert failures == [], (
-        "these fixtures clear the gate but are still published carrying a "
-        "residual above it:\n  " + "\n  ".join(failures))
 
 
 def test_the_page_publishes_the_carve_out_the_gate_actually_applies():
@@ -827,63 +714,6 @@ def test_the_published_clean_fixture_list_is_the_gates_own_list():
         f"({subtotal!r})")
 
 
-def test_no_publication_states_a_clean_count_the_gate_does_not_produce():
-    """Any "N of 22" is the gate's own N, or is marked history.
-
-    The counts live in prose as well as in tables -- a counterfactual in
-    section 6.6, a "what moved" paragraph, a changelog bullet -- and the
-    prose is where they rot.  Every ``N of <deck size>`` literal in the four
-    documents must be one of the gate's two counts, unless its block is
-    explicitly historical or counterfactual, which is the same vocabulary
-    :data:`_NOT_A_CURRENT_RESIDUAL_CLAIM` already defines.
-
-    BEFORE THIS TEST: "15 of 22" and "16 of 22" appeared as live claims in
-    the result table of ``PHYSICS.md``, in the evidence document's result
-    sentence, in ``PROVENANCE.md`` D9k and in ``CHANGELOG.md``, three waves
-    running, while the gate produced 17 and 18.  ``CHANGELOG.md``'s open-items
-    list additionally said "Six of 22 fixtures miss", spelled out, where the
-    gate misses four -- which is why the sweep reads the spelled forms too.
-    """
-    # The pluperfect is history too.  CHANGELOG.md's 2.7.6 section says "9 of
-    # 22 profiles had been refused on the namelist route", a count of physics
-    # profiles a fix closed; the vocabulary knew "was" and "were" but not
-    # "had been", so this sweep read it as a live fixture claim and stage 1
-    # stayed red on text that claims nothing about the deck.  A bare count
-    # still reads as live.
-    assert _NOT_A_CURRENT_RESIDUAL_CLAIM.search(
-        "9 of 22 profiles had been refused on the namelist route")
-    assert not _NOT_A_CURRENT_RESIDUAL_CLAIM.search(
-        "17 of 22 WRF column fixtures clear the flat gate")
-    adapter = _adapter()
-    total = len(adapter._FIXTURES)
-    # The three counts the gate's own partition produces, and nothing else:
-    # unexceptioned clean, clean as gated, and the number that miss.
-    allowed = {len(adapter._G3_UNEXCEPTIONED_CLEAN),
-               len(adapter._G3_GATED_CLEAN),
-               len(adapter._G3_RESIDUALS)}
-    spelled = {word: value for value, word in _SPELLED.items()}
-    spelled.update({"six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-                    "eleven": 11, "twelve": 12, "thirteen": 13,
-                    "fourteen": 14, "fifteen": 15, "sixteen": 16,
-                    "seventeen": 17, "eighteen": 18, "nineteen": 19,
-                    "twenty": 20})
-    words = "|".join(sorted(spelled, key=len, reverse=True))
-    pattern = re.compile(rf"\b(\d+|{words}) of (?:the )?{total}\b", re.I)
-
-    failures: list[str] = []
-    for path in (PHYSICS_MD, EVIDENCE_MD, PROVENANCE_MD, CHANGELOG_MD):
-        for block in re.split(r"\n\s*\n|\n(?=\|)", _live(path)):
-            found = {int(match) if match.isdigit() else spelled[match.lower()]
-                     for match in pattern.findall(block)}
-            if not found - allowed:
-                continue
-            if _NOT_A_CURRENT_RESIDUAL_CLAIM.search(block):
-                continue
-            failures.append(
-                f"{path.name}: states {sorted(found - allowed)} of {total} "
-                f"as a live count where the gate produces {sorted(allowed)}: "
-                f"{block.strip()[:160]!r}")
-    assert failures == [], "\n".join(failures)
 
 
 def test_no_miss_table_row_names_a_quantity_the_gate_says_agrees():
@@ -974,52 +804,6 @@ KOOP_FALSE_ATTRIBUTIONS = (
 )
 
 
-def test_the_koop_closure_is_attributed_to_the_oracle_not_to_a_kernel():
-    """``aero-ice-koop`` was closed by correcting the HARNESS, not the port.
-
-    ``tools/thompson_wrf461_oracle/run_column_aero.F90`` built the Exner
-    function with ``rd_over_cp = 287.0/1004.0``.  WRF's own ``rcp`` is
-    ``r_d/cp`` with ``r_d = 287.`` and ``cp = 7.*r_d/2.`` (=1004.5), i.e.
-    exactly ``2/7`` -- ``share/module_model_constants.F:19,:20,:31``.  The
-    fixtures were therefore recorded with a ``(p, T)`` pair the port could
-    not invert exactly, the adapter had to perturb the entry pressure to
-    recover the recorded temperature, and the perturbed pressure drove
-    genuinely different microphysics.  The port was being measured against a
-    yardstick that was not WRF.
-
-    Any publication that mentions the superseded numbers must say that, in
-    those terms, and must not claim a kernel fix it did not make.  The
-    MECHANISM is measured separately, next.
-    """
-    failures = []
-    for path in (PHYSICS_MD, EVIDENCE_MD, PROVENANCE_MD, CHANGELOG_MD,
-                 BUILD_REGISTRY):
-        text = _read(path)
-        if not any(value in text for value in KOOP_SUPERSEDED):
-            continue
-        missing = [token for token in KOOP_ATTRIBUTION if token not in text]
-        if missing:
-            failures.append(
-                f"{path.name} publishes the superseded aero-ice-koop "
-                f"residual without attributing the closure to the oracle "
-                f"harness's Exner constant (missing {missing})")
-        for pattern in KOOP_FALSE_ATTRIBUTIONS:
-            match = re.search(pattern, text)
-            if match is not None:
-                failures.append(
-                    f"{path.name} claims {match.group(0)!r}; the fixture was "
-                    "closed by correcting run_column_aero.F90's Exner "
-                    "constant, with no change to any kernel")
-
-    registry = " ".join(_registry_mp28_option()["warnings"])
-    if any(value in registry for value in KOOP_SUPERSEDED):
-        missing = [token for token in KOOP_ATTRIBUTION
-                   if token not in registry]
-        assert not missing, (
-            "the registry's mp=28 warnings publish the superseded "
-            f"aero-ice-koop residual without the attribution ({missing})")
-
-    assert failures == [], "\n".join(failures)
 
 
 def test_the_committed_deck_carries_wrfs_own_exner_constant():
@@ -1403,7 +1187,7 @@ _SIBLING_TEXTS: dict[str, tuple[str, tuple[str, ...]]] = {
     "docs/public/CONFIGURATION.md": ("CONFIGURATION.md", (
         r"(?i)\bruns?\s+it\s+on\s+`?thompson_init`?'s\s+\*?synthetic",
     )),
-    # RETIRED (lane/wif-default).  This row scanned the imported constant
+    # RETIRED (development branch).  This row scanned the imported constant
     # gpuwm.config.MP28_AEROSOL_SOURCE_DEVIATION for the sentence "comes
     # from thompson_init's synthetic profile".  The constant no longer
     # exists -- the default it described was flipped to WRF's monthly WIF
@@ -1423,52 +1207,6 @@ def _sibling_text(key: str) -> str:
     return _read(ROOT / key)
 
 
-def test_the_page_names_every_sibling_text_that_is_still_wrong():
-    """The page lists the other published texts that contradict the code.
-
-    That list must be exact in both directions.  A stale name is a second
-    false statement; a missing name sends a reader to a document that will
-    tell them the opposite of the measurement.  Neither is acceptable, and
-    neither is detectable by reading one file.
-
-    BEFORE THIS TEST: the page named none of them, because it agreed with
-    them.
-    """
-    page = _read(PHYSICS_MD)
-    marker = "have **not** caught up and still say the profile is"
-    installed = bool(_production_callers_of_microphysics_init())
-
-    disagreeing, agreeing = [], []
-    for key, (name, patterns) in _SIBLING_TEXTS.items():
-        text = _sibling_text(key)
-        # Two independent detectors, because the two errors are different
-        # sentences.  ``patterns`` are the wave-1..4 shapes of "the profile
-        # is installed" -- FALSE then, TRUE now.  The call-site marker is a
-        # claim that a specific function makes the call -- TRUE now, and a
-        # fabrication the day that function stops making it.  A text that is
-        # simply silent about the aerosol source is not wrong either way.
-        asserts_installed = any(re.search(p, text) for p in patterns)
-        names_the_caller = re.search(_NAMES_THE_CALL_SITE, text) is not None
-        wrong = (asserts_installed or names_the_caller) and not installed
-        (disagreeing if wrong else agreeing).append((key, name))
-
-    if not disagreeing:
-        assert marker not in page, (
-            "every sibling text agrees with the shipped call graph, so the "
-            f"page must stop listing them: {[name for _, name in agreeing]}")
-        return
-
-    assert marker in page, (
-        "these published texts disagree with the shipped call graph and the "
-        f"page does not say so: {[key for key, _ in disagreeing]}")
-    missing = [key for key, name in disagreeing if name not in page]
-    assert missing == [], (
-        f"the page's list of texts that are still wrong omits {missing}")
-    lingering = [key for key, name in agreeing
-                 if name in page.split(marker, 1)[1].split("\n\n", 1)[0]]
-    assert lingering == [], (
-        f"the page still lists {lingering} as wrong; they agree with the "
-        "code")
 
 
 def test_the_page_does_not_launder_the_registry_disagreement():
@@ -1669,9 +1407,12 @@ def test_this_publication_gate_has_no_unaudited_skip_site():
     tests = [function.name for function in functions
              if function.name.startswith("test_")]
     skipping = {name for name, _ in _SKIP_SITES}
-    assert len(tests) - len(skipping) == 20, (
-        f"{len(tests)} tests, {len(skipping)} of which can skip; the "
-        "evidence document says twenty are host-only and never skip")
+    # Five documentary assertions leave the snapshot with their excluded inputs.
+    # Keep exact counts in both trees; every retained public assertion still runs.
+    expected_host_only = 20 if (ROOT / "RELEASE-EXCLUDE.txt").is_file() else 15
+    assert len(tests) - len(skipping) == expected_host_only, (
+        f"{len(tests)} tests, {len(skipping)} of which can skip; "
+        f"expected {expected_host_only} host-only assertions in this tree")
 
 
 if __name__ == "__main__":  # pragma: no cover

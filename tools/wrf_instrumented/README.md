@@ -346,7 +346,7 @@ The repo Python environment has NumPy.  From PowerShell at the repo root,
 read the WSL dump through the distro UNC path:
 
 ```powershell
-$dump = '\\wsl.localhost\Ubuntu-24.04\home\drew\wrf-oracle-build\dumps\n1p5-d01-d02-force001.bin'
+$dump = '\\wsl.localhost\Ubuntu-24.04\home\user\wrf-oracle-build\dumps\n1p5-d01-d02-force001.bin'
 $expected = (Get-Content tools/wrf_instrumented/n1p5-dump.sha256 -Raw).Trim()
 $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $dump).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw "WRF oracle hash mismatch: $actual" }
@@ -368,7 +368,7 @@ included only with names beginning `__`.
 The controller producer and comparison commands are:
 
 ```powershell
-$candidate = '\\wsl.localhost\Ubuntu-24.04\home\drew\wrf-oracle-build\dumps\gpuwm-nest-force001.npz'
+$candidate = '\\wsl.localhost\Ubuntu-24.04\home\user\wrf-oracle-build\dumps\gpuwm-nest-force001.npz'
 python tools/wrf_instrumented/produce_nest_force_candidate.py $dump $candidate --summary
 python tools/wrf_instrumented/compare_nest_force.py $dump $candidate --summary
 ```

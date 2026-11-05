@@ -79,6 +79,10 @@ def manifest():
                 row(f"gpuwm-{VERSION}.tar.gz"),
                 row(f"gpuwm_data-{VERSION}-py3-none-any.whl"),
                 row(f"gpuwm_data-{VERSION}.tar.gz"),
+                row(f"gpuwm_kernels-{VERSION}-py3-none-any.whl"),
+                row(f"gpuwm_kernels-{VERSION}.tar.gz"),
+                row(f"gpuwm_kernels_startup-{VERSION}-py3-none-any.whl"),
+                row(f"gpuwm_kernels_startup-{VERSION}.tar.gz"),
             ]
         },
     }
@@ -335,7 +339,7 @@ def test_index_wait_rejects_a_complete_response_after_its_deadline(publication, 
 
 def metadata_fixture(tmp_path, *, project="gpuwm", readme="Prepared release documentation.\n", archive_kind="wheel"):
     repo = tmp_path / "repo"
-    project_root = repo / "gpuwm-data" if project == "gpuwm-data" else repo
+    project_root = repo if project == "gpuwm" else repo / project
     package = project.replace("-", "_")
     source_dir = project_root / package
     source_dir.mkdir(parents=True)
@@ -343,8 +347,8 @@ def metadata_fixture(tmp_path, *, project="gpuwm", readme="Prepared release docu
     (source_dir / "__init__.py").write_bytes(source)
     (project_root / "README.md").write_text(readme, encoding="utf-8")
     config = f'[project]\nname = "{project}"\nreadme = "README.md"\n'
-    if project == "gpuwm-data":
-        config += 'dynamic = ["version"]\n[tool.setuptools.dynamic]\nversion = {file = ["gpuwm_data/VERSION"]}\n'
+    if project != "gpuwm":
+        config += f'dynamic = ["version"]\n[tool.setuptools.dynamic]\nversion = {{file = ["{package}/VERSION"]}}\n'
         (source_dir / "VERSION").write_text(VERSION + "\n", encoding="utf-8")
     else:
         config += f'version = "{VERSION}"\n'
@@ -366,9 +370,10 @@ def metadata_fixture(tmp_path, *, project="gpuwm", readme="Prepared release docu
     return repo, artifact
 
 
-def test_metadata_accepts_companion_dynamic_version_file(publication, tmp_path):
-    repo, wheel = metadata_fixture(tmp_path, project="gpuwm-data")
-    result = publication.check_metadata(wheel, "gpuwm-data", VERSION, repo)
+@pytest.mark.parametrize("project", ["gpuwm-data", "gpuwm-kernels", "gpuwm-kernels-startup"])
+def test_metadata_accepts_companion_dynamic_version_file(publication, tmp_path, project):
+    repo, wheel = metadata_fixture(tmp_path, project=project)
+    result = publication.check_metadata(wheel, project, VERSION, repo)
     assert result["version"] == VERSION
 
 
@@ -590,7 +595,18 @@ def test_the_on_demand_set_is_read_from_the_tagged_declaration(publication):
                                                     # radar, ML export, the wind-farm table decoder
                                                     # and the hydro door's payload library.
                                                     "rw_simradar", "rw_mlexport", "rw-wind-table",
-                                                    "nextgen_hydrofabric"} == {
+                                                    "nextgen_hydrofabric",
+                                                    # 3.0 opt-in preparation and observation helpers.
+                                                    "rw_fddaobs", "rw_waves_data",
+                                                    "rw_waves_coupled_prepare",
+                                                    # 3.0 hurricane line: verification tools.
+                                                    "rw_tc_rmw_score", "tc-verify",
+                                                    # 3.0 SIZE-01 (PyPI per-file limit).
+                                                    "rw_history_grib2", "rw_odim", "rw_mpas_static",
+                                                    "rw_mpas_lbc", "rw_mpas_convert",
+                                                    "rw_mpas_geometry", "rw_mpas_mesh",
+                                                    "rw_storm_merge", "rw_tc_vitals",
+                                                    "public-aerosol-build", "aerosol-grid"} == {
         a.name for a in bridge_assets.on_demand_artifacts()}
     # The global worker's packer stays in the wheel: a global run without it
     # builds its statics natively (about 2,000 s at T255).

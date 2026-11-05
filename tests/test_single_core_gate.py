@@ -179,6 +179,9 @@ def test_c1_stage_carries_cpu_and_a_serial_stage_is_flagged(tmp_path, monkeypatc
         rows = dict(par.ledger_stages(path, **QUICK))
         if rows["prep.serial_child"]["verdict"] == "single-core":
             break
+        # Calibrate beside each missed reading, not once after the last: 2.9.12 pass 3acde933 R5 read the child at
+        # 0.52 of a core three times while a single calibration spin afterwards got a whole one.
+        _skip_if_host_cannot_give_one_core("C1 serial child read below one core")
     if rows["prep.serial_child"]["verdict"] != "single-core":
         _skip_if_host_cannot_give_one_core("C1 serial child read below one core")
     assert rows["prep.serial_child"]["verdict"] == "single-core", rows

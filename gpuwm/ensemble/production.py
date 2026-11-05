@@ -1052,6 +1052,8 @@ class PreparedEnsembleSession:
                     capture = MemberOutputCapture(self.collector.submit, member,
                         member_history_required(member_inputs, self.request.keep_member_files),
                         initialize_callback=initialize,
+                        resuming=self.restart_roster is not None,
+                        restart_pending=resume.get("status") == "pending",
                         provenance=(self.request.provenance[member] if self.request.provenance else None))
                     options = dict(runner_options)
                     options["first_products"] = None

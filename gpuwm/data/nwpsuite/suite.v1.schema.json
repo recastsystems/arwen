@@ -286,8 +286,6 @@
               "method": {
                 "enum": [
                   "none",
-                  "jedi-3denvar",
-                  "jedi-letkf",
                   "local-da"
                 ]
               },
@@ -669,8 +667,6 @@
             "method": {
               "enum": [
                 "none",
-                "jedi-3denvar",
-                "jedi-letkf",
                 "local-da"
               ]
             },

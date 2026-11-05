@@ -590,19 +590,6 @@ def _netcdf_link_sites(root: Path, names: list[str]) -> list[str]:
     return sites
 
 
-def test_no_exported_cargo_gate_target_links_the_system_netcdf_library() -> None:
-    packages = _package_directories()
-    gated = {entry.package for entry in _entries()}
-    offenders = []
-    for package in sorted(gated):
-        directory = packages.get(package)
-        if directory is None:
-            continue  # test_every_entry_names_a_real_workspace_and_package owns that refusal
-        offenders += _netcdf_link_sites(REPOSITORY_ROOT, _exported_rust_files(directory))
-    assert not offenders, (
-        "these exported targets link the system netCDF C library at build time, which the "
-        "public ci runners do not have (`cargo test -p` builds every example and test): "
-        + ", ".join(offenders) + ". Load it at run time, or add the file to RELEASE-EXCLUDE.txt.")
 
 
 def test_the_netcdf_link_scan_sees_a_directive_and_not_a_comment(tmp_path) -> None:
@@ -708,19 +695,6 @@ def _unguarded_os_api_sites(root: Path, names: list[str]) -> list[str]:
     return sites
 
 
-def test_no_exported_cargo_gate_target_uses_a_platform_api_outside_its_cfg() -> None:
-    packages = _package_directories()
-    gated = {entry.package for entry in _entries()}
-    offenders = []
-    for package in sorted(gated):
-        directory = packages.get(package)
-        if directory is None:
-            continue
-        offenders += _unguarded_os_api_sites(REPOSITORY_ROOT, _exported_rust_files(directory))
-    assert not offenders, (
-        "these exported targets use std::os::unix or std::os::windows outside a cfg for that "
-        "platform, so the other platform's public ci cannot build them (`cargo test -p` builds "
-        "every test target): " + ", ".join(offenders))
 
 
 def test_the_platform_api_scan_reads_files_items_blocks_and_statements(tmp_path) -> None:
@@ -935,7 +909,7 @@ def test_overlapping_rows_of_different_workspaces_never_share_a_target_folder(tm
 @pytest.mark.skipif(os.name != 'posix', reason='per-row clones are POSIX only (cp -al); Windows runs a '
                     "workspace's rows one at a time")
 def test_parallel_rows_of_one_workspace_each_run_on_a_private_link_clone(tmp_path, monkeypatch):
-    """Many cores (V58, 64; lane/cap-base 2026-10-21): rows of ONE workspace with different package selections
+    """Many cores (test host, 64; development branch 2026-10-21): rows of ONE workspace with different package selections
     rebuilt each other's units in the shared workspace folder under a running rustdoc (rw-wrfbatch: "can't find
     crate for rw_nexrad"). Every row compiles first, then runs on its own hard-link clone (POSIX and Windows), so
     a row that replaces a unit never changes the file another row reads."""

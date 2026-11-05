@@ -102,6 +102,11 @@ def _synthetic_tree(tmp_path: Path, pins: dict | None) -> Path:
     bridges.mkdir(parents=True)
     (tree / "gpuwm" / "__init__.py").write_text("", encoding="utf-8")
     shutil.copyfile(SETUP, tree / "setup.py")
+    # setup.py reads VERIFY_ORACLE_TREES from gpuwm/data_assets.py (by ast,
+    # never importing it) to keep the oracle trees out of every wheel, so a
+    # tree driven by the real setup.py carries that declaration too.
+    shutil.copyfile(SETUP.parent / "gpuwm" / "data_assets.py",
+                    tree / "gpuwm" / "data_assets.py")
     (tree / "pyproject.toml").write_text(
         '[build-system]\n'
         'requires = ["setuptools"]\n'

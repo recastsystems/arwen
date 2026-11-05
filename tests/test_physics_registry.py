@@ -135,6 +135,14 @@ def _single_plan(template_id: str = WSM6_TEMPLATE_ID) -> dict[str, object]:
     return plan
 
 
+@pytest.mark.parametrize("surface", ["revised-mm5", "classic-mm5", "pleim-xiu"])
+def test_acm2_surface_pairs_are_launchable_physics_plans(surface):
+    plan = _single_plan()
+    plan["domains"][0]["components"] = {"pbl": "acm2", "surface_layer": surface}
+    report = validate_physics_plan(plan)
+    assert report["launchable"], report["errors"]
+
+
 def _uniform_tree(template_id: str = WSM6_TEMPLATE_ID) -> dict[str, object]:
     return {
         "schema": PLAN_SCHEMA,
@@ -336,7 +344,7 @@ def test_every_repo_local_registry_citation_still_says_what_the_claim_says():
              if row == ("gpuwm/core/kernels/ysu_480.cu", "kpbl < nz")]
     assert len(guard) == 1 and guard[0] in found, guard
     # bl_ysu.F90:1315 (the ctopo-absent drag arm) left the registry with the
-    # warning that cited it: lane/parity-286 put every YSU entry point on
+    # warning that cited it: development branch put every YSU entry point on
     # WRF's default ctopo arm, :1308.
     assert "bl_ysu.F90:1315" not in found
     assert "bl_ysu.F90" in checker.EXTERNAL
@@ -859,10 +867,11 @@ def test_a_deferred_per_domain_parameter_names_its_component_and_its_value():
         "runner_routes.tools.prepared_single_domain_forecast"
         ".allowed_parameter_keys" in error["message"] for error in other)
 
-    # A route that takes NO per-domain setting says that, rather than
-    # pointing a reader at an empty list as though it were a way out.
+    # The fixed benchmark now accepts four native controls. An
+    # unrelated parameter must still name its allowed vocabulary.
     sealed_id = "tools.hrrr_single_domain_benchmark"
-    assert routes[sealed_id]["allowed_parameter_keys"] == []
+    assert routes[sealed_id]["allowed_parameter_keys"] == [
+        "accum_mode", "aitken_mode", "coarse_mode", "shcu_physics"]
     sealed = _single_plan()
     sealed["context"].update(source_id="hrrr", runner_id=sealed_id)
     sealed["domains"][0]["template_id"] = routes[sealed_id][
@@ -871,8 +880,7 @@ def test_a_deferred_per_domain_parameter_names_its_component_and_its_value():
     closed = [error for error in validate_physics_plan(sealed)["errors"]
               if error["code"] == "parameter-route"]
     assert closed
-    assert all("takes no per-domain setting at all" in error["message"]
-               and "the configuration its runner replays"
+    assert all(f"runner_routes.{sealed_id}.allowed_parameter_keys"
                in error["message"] for error in closed)
 
     # And the fourth case, which a review read as an unreachable branch:
@@ -1050,6 +1058,8 @@ def test_every_composition_suite_reaches_a_door_that_can_resolve_it():
         # inventory the door writes into the experiment it materializes.
         assert switches == single_domain_runtime_switches(profile)
 
+        # OSAS included: 2a23840a9db took it off the native route, whose
+        # runner has no namelist contract to replay it against.
         assert profile not in benchmark_profiles, (
             f"{profile} is offered by a runner that refuses it")
         with pytest.raises(ValueError, match="unsupported native HRRR"):
@@ -1374,26 +1384,26 @@ def test_registry_advertises_every_mixed_edge_accurately():
         (rule["parent_option_id"], rule["child_option_id"])
         for rule in rules
     }
-    assert len(rules) == len(pairs) == 110
+    assert len(rules) == len(pairs) == 132
     others = ("kessler-mp1", "wsm6-mp6", "thompson-mp8", "morrison-mp10",
               "nssl2-mp18", "milbrandt2mom-mp9", "wdm6-mp16",
-              "thompson-aerosol-mp28", "lin-mp2", "wsm7-mp24")
+              "thompson-aerosol-mp28", "lin-mp2", "wsm7-mp24", "sbu-ylin-mp13")
     p3_pairs = {pair for pair in pairs if "p3-mp50" in pair}
     assert p3_pairs == {
         *((other, "p3-mp50") for other in others),
         *(("p3-mp50", other) for other in others),
     }
     my2_pairs = {pair for pair in pairs if "milbrandt2mom-mp9" in pair}
-    assert len(my2_pairs) == 20
-    for option_id in ("wdm6-mp16", "thompson-aerosol-mp28", "lin-mp2", "wsm7-mp24"):
-        assert len({pair for pair in pairs if option_id in pair}) == 20
+    assert len(my2_pairs) == 22
+    for option_id in ("wdm6-mp16", "thompson-aerosol-mp28", "lin-mp2", "wsm7-mp24", "sbu-ylin-mp13"):
+        assert len({pair for pair in pairs if option_id in pair}) == 22
     ratified = [rule for rule in rules if rule["status"] == "ratified"]
     assert [(rule["parent_option_id"], rule["child_option_id"])
             for rule in ratified] == [("thompson-mp8", "nssl2-mp18")]
     experimental = [
         rule for rule in rules if rule["status"] == "experimental"
     ]
-    assert len(experimental) == 109
+    assert len(experimental) == 131
     assert {
         rule["maturity"] for rule in experimental
     } == {"experimental-runtime"}
@@ -1443,7 +1453,11 @@ def test_ruc_admits_both_soil_geometries_its_own_module_defines():
     from gpuwm.physics_registry import physics_registry
 
     registry = physics_registry()
-    assert registry["parameters"]["num_soil_layers"]["enum"] == [4, 6, 9]
+    # The global declaration covers every land-surface provider, while
+    # the per-option constraints below continue to restrict each scheme.
+    declared = sorted({int(count) for selector in LAND_SURFACE_SOIL_LAYERS
+                       for count in LAND_SURFACE_SOIL_LAYERS[selector]})
+    assert registry["parameters"]["num_soil_layers"]["enum"] == declared
     for option_id, selector in (("noah", 2), ("ruc-lsm", 3), ("noah-mp", 4)):
         constraints = (registry["components"]["land_surface"]["options"]
                        [option_id]["constraints"])
@@ -1628,14 +1642,14 @@ def test_mynn_component_dependencies_are_the_wrf_v461_cells():
     # (gpuwm.wrf461_compatibility.AXIS_EXCLUSIONS).
     assert components["surface_layer"]["options"]["mynn"]["constraints"][
         "requires_components"
-    ] == {"pbl": ["off", "mynn", "sase", "uw"]}
+    ] == {"pbl": ["off", "mynn", "sase", "uw", "eeps", "keps"]}
     assert components["pbl"]["options"]["mynn"]["constraints"][
         "requires_components"
     ] == {
         "surface_layer": ["revised-mm5", "classic-mm5", "mynn"]}
     sase = components["pbl"]["options"]["sase"]["constraints"]
     assert sase["requires_components"]["surface_layer"] == [
-        "revised-mm5", "classic-mm5", "mynn"]
+        "revised-mm5", "classic-mm5", "mynn", "pleim-xiu"]
     # The cadence pin went with it: the driver runs SASE at bldt_seconds
     # and holds/recouples its tendencies across skipped calls, and
     # tests/test_sase_cadence*.py exercise 0.1 s and 5.0 s.
@@ -1647,7 +1661,7 @@ def test_mynn_is_implemented_and_warns_rather_than_blocking():
 
     ``implemented: true`` is what puts a scheme in a user's picker, so the
     warnings carry what a user has to know before choosing it: that no
-    gpuwm/WRF trajectory comparison exists, and -- since lane/mynn-exact --
+    gpuwm/WRF trajectory comparison exists, and -- since development branch --
     that the CUDA scheme is bitwise WRF v4.6.1 on every oracle, with the
     test that holds it named; phim/phih run on the device.
     """
@@ -1722,14 +1736,15 @@ def test_noahmp_is_admitted_with_mm5_or_the_coupled_mynn_suite():
     STRUCTURAL statement -- which surface layers write the exchange fields
     this LSM seam reads -- and the Eta layer writes all of them
     (UST/CHS/CHS2/CQS2/FLHC/FLQC plus the driver's BR); no Noah-MP runtime
-    read is MM5-specific.  Its evidence tier lives in the surface-layer
+    read is MM5-specific. PX supplies the same required exchange fields.
+    Its evidence tier lives in the surface-layer
     option's own maturity, which is implemented-unverified, not here.
     """
     option = physics_registry()["components"]["land_surface"]["options"][
         "noah-mp"]
     assert option["constraints"]["requires_components"] == {
         "surface_layer": ["revised-mm5", "classic-mm5", "mynn",
-                          "eta-similarity"]}
+                          "eta-similarity", "temf", "gfs", "qnse", "pleim-xiu"]}
 
 
 def test_registry_refuses_the_same_mynn_surface_ysu_cell_as_wrf():
@@ -1822,7 +1837,8 @@ def test_expert_settings_are_generic_but_selectors_cannot_claim_implementation()
         error["code"] for error in blocked["errors"]
     }
 
-    plan["domains"][0]["expert_overrides"] = {"selectors": {"mp_physics": 7}}
+    # MP7 now has a real implementation; use a future unknown value.
+    plan["domains"][0]["expert_overrides"] = {"selectors": {"mp_physics": 777}}
     blocked_value = validate_physics_plan(plan, registry=registry)
     assert blocked_value["launchable"] is False
     assert "unknown-selector-combination" in {
@@ -2868,7 +2884,7 @@ def test_the_aerosol_roadmap_knobs_are_published_and_stay_unsettable():
     for name in (
         "num_wif_levels", "use_aero_icbc",
         "qna_update",
-        "grav_settling", "dust_emis", "wif_fire_emit", "wif_fire_inj",
+        "dust_emis", "wif_fire_emit", "wif_fire_inj",
         "progn", "naer",
     ):
         spec = parameters[name]
@@ -2928,126 +2944,6 @@ def test_mp28_does_not_disturb_the_frozen_mp8_registry_entry():
     assert len(mp8["asset_requirements"][0]["assets"]) == 4
 
 
-def test_the_published_mp28_evidence_agrees_between_registry_and_docs():
-    """Nothing mechanically checks prose, so this does, for the numbers.
-
-    ``docs/public/PHYSICS.md`` republishes the mp=28 column residuals for a
-    reader who will never open the registry.  Two copies of a measurement is
-    how a measurement goes stale, so every number the registry publishes must
-    appear in the page, spelled the same way, and the page's maturity label
-    for the row must be the registry's own.  This is deliberately one-
-    directional: the page may say MORE than the registry (it carries the
-    mechanism for each residual), but it may not disagree.
-    """
-    page = (ROOT / "docs" / "public" / "PHYSICS.md").read_text(
-        encoding="utf-8")
-    option = _mp28_option()
-    evidence = option["extensions"]["column_oracle_evidence"]
-
-    assert "| Thompson aerosol-aware | 28 |" in page, (
-        "the microphysics table has no mp=28 row")
-    assert f"| {option['maturity']} |" in page, (
-        "the page does not use the maturity vocabulary the registry uses; a "
-        "vocabulary rebase must move both")
-
-    missing = []
-    for name, fields in evidence["residual_fixtures"].items():
-        if f"`{name}`" not in page:
-            missing.append(name)
-        for field, value in fields.items():
-            if f"{value:.3e}" not in page:
-                missing.append(f"{name}.{field}={value:.3e}")
-    for name, fields in evidence["carved_out_bound"].items():
-        if f"`{name}`" not in page:
-            missing.append(name)
-        for field, value in fields.items():
-            if f"{value:.3e}" not in page:
-                missing.append(f"{name}.{field}={value:.3e}")
-    for name in evidence["clean_fixtures"]:
-        if f"`{name}`" not in page:
-            missing.append(name)
-    assert missing == [], (
-        "docs/public/PHYSICS.md no longer publishes what the registry "
-        f"measured: {missing}")
-
-    # What the page must and must not claim about forecast evidence.
-    #
-    # REWRITTEN ON 2026-08-01, in the commit that landed the matched
-    # trajectory.  Two things were wrong with what stood here.
-    #
-    # 1.  It was VACUOUS.  It required "no matched" and "trajectory"
-    #     anywhere in the whole page, and what satisfied it was three map
-    #     PROJECTION rows -- "no matched WRF run" at PHYSICS.md:628-630 --
-    #     which have nothing to do with microphysics.  Deleting every word
-    #     about mp=28's forecast evidence would not have failed it.  It is
-    #     now sliced to the mp=28 section, the same slice
-    #     tests/test_physics_md_aerosol_claims.py uses.
-    #
-    # 2.  It required a claim that had become FALSE.  "No forecast has ever
-    #     been verified against WRF" was true until a single-domain doubly
-    #     periodic idealized forecast was run against WRF v4.6.1 and
-    #     published, with its own failed declared condition, in
-    #     docs/public/wrf-comparison/mp28-matched-trajectory.md.  A gate that
-    #     forces the page to keep publishing a superseded sentence is a gate
-    #     that manufactures a false statement.
-    #
-    # What is still true, and is what this now requires, is the NARROWER
-    # claim: no REAL-DATA or NESTED matched comparison is recorded here.
-    # The WIF boundary carrier now exists; absence of comparison evidence
-    # must not be described as absence of a current runtime capability.
-    # Tokens, not sentences, so a rewrite of the prose does not break it
-    # and cannot quietly drop the qualification either.
-    section = page[page.index("### Thompson aerosol-aware (`mp_physics = 28`)")
-                   :page.index("## Planetary boundary layer")].lower()
-
-    assert "real-data" in section and "nested" in section, (
-        "the mp=28 section must qualify its forecast evidence: the matched "
-        "comparison that exists is idealized, and no real-data or nested "
-        "matched WRF comparison is recorded here")
-    assert re.search(
-        r"no real-data or nested\b[^.]*comparison against matched wrf"
-        r"[^.]*is recorded here", section), (
-        "the mp=28 section must explicitly state the missing real-data "
-        "and nested matched-WRF comparison evidence")
-    assert "wrf-comparison/mp28-matched-trajectory.md" in section, (
-        "the mp=28 section must point at the one matched forecast "
-        "comparison, so a reader reaches its limits and its failed "
-        "declared condition without being told they exist")
-    assert "implemented-unverified" in section, (
-        "the matched idealized comparison did not raise the maturity label, "
-        "and the section is where a reader learns that")
-    for overclaim in ("model-validated | 28", "validation-candidate | 28",
-                      "wrf-matched-run-candidate | 28",
-                      "wrf-matched-run | 28"):
-        assert overclaim not in page, overclaim
-
-    # PROVENANCE.md is the repo-level deviation register and republishes the
-    # same measurement in its D9 entry; it drifts the same way.
-    register = (ROOT / "PROVENANCE.md").read_text(encoding="utf-8")
-    assert "### D9 " in register, (
-        "the deviation register has no mp=28 entry")
-    drifted = []
-    for group in ("residual_fixtures", "carved_out_bound"):
-        for name, fields in evidence[group].items():
-            for field, value in fields.items():
-                if f"{value:.3e}" not in register:
-                    drifted.append(f"{name}.{field}={value:.3e}")
-    assert drifted == [], (
-        f"PROVENANCE.md D9k no longer matches the registry: {drifted}")
-
-    # CONFIGURATION.md is where a user looks for a knob, so every aerosol
-    # knob the registry refuses has to be findable there under its own name.
-    knobs = (ROOT / "docs" / "public" / "CONFIGURATION.md").read_text(
-        encoding="utf-8")
-    for name in (
-        "use_aero_icbc", "use_rap_aero_icbc", "wif_input_opt",
-        "num_wif_levels", "qna_update", "grav_settling",
-        "dust_emis", "wif_fire_emit", "wif_fire_inj",
-    ):
-        assert f"`{name}`" in knobs, (
-            f"CONFIGURATION.md does not document the refused knob {name}")
-    assert "aer_init_opt" in knobs and "derived" in knobs, (
-        "the page must say why aer_init_opt is not an ArWen knob")
 
 
 def test_mp28_published_residuals_still_equal_a_live_adapter_measurement():

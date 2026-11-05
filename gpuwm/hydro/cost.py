@@ -1,6 +1,6 @@
 """Per-step hydro cost in every forecast receipt, measured without slowing it.
 
-Drew, 2026-10-18: hydro is default on because it is cheap; the per-step cost is
+Owner, 2026-10-18: hydro is default on because it is cheap; the per-step cost is
 measured and reported with parallelism named in every forecast receipt, and it
 stays under 5 percent of the atmosphere step or it is a defect.
 

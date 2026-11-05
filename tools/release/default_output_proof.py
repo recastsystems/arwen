@@ -5,6 +5,10 @@ import hashlib
 import json
 import numpy as np
 from netCDF4 import Dataset
+try:
+    from .version_byte_proof import PRODUCER_STAMPS, compare_container
+except ImportError:
+    from version_byte_proof import PRODUCER_STAMPS, compare_container
 
 
 def _stored_words(variable):
@@ -28,6 +32,36 @@ def _audit(values):
     return result
 
 
+def _metadata_value(value):
+    a = np.asarray(value)
+    return (a.dtype.str, tuple(a.shape), a.tobytes())
+
+
+def _metadata_differences(x, y):
+    rows = []
+    if list(x.dimensions) != list(y.dimensions):
+        rows.append('dimension order or names')
+    for name in set(x.dimensions) & set(y.dimensions):
+        a, b = x.dimensions[name], y.dimensions[name]
+        if (len(a), a.isunlimited()) != (len(b), b.isunlimited()):
+            rows.append('dimension ' + name)
+    if list(x.variables) != list(y.variables):
+        rows.append('variable order or names')
+    owners = [('global', x, y)] + [(name, x.variables[name], y.variables[name])
+                                for name in set(x.variables) & set(y.variables)]
+    for label, a, b in owners:
+        if label != 'global' and a.dimensions != b.dimensions:
+            rows.append(label + ': dimension binding')
+        skip = set(PRODUCER_STAMPS) if label == 'global' else set()
+        an, bn = [k for k in a.ncattrs() if k not in skip], [k for k in b.ncattrs() if k not in skip]
+        if an != bn:
+            rows.append(label + ': attribute order or names')
+        for key in set(an) & set(bn):
+            if _metadata_value(a.getncattr(key)) != _metadata_value(b.getncattr(key)):
+                rows.append(label + ': ' + key)
+    return rows
+
+
 def compare_folders(base, tip, hash_bytes=None):
     base, tip = Path(base), Path(tip)
     hash_bytes = hash_bytes or (lambda data: hashlib.sha256(data).hexdigest())
@@ -35,12 +69,23 @@ def compare_folders(base, tip, hash_bytes=None):
     right = {p.name: p for p in tip.glob('wrfout*') if p.is_file()}
     if not left or not right:
         raise ValueError('both arms must contain history frames')
-    rows, missing = [], []
+    rows, missing, whole_files = [], [], []
     for frame in sorted(set(left) | set(right)):
         if frame not in left or frame not in right:
             missing.append(dict(frame=frame, base=frame in left, tip=frame in right))
             continue
         with Dataset(left[frame]) as x, Dataset(right[frame]) as y:
+            metadata = _metadata_differences(x, y)
+            # R1: only the producer stamps both arms carry may differ.
+            stamps = {name: str(y.getncattr(name)) for name in PRODUCER_STAMPS
+                      if name in x.ncattrs() and name in y.ncattrs()}
+            whole = compare_container(left[frame], right[frame], stamps=stamps)
+            if not stamps:
+                whole['version_only'] = whole['byte_equal']
+            whole.update(frame=frame, metadata_differences=metadata,
+                         base_sha256=hashlib.sha256(left[frame].read_bytes()).hexdigest(),
+                         tip_sha256=hashlib.sha256(right[frame].read_bytes()).hexdigest())
+            whole_files.append(whole)
             for name in sorted(set(x.variables) | set(y.variables)):
                 if name not in x.variables or name not in y.variables:
                     v = _stored_words((x if name in x.variables else y).variables[name])
@@ -80,11 +125,12 @@ def compare_folders(base, tip, hash_bytes=None):
                                        for i in np.flatnonzero(unequal)[:8]]
                 rows.append(row)
     differences = sum(r['values_differing'] for r in rows)
-    return dict(schema='r290-default-full-field-byte-compare-v2', base_path=str(base), tip_path=str(tip),
+    return dict(schema='default-container-and-field-byte-compare-v4', base_path=str(base), tip_path=str(tip),
                 fields=len(rows), values=sum(r['values'] for r in rows), values_differing=differences,
-                missing=missing, rows=rows,
+                missing=missing, rows=rows, whole_files=whole_files,
                 reader='netCDF4.Dataset; stored dtype; mask, scale and character conversion disabled',
-                verdict='IDENTICAL' if not differences and not missing else 'DIFFERENT')
+                verdict='IDENTICAL' if not differences and not missing and all(
+                    r['version_only'] and not r['metadata_differences'] for r in whole_files) else 'DIFFERENT')
 
 
 def main():
@@ -95,9 +141,10 @@ def main():
     args = parser.parse_args()
     result = compare_folders(args.base, args.tip)
     args.output.write_text(json.dumps(result, indent=2) + '\n')
-    print(json.dumps({k: v for k, v in result.items() if k not in ('rows', 'missing')}))
+    print(json.dumps({k: v for k, v in result.items() if k not in ('rows', 'missing', 'whole_files')}))
     print(json.dumps(dict(missing_fields_or_frames=len(result['missing']))))
+    return 0 if result['verdict'] == 'IDENTICAL' else 1
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

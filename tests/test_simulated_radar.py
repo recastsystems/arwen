@@ -551,7 +551,8 @@ def _late_domain_writers(monkeypatch, simulated_radar):
     monkeypatch.setattr(wrfout, "soil_layer_count", lambda run: 4)
     monkeypatch.setattr(runtime, "_global_wrf_attrs", lambda *a, **k: {})
     monkeypatch.setattr(runtime, "_metadata_frame", lambda *a, **k: {})
-    run = SimpleNamespace(nx=4, ny=4, nz=3, dx=1000.0, dy=1000.0)
+    run = SimpleNamespace(nx=4, ny=4, nz=3, dx=1000.0, dy=1000.0, p_lev_diags=0, z_lev_diags=0,
+                          mean_diag=0, diurnal_diag=0, output_diagnostics=0, auxhist3_interval=0)
     node = SimpleNamespace(cfg=SimpleNamespace(start_time=None, run=run, output=None),
                            state=None)
     case = SimpleNamespace(geog_selection=None, initial_result=SimpleNamespace(coord=None))
@@ -564,6 +565,10 @@ def _late_domain_writers(monkeypatch, simulated_radar):
     writers._abort_event = threading.Event()
     writers._simulated_radar = simulated_radar
     writers._output_observer = lambda **event: None
+    # add_domain also opens the domain's level-output streams (p/z_lev_diags).
+    from gpuwm.io.level_output import LevelOutputWriters
+    writers.model.walk_parent_first = lambda: []
+    writers._auxiliary = LevelOutputWriters(writers)
     writers.add_domain(2, grid=None, static_fields={})
     return writers, built
 

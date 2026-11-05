@@ -1,7 +1,7 @@
 #!/bin/sh
 # glibc243.sh SYSROOT CMD... : run CMD under Ubuntu glibc 2.43 (libc6 2.43-2ubuntu2.4).
 #
-# The project's WRF oracles link the libm of weather-node-1 (Ubuntu glibc
+# The project's WRF oracles link the libm of a test host (Ubuntu glibc
 # 2.43, libm.so.6 sha256 1c488db6...).  gfortran binds WRF's REAL32 tan() to
 # that libm's tanf, which since glibc 2.41 is CORE-MATH's correctly rounded
 # tanf, the function gpuwm/core/kernels/glibc_trig_flt32.cuh transcribes.

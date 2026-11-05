@@ -25,9 +25,7 @@
         "{prepared.outdir}"
       ],
       "da_methods": [
-        "none",
-        "jedi-3denvar",
-        "jedi-letkf"
+        "none"
       ],
       "ensembles": false,
       "admission_inputs": [
@@ -484,9 +482,7 @@
         "{prepared.outdir}"
       ],
       "da_methods": [
-        "none",
-        "jedi-3denvar",
-        "jedi-letkf"
+        "none"
       ],
       "ensembles": true,
       "admission_inputs": [
@@ -672,9 +668,7 @@
         "{prepared.outdir}"
       ],
       "da_methods": [
-        "none",
-        "jedi-3denvar",
-        "jedi-letkf"
+        "none"
       ],
       "ensembles": false,
       "admission_inputs": [
@@ -1135,9 +1129,7 @@
         "{prepared.outdir}"
       ],
       "da_methods": [
-        "none",
-        "jedi-3denvar",
-        "jedi-letkf"
+        "none"
       ],
       "ensembles": false,
       "admission_inputs": [
@@ -1606,9 +1598,7 @@
         "{prepared.outdir}"
       ],
       "da_methods": [
-        "none",
-        "jedi-3denvar",
-        "jedi-letkf"
+        "none"
       ],
       "ensembles": false,
       "admission_inputs": [

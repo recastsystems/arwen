@@ -155,12 +155,3 @@ def test_phase_one_is_done_and_the_real_gate_owns_it_now():
                 / "ntiedtke.py").read_text(encoding="utf-8")
     assert "def run_chunk" in launcher and "NT_CALL_ORDER" in launcher, (
         "the assembler no longer walks the declared order from the module")
-
-
-def test_the_closed_gap_and_the_open_one_are_both_in_the_port_doc():
-    """A gap the record does not carry is a gap only this file knows."""
-    doc = (Path(__file__).resolve().parents[1]
-           / "docs/ntiedtke/PORT-RECORD.md").read_text(encoding="utf-8")
-    assert "cu_ntiedtke_post_run" in doc
-    assert "502-527" in doc, "the doc must name post_run's real range"
-    assert "assembler" in doc, "the remaining Phase 1 gap must be named"

@@ -826,7 +826,7 @@ mod tests {
     }
     #[test]
     fn runs_resolve_the_requested_saved_node_without_changing_the_active_one(){
-        let mut store=remote::Store::default();let first=node("node-1");let second=node("node-2");
+        let mut store=remote::Store::default();let first=node("test-host-1");let second=node("test-host-2");
         store.active=Some(first.id.clone());store.nodes=vec![first.clone(),second.clone()];
         let before=store.nodes.clone();
         assert_eq!(resolve_node(&store,&target(&second)).unwrap(),Some(second.clone()));
@@ -860,7 +860,7 @@ mod tests {
     }
     #[test]
     fn readonly_native_validator_refuses_stop_and_launch_before_any_profile_write(){
-        let node=node("node-2");
+        let node=node("test-host-2");
         for operation in [remote::Operation::Stop{job:"job-1".into()},remote::Operation::Probe,
             remote::Operation::Start{products:"all".into(),preview:false,binding:None}]{
             assert!(remote::validate_readonly_reply(&node,&operation,&json!({"ok":true})).unwrap_err().contains("read-only"));
@@ -968,14 +968,14 @@ mod tests {
         let session=manager.viewers[0].session.directory.clone();
         // The shape a remote viewer fills: raw objects and their leases under
         // its own session, converted frames beside them, shared caches outside.
-        let raw=session.join("remote-artifacts").join("node-2").join("job-1");
-        let processed=session.join("processed-store").join("node-2").join("job-1");
+        let raw=session.join("remote-artifacts").join("test-host-2").join("job-1");
+        let processed=session.join("processed-store").join("test-host-2").join("job-1");
         for made in [raw.join("objects"),raw.join("leases"),processed.clone()]{fs::create_dir_all(&made).unwrap();}
         fs::write(raw.join("objects").join("frame.wrf"),b"raw").unwrap();
         fs::write(raw.join("leases").join("frame.lock"),b"").unwrap();
         fs::write(processed.join("frame.json"),b"{}").unwrap();
-        let shared=[output.join(".arwen-viewer-cache").join("node-2").join("job-1"),
-            output.join(".arwen-native-plots-cache").join("node-2").join("job-1")];
+        let shared=[output.join(".arwen-viewer-cache").join("test-host-2").join("job-1"),
+            output.join(".arwen-native-plots-cache").join("test-host-2").join("job-1")];
         for cache in &shared{fs::create_dir_all(cache).unwrap();fs::write(cache.join("frame.bin"),b"kept").unwrap();}
         let viewer=&mut manager.viewers[0];
         viewer.begin(&request(Action::CloseRun(viewer.job_id().into()),Target::Local)).unwrap();

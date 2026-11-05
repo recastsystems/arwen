@@ -118,7 +118,7 @@ fn downscale_peer(handoff: &Value, cwd: &Path) {
         value
     };
     refused(handoff, "downscale-remote", "launch_downscale",
-        request(json!({"target":{"kind":"ssh","node_id":"node-1","connection_sha256":"a".repeat(64)}})),
+        request(json!({"target":{"kind":"ssh","node_id":"test-host-1","connection_sha256":"a".repeat(64)}})),
         "this computer's disk");
     refused(handoff, "downscale-both", "launch_downscale",
         request(json!({"child_config":cwd.join("child.toml")})),

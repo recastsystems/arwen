@@ -31,6 +31,7 @@ members = [
     "crates/rw-ingest",
     "crates/rw-isobaric",
     "crates/rw-libm",
+    "crates/rw-p3",
     "crates/rw-mpas",
     "crates/rw-mlexport",
     "crates/rw-post",
@@ -47,11 +48,15 @@ members = [
     "crates/rw-goes",
     "crates/rw-globe-pack",
     "crates/rw-grib2export",
+    "crates/rw-history-grib2",
     "crates/rw-store",
     "crates/rw-soundings",
     "crates/rustwx-sounding",
     "crates/rw-superob",
     "crates/rw-tempo",
+    "crates/rw-p3",
+
+    "crates/rw-cu99-launch",
     "crates/rw-wrfbatch",
     "crates/static-fields",
 ]
@@ -102,6 +107,7 @@ ureq = { version = "3", default-features = false, features = ["rustls-no-provide
 # Direct registry dependencies use the same readers as netcrust's path
 # dependencies. The facade itself does not require a workspace patch.
 [patch.crates-io]
+cudarc = { path = "vendor/crates-io/cudarc-0.19.8" }
 hdf5-reader = { path = "vendor/netcrust/vendor/hdf5-reader" }
 netcdf-reader = { path = "vendor/netcrust/vendor/netcdf-reader" }
 
@@ -117,7 +123,7 @@ codegen-units = 1
 # do not change.  Keeping .symtab after dropping the debug info cost
 # 5,084,832 B compressed across the 42 Linux bridges in the 2.8.7
 # manylinux wheel (74,526,220 -> 69,441,388 B, measured on
-# weather-node-4 on 2026-10-07).  Nothing that proves an artifact reads
+# a test host on 2026-10-07).  Nothing that proves an artifact reads
 # .symtab: the
 # source-revision stamp (`GPUWM_BRIDGE_SOURCE_REV=`) and the contract
 # markers are string constants in .rodata, the executables' ABI probes

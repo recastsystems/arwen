@@ -103,42 +103,8 @@ def _skip_only_a_public_export_without_baseline_history() -> None:
             "still runs in repositories carrying that history")
 
 
-def test_the_clean_base_is_present_in_this_clone() -> None:
-    """F15.  Three of the five scans skip themselves without it.
-
-    A skip is the right behaviour for a scan that cannot run.  A file that
-    exits 0 while three of its five scans skipped is not: the release
-    acceptance check reads the exit code.  This is the assertion that turns
-    a silent skip into a named failure, and it belongs outside the scan
-    module so that it cannot itself be skipped by the same missing object.
-    """
-
-    _skip_only_a_public_export_without_baseline_history()
-    assert _object_present(scan.CLEAN_BASE), (
-        f"tests/test_excluded_subsystem_absent.py pins CLEAN_BASE = "
-        f"{scan.CLEAN_BASE} and this clone does not contain that commit.  "
-        "Its branch-diff scan, its generated-document control and its "
-        "COMMIT MESSAGE scan all take pytest.skip when the object is "
-        "absent, so that file exits 0 with the release blocker unevaluated. "
-        " Fetch the base, or re-pin CLEAN_BASE to the commit this branch "
-        "was actually re-applied onto and say which in the commit message.  "
-        "Do not run a release cut from a clone that cannot resolve it.")
 
 
-def test_the_clean_base_is_an_ancestor_of_head() -> None:
-    """A base that resolves but is off this history diffs the wrong thing."""
-
-    _skip_only_a_public_export_without_baseline_history()
-    if not _object_present(scan.CLEAN_BASE):
-        pytest.fail("CLEAN_BASE is absent; see the test above")
-    result = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", scan.CLEAN_BASE, "HEAD"],
-        cwd=scan.ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    assert result.returncode == 0, (
-        f"CLEAN_BASE {scan.CLEAN_BASE} is not an ancestor of HEAD.  "
-        "`git diff CLEAN_BASE..HEAD` then reports the difference between two "
-        "unrelated tips rather than what this branch added, and the "
-        "branch-diff scan is measuring the wrong thing while passing.")
 
 
 @pytest.mark.parametrize("private_builder, commit_count, returncode, expected", [

@@ -5,7 +5,7 @@ the real GFS door, experiment loader, manifest verifier, prepared-tree
 writer and head digest run; decoding, array numerics, the hierarchy's child
 preparation and the one-shot artifact writer are doubles.  The arrays
 themselves are held byte-equal between the chained and one-shot trees by
-the real-data identity proof on node-4.
+the real-data identity proof on test host 4.
 """
 from __future__ import annotations
 

@@ -180,7 +180,7 @@ def _imports_cupy(path: str) -> bool:
 # question it does not answer, and until 2026-09-17 nothing did: can this
 # selection even be COLLECTED on an install that has no cupy at all?
 #
-# MEASURED on node-1 in a venv built from the runtime dependencies with no
+# MEASURED on a test host in a venv built from the runtime dependencies with no
 # cupy extra: ``-m "not gpu and not slow and not network"`` over the stage-1
 # and always lists ends in ``Interrupted: 8 errors during collection`` and
 # runs NOTHING.  Six of those eight are cupy: a test module imports a
@@ -445,7 +445,7 @@ _CUPY_IS_ABSENT = "No module named 'cupy'"
 def _is_the_missing_cupy(error: BaseException) -> str | None:
     """Why this failure is only the absent cupy, or None for everything else.
 
-    MEASURED, on the cupy-less venv on node-1: the absence arrives in three
+    MEASURED, on the cupy-less venv on a test host: the absence arrives in three
     shapes, and a hook that knew only the first left twelve tests failing
     for it.
 
@@ -519,7 +519,7 @@ def pytest_runtest_call(item):
     """The runtime half, which no source scan can reach.
 
     THE MEASURED REMAINDER.  With the import-time closure above in place,
-    the cupy-less venv on node-1 still reported 214 failures, and 136 of
+    the cupy-less venv on a test host still reported 214 failures, and 136 of
     them were ``ModuleNotFoundError: No module named 'cupy'`` raised
     DURING the test -- an engine function importing a device module when
     called, most often through the command line and
@@ -993,7 +993,7 @@ def _run_disk_pinned_to_ample_free_space(monkeypatch):
     preparation, history, checkpoints and pictures) is larger than the
     free space on the run directory's disk.  The plans this suite executes
     stub every stage and write almost nothing, yet unpinned their verdict
-    followed the host's disk: on node-4 with 12 GB free, 17 run-plan tests
+    followed the host's disk: on a test host with 12 GB free, 17 run-plan tests
     failed with "This run would write about 29.0 GiB" before reaching the
     stage they test.  The pin is a petabyte; the refusal itself is tested
     by the disk-budget tests, which pin their own free space.
@@ -1080,7 +1080,7 @@ def _the_default_geography_root_counts_as_staged(monkeypatch):
     Since 2.8.8 ``gpuwm go --dry-run`` asks the same geography question the
     launch asks (it exited 0 on a tree the launch refused).  The dry-run
     tests here plan configurations against whatever geography the machine
-    has at ``default_geog_root()``: none on public CI and node-4, 16 GB on
+    has at ``default_geog_root()``: none on public CI and a test host, 16 GB on
     a workstation, so without this pin the same test passed or refused by
     host.  Only the default root is answered; a root a test NAMES
     (``--geog-root``, ``[case_data].geog_root``, a direct call) gets the

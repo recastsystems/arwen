@@ -23,7 +23,7 @@ names the skip in its receipt).  Everywhere else the default row stands.
 not a list of the parts someone measured (A167).  The list read only
 compute_100 and compute_120, so a B300 (10.3), a Thor (11.0) or a GB10
 (12.1) fell through to the sm_86/89 default row as if it were Ampere or
-Ada.  MEASURED 2026-10-01 on node-2, CPU only, x / 3.0f and x / 60.0f under
+Ada.  MEASURED 2026-10-01 on a test host, CPU only, x / 3.0f and x / 60.0f under
 -ftz=true: NVRTC 12.9.86 and 13.4.92 both compile them as a multiply by the
 rounded reciprocal for every compute_100, 101, 103, 110, 120 and 121 they
 accept (12.9.86 has no compute_110, 13.4.92 no compute_101), and keep

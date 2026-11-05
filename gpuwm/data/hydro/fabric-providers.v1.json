@@ -12,7 +12,7 @@
   },
   "budget": {
     "max_fraction_of_atmosphere_step": 0.05,
-    "ruling": "Drew 2026-10-18T08:40Z: per-step cost stays under 5 percent of the step or it is a defect"
+    "ruling": "2026-10-18T08:40Z: per-step cost stays under 5 percent of the step or it is a defect"
   },
   "providers": [
     {

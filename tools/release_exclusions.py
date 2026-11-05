@@ -80,7 +80,7 @@ CODE_SUFFIXES = frozenset({
 #: package's package-data (tests/test_package_data_coverage.py holds every
 #: data file under gpuwm/ declared), the data companion's ``data/**/*`` and
 #: the repository configs (``configs = ["**/*"]``).
-WHEEL_DATA_SUBTREES = ("gpuwm/", "gpuwm-data/gpuwm_data/", "configs/")
+WHEEL_DATA_SUBTREES = ("gpuwm/", "gpuwm-data/gpuwm_data/", "gpuwm-kernels/gpuwm_kernels/", "gpuwm-kernels-startup/gpuwm_kernels_startup/", "configs/")
 
 #: The other package-data declarations, as tree patterns: the tools package's
 #: ``release/*.json``, the default-on hydro door's three source tables
@@ -97,7 +97,7 @@ WHEEL_DATA_PATTERNS = ("tools/release/*.json",
 #: ``tilestream*``, ``configs*``, ``mpas_cycle_bridge*``) and the data
 #: companion's package.  Read whole: a development module the build leaves
 #: out (tilestream's ``test_*``) is still in the public tree.
-WHEEL_CODE_SUBTREES = ("gpuwm/", "gpuwm-data/gpuwm_data/", "configs/",
+WHEEL_CODE_SUBTREES = ("gpuwm/", "gpuwm-data/gpuwm_data/", "gpuwm-kernels/gpuwm_kernels/", "gpuwm-kernels-startup/gpuwm_kernels_startup/", "configs/",
                        "tilestream/", "mpas_cycle_bridge/")
 
 #: The top-level-only packages the root pyproject includes (``tools`` and
@@ -182,15 +182,14 @@ def pinned_record_digests(repo_root: str | Path) -> frozenset[str]:
 #: host name, and the edit that re-pins the kernel drops it in the same commit.
 #: tests/test_release_snapshot_machine_paths.py fails on an entry whose file no
 #: longer has these bytes, so a spent entry cannot linger.
-PINNED_KERNEL_SOURCES = {
-    "gpuwm/core/kernels/flt32_expf_fma.cuh":
-        "755e2529eeead9a3a9099bfe67af703b5c378aad7d3face562a11b6f436e8424",
-    "gpuwm/core/kernels/kf.cu":
-        "5c9ee212cd0fc3dcedf298883c5455166402cdf9539db0a567c78db5b2303733",
-    "gpuwm/core/kernels/lin_support.cuh":
-        "0d169a555cfb91673a7439e24ca4c43c853d22e2cda2563d4e8b1819b26ed18a",
-    "gpuwm/core/kernels/p3.cu":
-        "449b70350553e31785c4a8a53c64d65ee846a3e77392e7a96ef8e58231b34080",
+PINNED_KERNEL_SOURCES: dict[str, str] = {
+    # flt32_expf_fma.cuh, kf.cu, lin_support.cuh and p3.cu were re-pinned by
+    # their own edits in the 3.0.0 fix batch and their entries were dropped.
+    # noah.cu: 07eaae5abfe (2026-11-02) cites the -O2 referee disassembly in a
+    # comment naming one lab host; its bytes bind the 3.0.0 cold-start kernel
+    # packs (opus/rel30-packs 62189113d77) and the Noah frame recordings, so
+    # the next edit to noah.cu rewords that comment and drops this entry.
+    "gpuwm/core/kernels/noah.cu": "ef57884c3f55818b9f6cb920d2c5734f5b019967bf0deb917b944cb67df95094",
 }
 
 
@@ -265,7 +264,6 @@ DA_TOOLING_ALLOWED_FILES = {
     "gpuwm/data/nwpsuite/shapes.v1.json": (10, "the stock upstream DA methods an agency suite shape may name (public since 2.9.0)"),
     "gpuwm/data/nwpsuite/suite.v1.schema.json": (4, "the schema enum of those methods (public since 2.9.0)"),
     "gpuwm/data/nwpsuite/templates/agency-2box.toml": (1, "the agency template's shadow DA row, stock upstream method (public since 2.9.0)"),
-    "gpuwm/data/kernel-pack-cuda13.json": (1, "no name at all: the base64 of a compiled cubin (cubin_xz_base64) in the cold-start kernel pack spells the marker by chance; the file is one JSON line"),
 }
 
 
