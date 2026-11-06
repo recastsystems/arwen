@@ -56,7 +56,7 @@ CONTAINS
      INTEGER, INTENT(IN) :: ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, &
              ips, ipe, jps, jpe, kps, kpe, kts, kte, num_tiles
      INTEGER, DIMENSION(num_tiles), INTENT(IN) :: i_start, i_end, j_start, j_end
-
+ 
      INTEGER :: i, j, k, its, ite, jts, jte, ij
      REAL    :: pmw, swp, iwp, lwp, q_aux, wc
      REAL, PARAMETER :: THREE_OVER_TWO = 3.0 / 2.0
@@ -261,13 +261,13 @@ CONTAINS
                    tau_qs(i, j) = 0.0
                  end if
                end if
-             else
+             else  
                swp2d(i, j) = MISSING
                re_snow_path(i, j) = MISSING
                tau_qs(i, j) = MISSING
              end if
 
-             if ( (f_qc .or. f_qi .or. f_qs) .and. &
+             if ( (f_qc .or. f_qi .or. f_qs) .and. & 
                   (p_qc > param_first_scalar .or. &
                    p_qi > param_first_scalar .or. &
                    p_qs > param_first_scalar) ) then

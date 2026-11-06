@@ -40,6 +40,10 @@ GIB = 1024 ** 3
 #: which is what made the old gate refuse against this exact number.
 CARD_FREE_BYTES = int(15.24 * GIB)
 
+#: The host beside that card, free RAM included: room for the ~6 GiB
+#: preparation these domains need, so only the card decides them.
+CARD_HOST_BYTES = int(64 * GIB)
+
 _TILES = """\
 [tiles]
 mode = "on"
@@ -180,6 +184,20 @@ def card(monkeypatch):
                 "name": "test card", "local_memory_bytes_per_thread": 0}
 
     monkeypatch.setattr(preflight, "device_memory_probe_subprocess", _probe)
+    # The host's RAM too.  Since 2.8.6 go also budgets the preparation
+    # against MemAvailable, so these card statements read the runner's
+    # live free RAM: 2.9.12 pass be38e676 R5 refused the 600^2 streamed
+    # control for "3.21 GiB available of 114.00 GiB" of host RAM (a test host
+    # under twenty Stage-1 parts and outside lanes), not for the card.
+    # The host-RAM admission has its own tests (the A44 worker below).
+    from gpuwm.core import streaming
+    from gpuwm.ingest import host_decode_window
+    monkeypatch.setattr(streaming, "_host_total_bytes",
+                        lambda: CARD_HOST_BYTES)
+    monkeypatch.setattr(host_decode_window, "available_host_bytes",
+                        lambda: CARD_HOST_BYTES)
+    monkeypatch.setattr(preflight, "host_available_bytes",
+                        lambda: CARD_HOST_BYTES)
     return _probe
 
 

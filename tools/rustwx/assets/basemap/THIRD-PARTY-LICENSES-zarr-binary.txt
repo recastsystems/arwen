@@ -6401,7 +6401,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-[ZARR-089] sha256 c5534e416fd7e9fc1b9244ce15767776e019cfcfc30ca831437251d14120f934
+[ZARR-089] sha256 ecc677addc7995f8be1da187ed9d7a0aff0ed662fe6a8541e132ed766b6589cd
 As carried by:
   licenses/THIRD-PARTY-LICENSES-bridge-binaries.txt
 ------------------------------------------------------------------------------
@@ -23949,8 +23949,8 @@ All LICENSE, LICENCE, COPYING, COPYRIGHT and NOTICE files at each
 resolved vendored package root are reproduced, deduplicated by raw SHA-256.
 The TUI itself uses the repository Apache-2.0 licence.
 
-tools/arwen-tui/Cargo.toml sha256 09232c356219ecd680b8b3c6da064c222f7169434c4bbfb51481f8b29ebf05a1
-tools/arwen-tui/Cargo.lock sha256 802e5ef577aa6fada0d1d97a0df57443dc56d61c0055993045be7516996e7f4e
+tools/arwen-tui/Cargo.toml sha256 0623d3a39a71daf3c2bb2f1e6d6fe69d6c3c73121a1c0da83fdcd2d8da088a10
+tools/arwen-tui/Cargo.lock sha256 0037a02708846fac4043ed12a98585f0937e972a6bb2b92f07967f14fb8cee1c
 x86_64-unknown-linux-gnu: 70 external packages
 x86_64-pc-windows-msvc: 67 external packages
 

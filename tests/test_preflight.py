@@ -479,7 +479,7 @@ def test_physics_shapes_scheme_selection(d01_cfg, exp4):
 
 
 def test_physics_manifest_groups_cover_restart_driver_attrs(d01_cfg):
-    """Cross-pin against the restart driver manifest (Fable F4/F2): every
+    """Cross-pin against the restart driver manifest (review F4/F2): every
     array-bearing serialized driver attribute has a manifest group, and
     conditional/rebuilt driver arrays are cross-pinned to their lifetime
     decisions.  Active Morrison diagnostics are absent here because the
@@ -1069,7 +1069,7 @@ def _scan_scratch_tree(tree, rel):
     that is not immediately called (method aliasing) and any
     ``getattr(x, "scratch")`` lookup are recorded as ``alias``/
     ``getattr`` sites so the completeness gate can reject them -- both
-    were silent-skip bypasses (Fable F3 / shadow F4).
+    were silent-skip bypasses (review F3 / F4).
     """
     sites = []
     call_func_ids = {id(node.func) for node in ast.walk(tree)
@@ -3061,10 +3061,10 @@ def test_scratch_scanner_catches_the_review_bypasses():
     # Keyword f-string still classifies as a prefix family.
     assert kinds("state.scratch((2, w), slot=f'lbc_weights_{n}')") == [
         ("prefix", "lbc_weights_")]
-    # Fable F3(2): method alias under another name -- the alias itself
+    # review F3(2): method alias under another name -- the alias itself
     # is flagged even though the later call is unrecognizable.
     assert ("alias", None) in kinds("sc = state.scratch\nsc((1,), 'x')")
-    # Fable F3(3): getattr lookup, stored or immediately called.
+    # review F3(3): getattr lookup, stored or immediately called.
     assert ("getattr", None) in kinds(
         "getattr(state, 'scratch')((1,), 'x')")
     assert ("getattr", None) in kinds(
@@ -4004,7 +4004,7 @@ def test_d01_calibration_bounds_measured_fixture(exp1):
 
 
 def test_calibration_constants_pin_the_measurement_record():
-    """CONSISTENCY pins, not validation (shadow F3 / Fable F5): these
+    """CONSISTENCY pins, not validation (review F3 / F5): these
     re-state the two controller measurement records -- the d01 run
     fixture (n0-preflight-baseline.log) and the N0 allocation probe
     (n0-alloc-probe-r2.json) -- so any silent constant edit is visible.
@@ -4717,7 +4717,7 @@ def test_check_cli_legacy_config_wraps(capsys):
 
 def test_check_cli_fails_closed_when_nothing_is_evaluable(capsys,
                                                           monkeypatch):
-    """Fable F6 / shadow F5: estimator mode with no budget and no GPU
+    """Review F6 / F5: estimator mode with no budget and no GPU
     verified NOTHING -- the exit code must say so (rc 2), never 0 via
     ``all([])``."""
     import sys
@@ -4767,7 +4767,7 @@ def _stub_cupy(free_bytes, total_bytes=int(31.84 * GIB)):
 
 def test_headroom_abort_still_reports_and_exits_distinctly(capsys,
                                                            monkeypatch):
-    """Fable F1 / shadow F5 fix: a headroom abort before measurement must
+    """Review F1 / F5 fix: a headroom abort before measurement must
     still emit the structured report (estimate-side legs evaluated, abort
     reason recorded) with an exit code DISTINCT from a leg FAIL."""
     import sys

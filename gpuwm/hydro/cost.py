@@ -162,7 +162,7 @@ def receipt(physics, *, forecast_seconds, atmosphere_steps, budget=0.05, setting
             "detail": f"hydro {hydro_per_atmosphere_step_ms:.4f} ms per atmosphere step is "
                       f"{fraction:.2%} of the {atmosphere_step_ms:.3f} ms atmosphere step "
                       f"(budget {budget:.0%})",
-            "owner": "astra-hydro-speed"}
+            "owner": "hydro-speed"}
     return block
 
 
@@ -176,4 +176,4 @@ def refuse_if_over_budget(block):
     if block and block.get("status") == "DEFECT":
         import sys
         print(f"{DEFECT}: {block['defect']['detail']}; DEFECT recorded; "
-              "forecast continues; owner astra-hydro-speed", file=sys.stderr)
+              "forecast continues; owner hydro-speed", file=sys.stderr)

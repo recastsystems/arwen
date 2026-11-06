@@ -15619,7 +15619,7 @@ def check_main(args) -> int:
         return 3
     if args.alloc:
         # A requested measurement run fails CLOSED: every leg must have
-        # been measured AND passed (shadow F5 / Fable F6).
+        # been measured AND passed (review findings F5 / F6).
         if not all(leg is True for leg in gates.values()):
             return 1
         if host_refused or preparation_refused or streamed_host_refused:

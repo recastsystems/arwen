@@ -1617,6 +1617,10 @@ _IMPORT_NAME = {
     "cupy-cuda12x": "cupy",
     "cupy-cuda13x": "cupy",
     "cupy-rocm-7-0": "cupy",
+    # [gpu-cu13] narrows the toolkit CuPy installs (NVRTC and nvJitLink below 13.5); both live in the
+    # nvidia namespace package, and the installed version is judged against the declared range.
+    "nvidia-cuda-nvrtc": "nvidia",
+    "nvidia-nvjitlink": "nvidia",
     # The kernel-image companions (3.0 size split): the AOT images and
     # the startup subset, imported by the kernel loader when present.
     "gpuwm-kernels": "gpuwm_kernels",

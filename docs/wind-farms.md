@@ -62,7 +62,7 @@ work to these quadratures: removing only wake graph/quadrature work costs
 0.9107x Fitch while keeping the 28 rotor arms and three launches. That
 control is diagnostic and is never installed. It does not establish an
 irreducible lower bound. Evidence is indexed in the lane report
-`~/lanes/downloads/WRF-PORTS-2026-11-01/spd-windfarm.md` and the
+`<reports>/WRF-PORTS-2026-11-01/spd-windfarm.md` and the
 [forecast receipt](evidence/retime-20261102/windfarm-summary.json). The new
 pinned GNU 13.3 WRF 4.7.1 real replay has zero differences in 516,840 words;
 its inputs and references are retained under

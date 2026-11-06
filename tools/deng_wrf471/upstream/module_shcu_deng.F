@@ -3,7 +3,7 @@
 MODULE module_shcu_deng
 
   USE module_wrf_error
-
+  
   REAL    , PARAMETER ::    TO           = 263.15
 ! Lookup table variables:
       INTEGER, PARAMETER :: KFNT=250,KFNP=220
@@ -39,7 +39,7 @@ CONTAINS
 !  ------------ IN ---------------------------------------------
    INTEGER,      INTENT(IN   ) :: ids,ide, jds,jde, kds,kde, &
                                   ims,ime, jms,jme, kms,kme, &
-                                  its,ite, jts,jte, kts,kte
+                                  its,ite, jts,jte, kts,kte  
    REAL,         INTENT(IN   ) :: DT, DX, xtime, gmt
    INTEGER,      INTENT(IN   ) :: KTAU
    REAL,         INTENT(IN   ) :: XLV, XLS,XLV0,XLV1,XLS0,XLS1,CP,R,G,  &
@@ -65,7 +65,7 @@ CONTAINS
                  INTENT(INOUT) :: ltopb, kdcldtop, kdcldbas
    REAL,         DIMENSION( ims:ime , kms:kme , jms:jme )         , &
                  INTENT(INOUT) :: W0AVG, TKEAVG,                    &
-                                  cldareaa, cldareab, cldliqa, cldliqb,  wub
+                                  cldareaa, cldareab, cldliqa, cldliqb,  wub 
    REAL,         DIMENSION( ims:ime , kms:kme , jms:jme )         , &
                  INTENT(IN   ) :: QC
    REAL,         DIMENSION( ims:ime , kms:kme , jms:jme )         , &
@@ -83,14 +83,14 @@ CONTAINS
 #ifdef DENG_SHCU1D
                                                   ca_rad1d,                     &
 #endif
-                                                  ten_radl1d, ten_rads1d
+                                                  ten_radl1d, ten_rads1d   
    REAL, DIMENSION( kts:kte+1 ) :: z_at_w1d
    REAL, DIMENSION( kts:kte )   :: QVTEN, QCTEN, QRTEN, TTEN, DCATEN, QCDCTEN
    REAL, DIMENSION( its:ite , jts:jte           ) :: pblh_tile, pblhavg_tile
    REAL, DIMENSION( its:ite , kts:kte , jts:jte ) :: w_at_half, w_at_half_mean
    REAL, DIMENSION( its:ite , kts:kte , jts:jte ) :: tke_tile, tkeavg_tile
    REAL, DIMENSION( its:ite , kts:kte , jts:jte ) :: cldareac, cldliqc, rh
-
+ 
    REAL                 :: dt2, DXSQ
    INTEGER              :: i, j, k, ii, ntst, kk
    REAL                 :: AMOIS, time_period_avg_min ! time window to perform a running mean value
@@ -127,7 +127,7 @@ CONTAINS
       CLOSE(3)
 #endif
 #endif
-!
+! 
 ! Time averaging w on the half levels
 !
   IF( if_avg_w == 1 ) THEN
@@ -135,7 +135,7 @@ CONTAINS
     DO J = jts,jte
     DO I = its,ite
     DO k = kts,kte
-       w_at_half(i,k,j) = 0.5* ( w(i,k,j) + w(i,k+1,j) )
+       w_at_half(i,k,j) = 0.5* ( w(i,k,j) + w(i,k+1,j) ) 
        w_at_half_mean(i,k,j) = w0avg(i,k,j)
     ENDDO
     ENDDO
@@ -193,7 +193,7 @@ CONTAINS
   write(302,*) xtime/60.,PBLHAVG(1,1)
 #endif
 !
-! Time averaging TKE
+! Time averaging TKE 
 !
   IF( if_avg_tke == 1 ) THEN
     time_period_avg_min = 30.0
@@ -227,7 +227,7 @@ CONTAINS
     ENDDO
   ENDIF
 !
-!  Calculate the RH-based cloud fraction, CS, based on Xu and Randall (1996, JAS)
+!  Calculate the RH-based cloud fraction, CS, based on Xu and Randall (1996, JAS)  
 !  As shown in Deng et al. 2003a, the virtual cloud fraction CAREA is a wighted average
 !  of Deng scheme-predicted cloud fraction, CLDLIQA and CS.  This effective cloud
 !  fraction is used in the radiation calculation.
@@ -509,7 +509,7 @@ CONTAINS
       REAL    , PARAMETER ::    AVT          = 841.99667
       REAL    , PARAMETER ::    BVT          = 0.8
       REAL    , PARAMETER ::    RHCRIT       = 0.999
-
+ 
       REAL, DIMENSION( kts:kte )  ::          SCR3
 
       REAL       :: nupdraft, ZLCL,ZLFC, TRPPT, CLDTOP, CLDDPTH,   & ! nupdraft is for sure a real number
@@ -532,7 +532,7 @@ CONTAINS
                                      THFXIN,THFXOUT,QFXIN,QFXOUT,DTFM,    &
                                      QC0,QCG,QCPA,QCFXIN,QCFXOUT,         &
                                      DCA,DCAFXIN,DCAFXOUT,DCA0,           &
-                                     RGVC,FALOUTC,wu,qes
+                                     RGVC,FALOUTC,wu,qes 
 
       REAL, DIMENSION( kts:kte+1 )  ::  OMG, KV,KR, LFLUX, LFLUX1, LFLUX2
 
@@ -556,7 +556,7 @@ CONTAINS
                  DPT, DPDD, a1, rdd, DQSSDT, DTMP, QSRH, PPTFLX, PPTFL2, CPR, CNDTNF, &
                  UPDINC, DMFMIN, DEVDMF, PPR, RCED, DPPTDF, DMFLFS, &
                  DDINC, FABE, STAB, TKEMAX, DSOURCE, TIMECS, &
-                 DTT, DTT1, GD, CPM, GM, DTEMPDT, DTHETADT, &
+                 DTT, DTT1, GD, CPM, GM, DTEMPDT, DTHETADT, & 
                  TMA, TMB, TMM, BCOEFF, ACOEFF, TOPOMG, DTMLTE, TDP, &
                  DQ, QMIN, TLOG, TDPT, CPORQ, DLP, ZLCL1, ABEG, THATA, &
                  THTFC, DABE, AINCMIN, RF, UPDIN2, &
@@ -729,7 +729,7 @@ CONTAINS
       LTOP2=99999
 !     ZPBL = PBL(I,J)
 !
-!...FIND CONVECTIVE SOURCE LAYER WHERE THE INITIAL PARCEL CHARACTERISTICS
+!...FIND CONVECTIVE SOURCE LAYER WHERE THE INITIAL PARCEL CHARACTERISTICS 
 !  ARE DEFINED.  IT IS THE MAXIMUM OF 20% OF PBL AND 2 (IF PBL IS AT LEAST
 !  4 LATERS DEEP.  DEFINE THE PARCEL PURTERBATION PROPERTITES FROM THE
 !  SOURCE LAYER (THMIX,QMIX,ZMIX,PMIX)
@@ -818,7 +818,7 @@ CONTAINS
         PCLDTPG(I,J)=PLCL
         TCLDTPG(I,J)=TLCL
 #endif
-
+ 
         IF(ZPBL .LE. Z0(1)) THEN
           PPBL=P0(1)
         ELSE
@@ -833,7 +833,7 @@ CONTAINS
           PPBL=P0(K0)*EXP(C1*(ALOG(P0(K0+1))-ALOG(P0(K0))))
         END IF
         TPBL=TLCL*(PPBL/PLCL)**ROCPQ
-
+ 
         ZLCL=Z0(KLCL)
         CLDTOP=ZLCL
         ZLFC=Z0(KL)
@@ -841,7 +841,7 @@ CONTAINS
       nca_ctr1(i,j)=nca_ctr1(i,j)+1
 #endif
         GOTO 425
-
+ 
 !     KLCL=KLCL+1
 !     K=KLCL-1
     ENDIF
@@ -930,7 +930,7 @@ CONTAINS
       LET=LCL
 !
 !  DEFINE THE UPDRAFT RADIUS, RAD, AS A FUNCTION OF DEPTHS OF THE PBL
-!  AND UPDRAFT AT THE PREVIOUS TIME STEP.  RAD IS IN THE RANGE OF 150
+!  AND UPDRAFT AT THE PREVIOUS TIME STEP.  RAD IS IN THE RANGE OF 150 
 !  AND 1500 M
 !
       VAL=CLDDPTHB(I,J)
@@ -968,7 +968,7 @@ CONTAINS
           IF( ZPBL .GE. Z0(KK) .AND. ZPBL .LT. Z0(KK+1) ) THEN
             K = KK
             EXIT loop13
-          END IF
+          END IF 
         ENDDO loop13
 
         C1 = ( ZPBL-Z0(K) )/( Z0(K+1)-Z0(K) )
@@ -1000,7 +1000,7 @@ CONTAINS
         P_INI = PPBL
         LET = KKPBL
       ELSE
-        K = KLCL-1
+        K = KLCL-1 
         RHO_INI = RHOLCL
         T_INI = TLCL
         TV_INI = TVLCL
@@ -1033,7 +1033,7 @@ CONTAINS
       ENDDO
 
  897  CONTINUE
-
+      
 #ifdef DENG_SHCU1D
       KCBASE=KLCL
       IF( i == 1 .AND. j == 1 ) write(300,*) xtime/60.,K, RHO_INI, T_INI, TV_INI, TVEN_INI, Z_INI, P_INI
@@ -1819,7 +1819,7 @@ CONTAINS
         ENDIF
       ENDDO loop107
 !
-!...ASSUME ALL OF DOWNDRAFT DETRAINMENT OCCURS AT ITS BASE, SO THE TOP OF THE
+!...ASSUME ALL OF DOWNDRAFT DETRAINMENT OCCURS AT ITS BASE, SO THE TOP OF THE 
 !...DETRAINMENT LAYER (LDT) IS THE SAME AS LDB...
 !
       DPDD= 20.0E2
@@ -1844,7 +1844,7 @@ CONTAINS
          GOTO 141
        ENDIF
 !
-!...MAKE A FIRST GUESS AT INITIAL DOWNDRAFT MASS FLUX, DETERMINE ITS VERTICAL
+!...MAKE A FIRST GUESS AT INITIAL DOWNDRAFT MASS FLUX, DETERMINE ITS VERTICAL 
 !...PROFILE...
 !
       TVD(LFS)=T0(LFS)*(1.+0.608*QES(LFS))
@@ -1911,7 +1911,7 @@ CONTAINS
 !...IF DOWNDRAFT DOES NOT EVAPORATE ANY WATER FOR SPECIFIED RELATIVE
 !...HUMIDITY, NO DOWNDRAFT IS ALLOWED...
 !
- 141  CONTINUE
+ 141  CONTINUE 
       IF(TDER.LT.1.)THEN
         PPTFLX=TRPPT
         CPR=TRPPT
@@ -2298,7 +2298,7 @@ CONTAINS
         TVG(NK)=TG(NK)*(1.+0.608*QQG(NK))
       ENDDO
 !
-!...ALLOW FROZEN PRECIP TO MELT OVER A LAYER 200mb DEEP IF PRECIP IS NOT FED
+!...ALLOW FROZEN PRECIP TO MELT OVER A LAYER 200mb DEEP IF PRECIP IS NOT FED 
 !...BACK TO EXMOIS...
 !
       DTMLTE=0.
@@ -2788,7 +2788,7 @@ CONTAINS
         DQCDCDT(K)=(DQLDT(K)-CLDLIQB(I,K,J)*DDCADT(K))/AREA
       ENDIF
 #ifdef DENG_SHCU1D
-
+ 
       CLDATEN0(K)=DDCADT(K)
       CLDLCTN0(K)=DQCDCDT(K)
       tt4(k) = RLIQ(K)+RICE(K)
@@ -2834,7 +2834,7 @@ CONTAINS
          RAINSH(I,J) = RAINSH(I,J)+RAINSHV(I,J)
 
 #ifdef DENG_SHCU1D
-
+ 
       PLET = P0(LET)
       TLET = TU(LET)
       PLFSG(I,J) = P0(LFS)
@@ -2845,12 +2845,12 @@ CONTAINS
       TLDBG(I,J) = TLCL*(PLDBG(I,J)/PLCL)**ROVCP
       PLLCG(I,J) = P0(LLC)
       TLLCG(I,J) = TU(LLC)
-
+ 
       nca_ctr2(i,j)=nca_ctr2(i,j)+1
 
 #endif
 
- 425  CONTINUE
+ 425  CONTINUE 
 
 #ifdef DENG_SHCU1D
       nca_ctr4(i,j)=nca_ctr4(i,j)+1
@@ -2920,7 +2920,7 @@ CONTAINS
     ENDIF
 #endif
 
-      IF(KDCT .LE. 1) THEN
+      IF(KDCT .LE. 1) THEN 
 #ifdef DENG_SHCU1D
         nca_ctr3(i,j)=nca_ctr3(i,j)+1
 #endif
@@ -3007,7 +3007,7 @@ CONTAINS
     ENDDO
 
       DO K=1,KL
-        tlong(k)=TEN_RADL0(K)
+        tlong(k)=TEN_RADL0(K) 
         tshort(k)=TEN_RADS0(K)
       ENDDO
       K=KAMAX
@@ -3027,7 +3027,7 @@ CONTAINS
         KR(K)=KR(KAMAX+1)
       ENDDO
 !
-!  CALCULATE IN-CLOUD DIFF FLUXES ASSOCIATED WITH KV and KR.  MAKE SURE
+!  CALCULATE IN-CLOUD DIFF FLUXES ASSOCIATED WITH KV and KR.  MAKE SURE 
 !  THAT UPWARD FLUXES AT CLOUD TOP(KDCT+1) VANISH, SO THAT THERE IS NO
 !  LIQUID DIFFUSE UPWARD
 !
@@ -3075,7 +3075,7 @@ CONTAINS
 !  CALCULATE DIFF TENDENCY ASSOCIATED WITH IN-CLOUD FLUXES CALCULATED ABOVE.
 !  FLUXES AT CLD BASE (KDCB) CARRY LIQUID TO THE LAYER BELOW THE CLD BASE
 !  AND EVAPORATE IN THAT LAYER
-!
+! 
 #ifdef DENG_SHCU1D
    IF ( wrf_dm_on_monitor()) THEN
      CALL get_wrf_debug_level( dbg_level )
@@ -3329,7 +3329,7 @@ CONTAINS
         SC7=(RHOE(K)*SC3*PPI/1000.)**0.25
       ELSE
         RHOS=0.1
-        PPIS=1./(PIE*N0S*RHOS)
+        PPIS=1./(PIE*N0S*RHOS) 
         SC7=(RHOE(K)*SC3*PPIS/1000.)**0.25
       ENDIF
       IF(TOUT .LT. TO)THEN
@@ -3396,9 +3396,9 @@ CONTAINS
 !  NSTEP IS THE # OF TIME STEPS NEEDED FOR A DROPLET TO MOVE FROM THE LAYER-TOP
 !  TO THE LAYER-BOTTOM
 !
-      RHO2=P0(K)/(R*( T0(K)+DT*TTEN(K)))
-      IF( (T0(K)+DT*TTEN(K)) .GT.TO)THEN
-        VT2C=0.
+      RHO2=P0(K)/(R*( T0(K)+DT*TTEN(K)))                     
+      IF( (T0(K)+DT*TTEN(K)) .GT.TO)THEN                                       
+        VT2C=0.                                                     
       ELSE
 !
 ! NOTE: SEDIMENTATION FORMULA OF HEYMSFIELD AND DONNER (1990, JAS)
@@ -3454,7 +3454,7 @@ CONTAINS
 #ifdef DENG_SHCU1D
 
     IF( i == 1 .AND. j == 1 ) THEN
-
+ 
       DO NK = 1,KX
         EE=Q0(NK)*P0(NK)/(0.622+Q0(NK))
         TLOG=LOG(EE/SVP1/1000.)
@@ -3686,14 +3686,14 @@ CONTAINS
   IMPLICIT NONE
   INTEGER,      INTENT(IN   ) :: its,ite, jts,jte
 
-  REAL, INTENT(IN   )  :: time_period_avg_min, dt ! time window to perform
+  REAL, INTENT(IN   )  :: time_period_avg_min, dt ! time window to perform 
                                                   !a running mean value
   LOGICAL ,INTENT(IN)  :: adapt_step_flag
   REAL,  DIMENSION( its:ite , jts:jte ), INTENT(IN   ) ::     array2d
   REAL,  DIMENSION( its:ite , jts:jte ), INTENT(INOUT) ::     array2d_avg
 
   INTEGER              :: i, j, ntst
-  REAL                 :: tst, AVGfctr, fctr, den
+  REAL                 :: tst, AVGfctr, fctr, den 
 
   NTST = NINT( time_period_avg_min * 60.0 / dt ) ! number of time steps in time_period_avg_min
   TST = FLOAT(NTST)
@@ -3727,14 +3727,14 @@ CONTAINS
   IMPLICIT NONE
   INTEGER,      INTENT(IN   ) :: its,ite, jts,jte, kts,kte
 
-  REAL, INTENT(IN   )  :: time_period_avg_min, dt ! time window to perform
+  REAL, INTENT(IN   )  :: time_period_avg_min, dt ! time window to perform   
                                                   !a running mean value
   LOGICAL ,INTENT(IN)  :: adapt_step_flag
   REAL,  DIMENSION( its:ite , kts:kte , jts:jte ), INTENT(IN   ) :: array3d
   REAL,  DIMENSION( its:ite , kts:kte , jts:jte ), INTENT(INOUT) :: array3d_avg
 
   INTEGER              :: i, j, k, ntst
-  REAL                 :: tst, AVGfctr, fctr, den
+  REAL                 :: tst, AVGfctr, fctr, den 
 
   NTST = NINT( time_period_avg_min * 60.0 / dt ) ! number of time steps in time_period_avg_min
   TST = FLOAT(NTST)
@@ -3839,7 +3839,7 @@ CONTAINS
 !-----------------------------------------------------------------------
    REAL,         INTENT(IN   )   :: P, SVP1,SVP2,SVPT0,SVP3,   &
                                     XLV0,XLV1,XLS0,XLS1, EFFQ
-
+                                    
    REAL,         INTENT(INOUT)   :: TU, THTEU, QVAP, QLIQ, QICE, RATIO2, &
                                     QNWFRZ, FRC1, RL
    INTEGER,      INTENT(INOUT)   :: IFLAG
@@ -3855,7 +3855,7 @@ CONTAINS
 !
 !...ADJUST THE LIQUID WATER CONCENTRATIONS FROM FRESH CONDENSATE AND THA
 !   BROUGHT UP FROM LOWER LEVELS TO AN AMOUNT THAT WOULD BE PRESENT IF N
-!   LIQUID WATER HAD FROZEN THUS FAR...THIS IS NECESSARY BECAUSE THE
+!   LIQUID WATER HAD FROZEN THUS FAR...THIS IS NECESSARY BECAUSE THE   
 !   EXPRESSION FOR TEMP CHANGE IS MULTIPLIED BY THE FRACTION EQUAL TO TH
 !   PARCEL TEMP DECREASE SINCE THE LAST MODEL LEVEL DIVIDED BY THE TOTAL
 !   GLACIATION INTERVAL, SO THAT EFFECTIVELY THIS APPROXIMATELY ALLOWS A
@@ -3863,7 +3863,7 @@ CONTAINS
 !   OF THE LIQUID WATER THAT WAS PRESENT BEFORE THE GLACIATION PROCESS W
 !   INITIATED...ALSO, TO ALLOW THETAU TO CONVERT APPROXIMATELY LINEARLY
 !   ITS VALUE WITH RESPECT TO ICE, WE NEED TO ALLOW A PORTION OF THE FRE
-!   CONDENSATE TO CONTRIBUTE TO THE GLACIATION PROCESS; THE FRACTIONAL
+!   CONDENSATE TO CONTRIBUTE TO THE GLACIATION PROCESS; THE FRACTIONAL 
 !   AMOUNT THAT APPLIES TO THIS PORTION IS 1/2 OF THE FRACTIONAL AMOUNT
 !   FROZEN OF THE "OLD" CONDENSATE BECAUSE THIS FRESH CONDENSATE IS ONLY
 !   PRODUCED GRADUALLY OVER THE LAYER...NOTE THAT IN TERMS OF THE DYNAMI
@@ -3904,7 +3904,7 @@ CONTAINS
 !  TYPICALLY, RATIO2 IS VERY CLOSE TO (TTFRZ-TU)/(TTFRZ-TBFRZ), USUALLY
 !  WITHIN 1% (USING TU BEFORE GALCIATION EFFECTS ARE APPLIED);  IF THE
 !  INITIAL UPDRAFT TEMP IS BELOW TBFRZ AND RATIO2 IS STILL LESS THAN 1,
-!  AN ADJUSTMENT TO FRC1 AND RATIO2 IS INTRODUCED SO THAT GLACIATION
+!  AN ADJUSTMENT TO FRC1 AND RATIO2 IS INTRODUCED SO THAT GLACIATION  
 !  EFFECTS ARE NOT UNDERESTIMATED; CONVERSELY, IF RATIO2 IS GREATER THAN
 !  FRC1 IS ADJUSTED SO THAT GLACIATION EFFECTS ARE NOT OVERESTIMATED...
 !
@@ -4197,7 +4197,7 @@ CONTAINS
 
       t1 = t0
       f1 = f0
-
+      
       CP=1005.7
 !
 !...ITERATE TO FIND WET-BULB TEMPERATURE...
@@ -4218,7 +4218,7 @@ CONTAINS
              t0 = t0
       endif
       f1 = f2
-      t1 = t2
+      t1 = t2 
 
       IF(ABS(F1).LT.0.05)GOTO 50
       ITCNT=ITCNT+1
@@ -4280,7 +4280,7 @@ CONTAINS
 !
 !...THIS SUBROUTINE ITERATIVELY EXTRACTS WET-BULB TEMPERATURE FROM EQUIV
 !   POTENTIAL TEMPERATURE, THEN CHECKS TO SEE IF SUFFICIENT MOISTURE IS
-!   AVAILABLE TO ACHIEVE SATURATION...IF NOT, TEMPERATURE IS ADJUSTED
+!   AVAILABLE TO ACHIEVE SATURATION...IF NOT, TEMPERATURE IS ADJUSTED 
 !   ACCORDINGLY, IF SO, THE RESIDUAL LIQUID WATER/ICE CONCENTRATION IS
 !   DETERMINED...
 
@@ -4297,7 +4297,7 @@ CONTAINS
         QS=0.622*ES/(P-ES)
         PI=(1.E5/P)**(0.2854*(1.-0.28*QS))
         THTGS=TU*PI*EXP((3374.6525/TU-2.5403)*QS*(1.+0.81*QS))
-      ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN
+      ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN 
 !       ES=AICE*EXP((BICE*TU-CICE)/(TU-DICE))
         ES=611.0*EXP(22.514-6.15E3/TU)
         QS=0.622*ES/(P-ES)
@@ -4342,7 +4342,7 @@ CONTAINS
       F1=THTGS-THTU
       IF(ABS(F1).LT.0.01)GOTO 50
       ITCNT=ITCNT+1
-      IF(ITCNT.GT.10)GOTO 50
+      IF(ITCNT.GT.10)GOTO 50 
       DT=F1*(T1-T0)/(F1-F0)
       T0=T1
       F0=F1
@@ -4396,7 +4396,7 @@ CONTAINS
       ELSE
         IF(RATIO2.LT.1.E-6)THEN
           RLL=XLV0-XLV1*T1
-        ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN
+        ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN 
           RLL=XLS0-XLS1*T1
         ELSE
           RLL=RL
@@ -4572,11 +4572,11 @@ CONTAINS
 !
 !...THIS SUBROUTINE ITERATIVELY EXTRACTS WET-BULB TEMPERATURE FROM EQUIV
 !   POTENTIAL TEMPERATURE, THEN CHECKS TO SEE IF SUFFICIENT MOISTURE IS
-!   AVAILABLE TO ACHIEVE SATURATION...IF NOT, TEMPERATURE IS ADJUSTED
+!   AVAILABLE TO ACHIEVE SATURATION...IF NOT, TEMPERATURE IS ADJUSTED 
 !   ACCORDINGLY, IF SO, THE RESIDUAL LIQUID WATER/ICE CONCENTRATION IS
 !   DETERMINED...
-!
-!    Modified BJG   1/17/2014
+!    
+!    Modified BJG   1/17/2014   
 !
 
       C5=1.0723E-3
@@ -4596,7 +4596,7 @@ CONTAINS
         QS=0.622*ES/(P-ES)
         PI=(1.E5/P)**(0.2854*(1.-0.28*QS))
         THTGS=TU*PI*EXP((3374.6525/TU-2.5403)*QS*(1.+0.81*QS))
-      ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN
+      ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN 
 !       ES=AICE*EXP((BICE*TU-CICE)/(TU-DICE))
         ES=611.0*EXP(22.514-6.15E3/TU)
         QS=0.622*ES/(P-ES)
@@ -4617,10 +4617,10 @@ CONTAINS
       T0=TU
       t1 = t0
       f1 = f0
-      t2 = 50.0
+      t2 = 50.0  
+ 
 
-
-
+   
       ITCNT=0
    90 IF(RATIO2.LT.1.E-6)THEN
 !       ES=ALIQ*EXP((BLIQ*T1-CLIQ)/(T1-DLIQ))
@@ -4654,11 +4654,11 @@ CONTAINS
              t0 = t0
       endif
       f1 = f2
-      t1 = t2
+      t1 = t2      
 
       IF(ABS(F1).LT.0.01)GOTO 50
       ITCNT=ITCNT+1
-      IF(ITCNT.GT.10)GOTO 50
+      IF(ITCNT.GT.10)GOTO 50 
       DT=F1*(T1-T0)/(F1-F0)
 
       if(abs(dt).lt.abs( (t1-t0)/2.0 )) then
@@ -4717,7 +4717,7 @@ CONTAINS
       ELSE
         IF(RATIO2.LT.1.E-6)THEN
           RLL=XLV0-XLV1*T1
-        ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN
+        ELSEIF(ABS(RATIO2-1.).LT.1.E-6)THEN 
           RLL=XLS0-XLS1*T1
         ELSE
           RLL=RL
@@ -4828,120 +4828,120 @@ CONTAINS
    REAL,         INTENT(IN   )   :: X
 !  REAL,         INTENT(  OUT)   :: GAMMA
 !----------------------------------------------------------------------
-!
+!                                                                     
 ! THIS ROUTINE CALCULATES THE GAMMA FUNCTION FOR A REAL ARGUMENT X.
-!   COMPUTATION IS BASED ON AN ALGORITHM OUTLINED IN REFERENCE 1.
+!   COMPUTATION IS BASED ON AN ALGORITHM OUTLINED IN REFERENCE 1. 
 !   THE PROGRAM USES RATIONAL FUNCTIONS THAT APPROXIMATE THE GAMMA
 !   FUNCTION TO AT LEAST 20 SIGNIFICANT DECIMAL DIGITS.  COEFFICIENTS
-!   FOR THE APPROXIMATION OVER THE INTERVAL (1,2) ARE UNPUBLISHED.
+!   FOR THE APPROXIMATION OVER THE INTERVAL (1,2) ARE UNPUBLISHED.  
 !   THOSE FOR THE APPROXIMATION FOR X .GE. 12 ARE FROM REFERENCE 2.
-!   THE ACCURACY ACHIEVED DEPENDS ON THE ARITHMETIC SYSTEM, THE
+!   THE ACCURACY ACHIEVED DEPENDS ON THE ARITHMETIC SYSTEM, THE   
 !   COMPILER, THE INTRINSIC FUNCTIONS, AND PROPER SELECTION OF THE
-!   MACHINE-DEPENDENT CONSTANTS.
-!
-!
+!   MACHINE-DEPENDENT CONSTANTS.                                 
+!                                                               
+!                                                              
 !*******************************************************************
 !*******************************************************************
-!
-! EXPLANATION OF MACHINE-DEPENDENT CONSTANTS
-!
-! BETA   - RADIX FOR THE FLOATING-POINT REPRESENTATION
-! MAXEXP - THE SMALLEST POSITIVE POWER OF BETA THAT OVERFLOWS
+!                                                                  
+! EXPLANATION OF MACHINE-DEPENDENT CONSTANTS                      
+!                                                                
+! BETA   - RADIX FOR THE FLOATING-POINT REPRESENTATION          
+! MAXEXP - THE SMALLEST POSITIVE POWER OF BETA THAT OVERFLOWS  
 ! XBIG   - THE LARGEST ARGUMENT FOR WHICH GAMMA(X) IS REPRESENTABLE
-!          IN THE MACHINE, I.E., THE SOLUTION TO THE EQUATION
-!                  GAMMA(XBIG) = BETA**MAXEXP
+!          IN THE MACHINE, I.E., THE SOLUTION TO THE EQUATION     
+!                  GAMMA(XBIG) = BETA**MAXEXP                    
 ! XINF   - THE LARGEST MACHINE REPRESENTABLE FLOATING-POINT NUMBER;
-!          APPROXIMATELY BETA**MAXEXP
-! EPS    - THE SMALLEST POSITIVE FLOATING-POINT NUMBER SUCH THAT
-!          1.0+EPS .GT. 1.0
+!          APPROXIMATELY BETA**MAXEXP                             
+! EPS    - THE SMALLEST POSITIVE FLOATING-POINT NUMBER SUCH THAT 
+!          1.0+EPS .GT. 1.0                                     
 ! XMININ - THE SMALLEST POSITIVE FLOATING-POINT NUMBER SUCH THAT
-!          1/XMININ IS MACHINE REPRESENTABLE
-!
-!     APPROXIMATE VALUES FOR SOME IMPORTANT MACHINES ARE:
-!
-!                            BETA       MAXEXP        XBIG
-!
-! CRAY-1         (S.P.)        2         8191        966.961
-! CYBER 180/855
+!          1/XMININ IS MACHINE REPRESENTABLE                   
+!                                                             
+!     APPROXIMATE VALUES FOR SOME IMPORTANT MACHINES ARE:    
+!                                                           
+!                            BETA       MAXEXP        XBIG 
+!                                                         
+! CRAY-1         (S.P.)        2         8191        966.961 
+! CYBER 180/855                                             
 !   UNDER NOS    (S.P.)        2         1070        177.803
-! IEEE (IBM/XT,
+! IEEE (IBM/XT,                                            
 !   SUN, ETC.)   (S.P.)        2          128        35.040
-! IEEE (IBM/XT,
+! IEEE (IBM/XT,                                           
 !   SUN, ETC.)   (D.P.)        2         1024        171.624
 ! IBM 3033       (D.P.)       16           63        57.574
-! VAX D-FORMAT   (D.P.)        2          127        34.844
+! VAX D-FORMAT   (D.P.)        2          127        34.844 
 ! VAX G-FORMAT   (D.P.)        2         1023        171.489
-!
+!                                                          
 !                            XINF         EPS        XMININ
-!
+!                                                         
 ! CRAY-1         (S.P.)   5.45E+2465   7.11E-15    1.84E-2466
-! CYBER 180/855
+! CYBER 180/855                                             
 !   UNDER NOS    (S.P.)   1.26E+322    3.55E-15    3.14E-294
-! IEEE (IBM/XT,
-!   SUN, ETC.)   (S.P.)   3.40E+38     1.19E-7     1.18E-38
-! IEEE (IBM/XT,
+! IEEE (IBM/XT,                                            
+!   SUN, ETC.)   (S.P.)   3.40E+38     1.19E-7     1.18E-38 
+! IEEE (IBM/XT,                                             
 !   SUN, ETC.)   (D.P.)   1.79D+308    2.22D-16    2.23D-308
 ! IBM 3033       (D.P.)   7.23D+75     2.22D-16    1.39D-76
 ! VAX D-FORMAT   (D.P.)   1.70D+38     1.39D-17    5.88D-39
 ! VAX G-FORMAT   (D.P.)   8.98D+307    1.11D-16    1.12D-308
-!
+!                                                          
 !**************************************************************
 !*************************************************************
-!
-! ERROR RETURNS
-!
+!                                                            
+! ERROR RETURNS                                             
+!                                                          
 !  THE PROGRAM RETURNS THE VALUE XINF FOR SINGULARITIES OR
 !     WHEN OVERFLOW WOULD OCCUR.  THE COMPUTATION IS BELIEVED
-!     TO BE FREE OF UNDERFLOW AND OVERFLOW.
-!
-!
-!  INTRINSIC FUNCTIONS REQUIRED ARE:
-!
-!     INT, DBLE, EXP, LOG, REAL, SIN
-!
-!
-! REFERENCES: `AN OVERVIEW OF SOFTWARE DEVELOPMENT FOR SPECIAL
+!     TO BE FREE OF UNDERFLOW AND OVERFLOW.                 
+!                                                          
+!                                                         
+!  INTRINSIC FUNCTIONS REQUIRED ARE:                     
+!                                                       
+!     INT, DBLE, EXP, LOG, REAL, SIN                   
+!                                                     
+!                                                    
+! REFERENCES: `AN OVERVIEW OF SOFTWARE DEVELOPMENT FOR SPECIAL 
 !              FUNCTIONS`, W. J. CODY, LECTURE NOTES IN MATHEMATICS,
-!              506, NUMERICAL ANALYSIS DUNDEE, 1975, G. A. WATSON
-!              (ED.), SPRINGER VERLAG, BERLIN, 1976.
-!
-!              COMPUTER APPROXIMATIONS, HART, ET. AL., WILEY AND
-!              SONS, NEW YORK, 1968.
-!
-!  LATEST MODIFICATION: OCTOBER 12, 1989
-!
-!  AUTHORS: W. J. CODY AND L. STOLTZ
-!           APPLIED MATHEMATICS DIVISION
-!           ARGONNE NATIONAL LABORATORY
-!           ARGONNE, IL 60439
-!
+!              506, NUMERICAL ANALYSIS DUNDEE, 1975, G. A. WATSON  
+!              (ED.), SPRINGER VERLAG, BERLIN, 1976.              
+!                                                                
+!              COMPUTER APPROXIMATIONS, HART, ET. AL., WILEY AND 
+!              SONS, NEW YORK, 1968.                            
+!                                                              
+!  LATEST MODIFICATION: OCTOBER 12, 1989                      
+!                                                            
+!  AUTHORS: W. J. CODY AND L. STOLTZ                        
+!           APPLIED MATHEMATICS DIVISION                   
+!           ARGONNE NATIONAL LABORATORY                   
+!           ARGONNE, IL 60439                            
+!                                                       
 !------------------------------------------------------
-      INTEGER I,N
-      LOGICAL PARITY
-      REAL ::  &
-!D    DOUBLE PRECISION
+      INTEGER I,N                                     
+      LOGICAL PARITY                                 
+      REAL ::  &                                          
+!D    DOUBLE PRECISION                             
           C,CONV,EPS,FACT,HALF,ONE,P,PI,Q,RES,SQRTPI,SUM,TWELVE,  &
-          TWO,XBIG,XDEN,XINF,XMININ,XNUM,Y,Y1,YSQ,Z,ZERO
-      DIMENSION C(7),P(8),Q(8)
+          TWO,XBIG,XDEN,XINF,XMININ,XNUM,Y,Y1,YSQ,Z,ZERO      
+      DIMENSION C(7),P(8),Q(8)                                 
 !-------------------------------------------------------------
-!  MATHEMATICAL CONSTANTS
+!  MATHEMATICAL CONSTANTS                                    
 !-----------------------------------------------------------
       DATA ONE,HALF,TWELVE,TWO,ZERO/1.0E0,0.5E0,12.0E0,2.0E0,0.0E0/,  &
            SQRTPI/0.9189385332046727417803297E0/,                     &
-           PI/3.1415926535897932384626434E0/
+           PI/3.1415926535897932384626434E0/                      
 !D    DATA ONE,HALF,TWELVE,TWO,ZERO/1.0D0,0.5D0,12.0D0,2.0D0,0.0D0/,
-!D   1     SQRTPI/0.9189385332046727417803297D0/,
-!D   2     PI/3.1415926535897932384626434D0/
+!D   1     SQRTPI/0.9189385332046727417803297D0/,                  
+!D   2     PI/3.1415926535897932384626434D0/                      
 !----------------------------------------------------------------
-!  MACHINE DEPENDENT PARAMETERS
+!  MACHINE DEPENDENT PARAMETERS                                 
 !--------------------------------------------------------------
       DATA XBIG,XMININ,EPS/35.040E0,1.18E-38,1.19E-7/,        &
-           XINF/3.4E38/
-!D    DATA XBIG,XMININ,EPS/171.624D0,2.23D-308,2.22D-16/,
-!D   1     XINF/1.79D308/
+           XINF/3.4E38/                                      
+!D    DATA XBIG,XMININ,EPS/171.624D0,2.23D-308,2.22D-16/,   
+!D   1     XINF/1.79D308/                                  
 !---------------------------------------------------------
 !  NUMERATOR AND DENOMINATOR COEFFICIENTS FOR RATIONAL MINIMAX
-!     APPROXIMATION OVER (1,2).
+!     APPROXIMATION OVER (1,2).                              
 !-----------------------------------------------------------
       DATA P/-1.71618513886549492533811E+0,2.47656508055759199108314E+1,  &
              -3.79804256470945635097577E+2,6.29331155312818442661052E+2,  &
@@ -4960,119 +4960,119 @@ CONTAINS
 !D   2        2.25381184209801510330112D+4,4.75584627752788110767815D+3,
 !D   3      -1.34659959864969306392456D+5,-1.15132259675553483497211D+5/
 !----------------------------------------------------------------------
-!  COEFFICIENTS FOR MINIMAX APPROXIMATION OVER (12, INF).
+!  COEFFICIENTS FOR MINIMAX APPROXIMATION OVER (12, INF).             
 !--------------------------------------------------------------------
       DATA C/-1.910444077728E-03,8.4171387781295E-04,                   &
            -5.952379913043012E-04,7.93650793500350248E-04,              &
            -2.777777777777681622553E-03,8.333333333333333331554247E-02, &
-            5.7083835261E-03/
-!D    DATA C/-1.910444077728D-03,8.4171387781295D-04,
-!D   1     -5.952379913043012D-04,7.93650793500350248D-04,
+            5.7083835261E-03/                                         
+!D    DATA C/-1.910444077728D-03,8.4171387781295D-04,                
+!D   1     -5.952379913043012D-04,7.93650793500350248D-04,          
 !D   2     -2.777777777777681622553D-03,8.333333333333333331554247D-02,
-!D   3      5.7083835261D-03/
+!D   3      5.7083835261D-03/                                         
 !--------------------------------------------------------------------
-!  STATEMENT FUNCTIONS FOR CONVERSION BETWEEN INTEGER AND FLOAT
+!  STATEMENT FUNCTIONS FOR CONVERSION BETWEEN INTEGER AND FLOAT     
 !------------------------------------------------------------------
-      CONV(I) = REAL(I)
-!D    CONV(I) = DBLE(I)
-      PARITY=.FALSE.
-      FACT=ONE
-      N=0
-      Y=X
-      IF(Y.LE.ZERO)THEN
+      CONV(I) = REAL(I)                                           
+!D    CONV(I) = DBLE(I)                                          
+      PARITY=.FALSE.                                            
+      FACT=ONE                                                 
+      N=0                                                     
+      Y=X                                                    
+      IF(Y.LE.ZERO)THEN                                     
 !----------------------------------------------------------
-!  ARGUMENT IS NEGATIVE
+!  ARGUMENT IS NEGATIVE                                   
 !--------------------------------------------------------
-        Y=-X
-        Y1=AINT(Y)
-        RES=Y-Y1
-        IF(RES.NE.ZERO)THEN
-          IF(Y1.NE.AINT(Y1*HALF)*TWO)PARITY=.TRUE.
-          FACT=-PI/SIN(PI*RES)
-          Y=Y+ONE
-        ELSE
-          RES=XINF
-          GOTO 900
-        ENDIF
-      ENDIF
+        Y=-X                                            
+        Y1=AINT(Y)                                     
+        RES=Y-Y1                                      
+        IF(RES.NE.ZERO)THEN                          
+          IF(Y1.NE.AINT(Y1*HALF)*TWO)PARITY=.TRUE.  
+          FACT=-PI/SIN(PI*RES)                     
+          Y=Y+ONE                                 
+        ELSE                                     
+          RES=XINF                              
+          GOTO 900                             
+        ENDIF                                 
+      ENDIF                                  
 !-------------------------------------------
-!  ARGUMENT IS POSITIVE
+!  ARGUMENT IS POSITIVE                    
 !-----------------------------------------
-      IF(Y.LT.EPS)THEN
+      IF(Y.LT.EPS)THEN                   
 !---------------------------------------
-!  ARGUMENT .LT. EPS
+!  ARGUMENT .LT. EPS                   
 !-------------------------------------
-        IF(Y.GE.XMININ)THEN
-          RES=ONE/Y
-        ELSE
-          RES=XINF
-          GOTO 900
-        ENDIF
-      ELSEIF(Y.LT.TWELVE)THEN
-        Y1=Y
-        IF(Y.LT.ONE)THEN
+        IF(Y.GE.XMININ)THEN          
+          RES=ONE/Y                 
+        ELSE                       
+          RES=XINF                
+          GOTO 900               
+        ENDIF                   
+      ELSEIF(Y.LT.TWELVE)THEN  
+        Y1=Y                  
+        IF(Y.LT.ONE)THEN     
 !---------------------------
-!  0.0 .LT. ARGUMENT .LT. 1.0
+!  0.0 .LT. ARGUMENT .LT. 1.0  
 !--------------------------
-          Z=Y
-          Y=Y+ONE
-        ELSE
+          Z=Y                 
+          Y=Y+ONE            
+        ELSE                
 !--------------------------
-!  1.0 .LT. ARGUMENT .LT. 12.0, REDUCE ARGUMENT IF NECESSARY
+!  1.0 .LT. ARGUMENT .LT. 12.0, REDUCE ARGUMENT IF NECESSARY 
 !-----------------------------------------------------------
-          N=INT(Y)-1
-          Y=Y-CONV(N)
-          Z=Y-ONE
-        ENDIF
+          N=INT(Y)-1                                       
+          Y=Y-CONV(N)                                     
+          Z=Y-ONE                                        
+        ENDIF                                           
 !------------------------------------------------------
-!  EVALUATE APPROXIMATION FOR 1.0 .LT. ARGUMENT .LT. 2.0
+!  EVALUATE APPROXIMATION FOR 1.0 .LT. ARGUMENT .LT. 2.0 
 !-----------------------------------------------------
-        XNUM=ZERO
-        XDEN=ONE
-        DO 260 I=1,8
-          XNUM=(XNUM+P(I))*Z
-          XDEN=XDEN*Z+Q(I)
-  260   CONTINUE
-        RES=XNUM/XDEN+ONE
-        IF(Y1.LT.Y)THEN
+        XNUM=ZERO                                       
+        XDEN=ONE                                       
+        DO 260 I=1,8                                  
+          XNUM=(XNUM+P(I))*Z                         
+          XDEN=XDEN*Z+Q(I)                          
+  260   CONTINUE                                   
+        RES=XNUM/XDEN+ONE                         
+        IF(Y1.LT.Y)THEN                          
 !-----------------------------------------------
 !  ADJUST RESULT FOR CASE  0.0 .LT. ARGUMENT .LT. 1.0
 !----------------------------------------------
-          RES=RES/Y1
-        ELSEIF(Y1.GT.Y)THEN
+          RES=RES/Y1                                
+        ELSEIF(Y1.GT.Y)THEN                        
 !-------------------------------------------------
 !  ADJUST RESULT FOR CASE  2.0 .LT. ARGUMENT .LT. 12.0
 !------------------------------------------------
-          DO 290 I=1,N
-            RES=RES*Y
-            Y=Y+ONE
-  290     CONTINUE
-        ENDIF
-      ELSE
+          DO 290 I=1,N                               
+            RES=RES*Y                               
+            Y=Y+ONE                                
+  290     CONTINUE                                
+        ENDIF                                    
+      ELSE                                      
 !----------------------------------------------
-!  EVALUATE FOR ARGUMENT .GE. 12.0,
+!  EVALUATE FOR ARGUMENT .GE. 12.0,           
 !--------------------------------------------
-        IF(Y.LE.XBIG)THEN
-          YSQ=Y*Y
-          SUM=C(7)
-          DO 350 I=1,6
-            SUM=SUM/YSQ+C(I)
-  350     CONTINUE
-          SUM=SUM/Y-Y+SQRTPI
-          SUM=SUM+(Y-HALF)*LOG(Y)
-          RES=EXP(SUM)
-        ELSE
-          RES=XINF
-          GOTO 900
-        ENDIF
-      ENDIF
+        IF(Y.LE.XBIG)THEN                   
+          YSQ=Y*Y                          
+          SUM=C(7)                        
+          DO 350 I=1,6                   
+            SUM=SUM/YSQ+C(I)            
+  350     CONTINUE                     
+          SUM=SUM/Y-Y+SQRTPI          
+          SUM=SUM+(Y-HALF)*LOG(Y)    
+          RES=EXP(SUM)              
+        ELSE                       
+          RES=XINF                
+          GOTO 900               
+        ENDIF                   
+      ENDIF                    
 !-----------------------------
-!  FINAL ADJUSTMENTS AND RETURN
+!  FINAL ADJUSTMENTS AND RETURN 
 !------------------------------
-      IF(PARITY)RES=-RES
+      IF(PARITY)RES=-RES      
       IF(FACT.NE.ONE)RES=FACT/RES
-  900 GAMMA=RES
-!D900 DGAMMA = RES
+  900 GAMMA=RES                 
+!D900 DGAMMA = RES             
       RETURN
 ! ---------- LAST LINE OF GAMMA -
       END FUNCTION GAMMA
@@ -5398,7 +5398,7 @@ CONTAINS
                    t0 = t0
             endif
             f1 = f2
-            t1 = t2
+            t1 = t2 
 
 
             if(abs(f1).lt.toler)then
@@ -5410,7 +5410,7 @@ CONTAINS
             if(abs(dt).lt.abs( (t1-t0)/2.0 )) then
                dt = (t1 - t0) / 2.0
             endif
-
+            
 !            t0=t1
 !            f0=f1
 !            t1=t1-dt

@@ -31,10 +31,10 @@
                 ! Need thetavUPDmoist, qlUPD
                 rUPD(i,k) = qtup_temfx(i,k) / (1. - qtup_temfx(i,k))
                 ! WA Updraft temperature assuming no liquid
--               TUPD(i,k) = thup_temfx(i,k) * pi2d(i,k)
+-               TUPD(i,k) = thup_temfx(i,k) * pi2d(i,k)   
 +               TUPD(i,k) = thup_temfx(i,k) * pi2d(i,k-1)  ! WOOF F5
-                ! Updraft saturation mixing ratio
-                rstUPD(i,k) = rsat(p2d(i,k-1),TUPD(i,k),ep2)
+                ! Updraft saturation mixing ratio 
+                rstUPD(i,k) = rsat(p2d(i,k-1),TUPD(i,k),ep2)  
                 ! Correct to actual temperature (Sommeria & Deardorff 1977)
 @@ -731,7 +731,7 @@
                 if (rUPD(i,k) > rstUPD(i,k)) then
@@ -53,7 +53,7 @@
 +   BU(kbot) = -1.0/dt - Khlf(kbot+1)/(dzm(kbot)*dzt(kbot+1))  ! WOOF F2
     CU(kbot) = Khlf(kbot+1)/(dzm(kbot)*dzt(kbot+1))
     YU(kbot) = -psi_n(kbot)/dt - srf_flux/dzm(kbot)
-
+ 
 --- a/phys/module_sf_temfsfclay.F
 +++ b/phys/module_sf_temfsfclay.F
 @@ -348,8 +348,13 @@
@@ -61,14 +61,14 @@
        flhc(i) = rho(i) * cp * fth(i)/fth0 * wm(i) * leps(i) / PrT0 / log(zm(i)/z0t(i)) / zt(i)
        flqc(i)  = rho(i) * fth(i)/fth0 * wm(i) * leps(i) / PrT0 / log(zm(i)/z0t(i)) / zt(i) * mavail(i)
 -      exch_temfx(i)  = flqc(i) / mavail(i)
--      chs(i) = flqc(i) / rho(i) / mavail(i)
+-      chs(i) = flqc(i) / rho(i) / mavail(i) 
 +      if (mavail(i) /= 0.) then   ! WOOF F3
 +         exch_temfx(i)  = flqc(i) / mavail(i)
-+         chs(i) = flqc(i) / rho(i) / mavail(i)
++         chs(i) = flqc(i) / rho(i) / mavail(i) 
 +      else
 +         exch_temfx(i) = rho(i) * fth(i)/fth0 * wm(i) * leps(i) / PrT0 / log(zm(i)/z0t(i)) / zt(i)
 +         chs(i) = exch_temfx(i) / rho(i)
 +      end if
-       ! WA Must exchange coeffs be limited to avoid runaway in some
+       ! WA Must exchange coeffs be limited to avoid runaway in some 
        ! (convective?) conditions?  Something like this is done in sfclay.
        ! Doing nothing for now.

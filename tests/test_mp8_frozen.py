@@ -743,7 +743,7 @@ FROZEN_MODULE_DIGESTS = {
         'a7bc9228a5e0f71045222629af2825e9ff48302bd568dd92ca9b61213ee31844',
         '5eac6c1d672997df599c3ee8dc59f5d6aa8539525638f98b1c1e3846ce1c87e3'),
     'kessler': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -775,7 +775,7 @@ FROZEN_MODULE_DIGESTS = {
         '437e750df30338848cc44b6c4a386839ba910551a2093c356228702a87017a7e',
         'e22b6b948f0d2c04da3c167ae6aad12c90e9ed6396c3df737d07405b3d7d4b48'),
     'kf': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -908,7 +908,7 @@ FROZEN_MODULE_DIGESTS = {
         'b35120f7012a89b7e8b3a0da7e30ce434ae3867e1ff35fea4665e3f645a16949',
         '1730a72093ba5b64c04aada3d8ebc94fc7c0a40ace6b1685e5fd3a04b405cdaf'),
     'morrison': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -1097,7 +1097,7 @@ FROZEN_MODULE_DIGESTS = {
         '0a3cc76ddc7fbdfc9b59d8db1c1365746cc4fd649a1bd7b7ae30c6e455643ba0',
         'cf6678981492e29c5d58e8c269f6cf247d5b00118cffa47e97d71014cd471342'),
     'mynn_surface': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -1175,7 +1175,7 @@ FROZEN_MODULE_DIGESTS = {
         '784e7c0e0b1f077bbccc9ceef2833c147548e6973a8aad6dc3001e64cfda7653',
         'fa42d757b211f33157ef13e24cdd4b8fd743794024ddb4d2bf012bc07fddaab1'),
     'noah': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -1711,7 +1711,7 @@ FROZEN_MODULE_DIGESTS = {
         'c3a2554827e7c39db269d0fa1d5ad594d1623d6974be859a1ae3a044d438951f',
         '36f7a4dccc8c66be225e16fdd6088f0fafa7a357ac1aba9b4a99f98af297c370'),
     'ruc': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -1827,7 +1827,7 @@ FROZEN_MODULE_DIGESTS = {
         'a057d932a4547a865da5458b3c6d01ff1d7551a58554cbbe0e2198a53f46387c',
         'e3bf69cd521ed814b1d25350dc81a07c43b1bb8934d0a77197c261cd981b9d86'),
     'sfclay': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -1899,7 +1899,7 @@ FROZEN_MODULE_DIGESTS = {
         '2110f93e4f5ca9fcdee9c2b41844f81082b333af6081133c7078d8d02c82cbb6',
         '1cbeb1fe01a272288a8afc2a0980182016180c8ec640be8d0fd98fa05044537d'),
     'smag2d': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -2026,7 +2026,7 @@ FROZEN_MODULE_DIGESTS = {
         'cbfc98e8d025a4511fd7f8a41ca4bd163c261da4a48dec22bb979ec5a496b14e',
         '9dc88c6e14b2aaaa4249a9f844dc231f105431623375c988a2894e322de2f3ea'),
     'vert_interp': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -2076,7 +2076,7 @@ FROZEN_MODULE_DIGESTS = {
         # Moved again with the file by 508691422 (above).
         'da6a8d9257d3ad04369b0b04c14224ec399d51a3e734daa3626166a294e049ca'),
     'wsm6': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)
@@ -2124,7 +2124,7 @@ FROZEN_MODULE_DIGESTS = {
         # Previously b31ff1ff.
         'eee09e2eae899e2379f5a0622faf82a6052e349f3aa0049428dec5650d1ffcd1'),
     'ysu': (
-        # Re-pinned by opus-reds/cat6, 2026-11-02: 51bb93111ee (export hygiene)
+        # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,
         # mynn_surface.cu, noah.cu, lin_support.cuh, terrain_drag.cu and
         # ysu_480_topo.cuh; their comment-stripped text (gcc -fpreprocessed)

@@ -1,13 +1,13 @@
 ## Notices
 
-> ⚠️ **Jun 14, 2026**
+> ⚠️ **Jun 14, 2026**  
 > Markdown is now used in REFERENCES and COMMENTS fields in data YAML files, and in ABOUT fields in about.yml files. This change is currently in the `develop` branch. Maintainers of applications and libraries that consume the database should prepare their software to support Markdown in these fields.
 
-> ⚠️ **Jan 18, 2026**
+> ⚠️ **Jan 18, 2026**  
 > Please use the `develop` branch for contributing new data and any edits.
 
-> ⚠️ **Jan 7, 2026**
-> The default branch was renamed from `master` to `main`.
+> ⚠️ **Jan 7, 2026**  
+> The default branch was renamed from `master` to `main`.  
 > Fork maintainers should update local tracking accordingly.
 
 # Refractive Index Database
@@ -26,8 +26,8 @@ If you use data from this database in research, publications, reports, or softwa
 
 **Reference:**
 
-> Polyanskiy, M. N. *Refractiveindex.info database of optical constants*.
-> *Scientific Data* **11**, 94 (2024).
+> Polyanskiy, M. N. *Refractiveindex.info database of optical constants*.  
+> *Scientific Data* **11**, 94 (2024).  
 > https://doi.org/10.1038/s41597-023-02898-2
 
 **BibTeX:**
@@ -63,10 +63,10 @@ Contributions of new data, corrections, and improvements are welcome.
 
 There are two recommended ways to contribute data:
 
-**Option A — YAML (preferred)**
+**Option A — YAML (preferred)**  
 The database uses the YAML format internally. Providing data already formatted as YAML significantly simplifies and speeds up inclusion. Existing data files in the repository can be used as templates.
 
-**Option B — Any format**
+**Option B — Any format**  
 Send numerical data in any common format (TXT, CSV, Excel, etc.), or a reference to a publication containing suitable data, to: <polyanskiy@refractiveindex.info>
 
 ### Contributing via GitHub
@@ -79,40 +79,40 @@ Send numerical data in any common format (TXT, CSV, Excel, etc.), or a reference
 ## Related projects
 
 ### refractiveindex.info-scripts
-Collection of Python scripts related to the refractiveindex.info database
+Collection of Python scripts related to the refractiveindex.info database  
 https://github.com/polyanskiy/refractiveindex.info-scripts
 
 ### refractiveindex
-Easy Python interface to the refractiveindex.info database
+Easy Python interface to the refractiveindex.info database  
 https://github.com/toftul/refractiveindex
 
 ### RefractiveIndex.jl
-Julia interface to the refractiveindex.info database
+Julia interface to the refractiveindex.info database  
 https://github.com/stillyslalom/RefractiveIndex.jl
 
 ### PyTMM
-Database browser and Transfer Matrix Method implementation
+Database browser and Transfer Matrix Method implementation  
 https://github.com/kitchenknif/PyTMM
 
 ### tmmnlay
-Another TMM package loosely based on PyTMM
+Another TMM package loosely based on PyTMM  
 https://github.com/ovidiopr/tmmnlay
 
 ### refractiveindex.info-sqlite
-Python 3 + SQLite wrapper for the refractiveindex.info database
+Python 3 + SQLite wrapper for the refractiveindex.info database  
 https://github.com/HugoGuillen/refractiveindex.info-sqlite
 
 ### refractiveindex.info
-Support for operations not possible through the web interface (e.g., finding materials with refractive index within a specified range)
-https://github.com/cinek810/refractiveindex.info (original scripts)
+Support for operations not possible through the web interface (e.g., finding materials with refractive index within a specified range)  
+https://github.com/cinek810/refractiveindex.info (original scripts)  
 https://github.com/mtarek/refractiveindex.info (fork and further development)
 
 ### PyMoosh
-Python library for multilayer simulation and optimization
+Python library for multilayer simulation and optimization  
 https://github.com/AnMoreau/PyMoosh
 
 ### pyElli
-Ellipsometry data processing package with a built-in refractive index data loader
+Ellipsometry data processing package with a built-in refractive index data loader  
 https://pyelli.readthedocs.io
 
 ### TFStudio

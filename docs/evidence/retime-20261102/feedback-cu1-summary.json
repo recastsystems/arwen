@@ -84,6 +84,6 @@
     "baseline": "/workspace/runs/spd-retime-rad-cu/logs/feedback-cu1-baseline.log",
     "candidate": "/workspace/runs/spd-retime-rad-cu/logs/feedback-cu1-candidate.log"
   },
-  "evidence_root": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/spd-retime-rad-cu",
+  "evidence_root": "<reports>/WRF-PORTS-2026-11-01/evidence/spd-retime-rad-cu",
   "retained_native_root": "~/weather/data/datasets/paper/wrf-ports/spd-retime-rad-cu"
 }

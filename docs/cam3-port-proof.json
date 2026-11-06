@@ -381,7 +381,7 @@
     ],
     "package_data": "3 passed; CAM column ABI metadata is included by cam3_*.json and checked from the whole wheel"
   },
-  "evidence_directory": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-ra3-cam/",
-  "report": "~/lanes/downloads/WRF-PORTS-2026-11-01/port-ra3-cam.md",
+  "evidence_directory": "<reports>/WRF-PORTS-2026-11-01/evidence/port-ra3-cam/",
+  "report": "<reports>/WRF-PORTS-2026-11-01/port-ra3-cam.md",
   "scope": "CAM radiation options 3 only. Separate CAM5 cloud/aerosol suite is not claimed as delivered by this lane. One real case establishes the exercised forecast; it does not establish general forecast skill."
 }

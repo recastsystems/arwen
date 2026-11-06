@@ -480,7 +480,7 @@
     "Lake coupling and NLCD40 cannot provide SSiB native state/category mapping.",
     "Noah-MP opt_btr=3 is a separate ENERGY branch under land option 4; not called by option 8."
   ],
-  "evidence_directory": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-sf8-ssib/",
+  "evidence_directory": "<reports>/WRF-PORTS-2026-11-01/evidence/port-sf8-ssib/",
   "source_sha256": {
     "gpuwm/core/ssib.py": "c2f7848da02787986ef374694810f20d3175b8785add08da10cd3216209d3a7f",
     "gpuwm/core/ssib_records.py": "a4a6fa6e98f88e5247519f188dbe36a64d511d38a74b27010ca0a8ef849f6658",

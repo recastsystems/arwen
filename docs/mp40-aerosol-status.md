@@ -101,7 +101,7 @@ On the RTX 5090, the median fast microphysics stage was 2.8455 ms versus
 0.4417). Candidate-default MP9 and MP10 full-physics state comparisons were
 byte-identical over 12 steps. See the compact
 [qualification receipt](../tools/morrison_aero_wrf461_oracle/qualification.json)
-and the lane report under `~/lanes/downloads/WRF-PORTS-2026-11-01/`.
+and the port report kept with the maintainers.
 
 The registry retains `experimental-runtime` maturity and `scientific_evidence=none`:
 this run proves the stated implementation scope and does not establish

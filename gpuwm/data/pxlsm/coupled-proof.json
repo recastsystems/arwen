@@ -450,7 +450,7 @@
     },
     "inherited_failed_rows_unchanged": true
   },
-  "evidence_root": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-sf7-pxlsm",
+  "evidence_root": "<reports>/WRF-PORTS-2026-11-01/evidence/port-sf7-pxlsm",
   "evidence_sha256": {
     "replay-o2.json": {
       "sha256": "1bc6f0debb134f2051a809c76d355cd31189dc9d84c53758e0d6c99d6b4e57b7",

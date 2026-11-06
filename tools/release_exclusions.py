@@ -187,7 +187,7 @@ PINNED_KERNEL_SOURCES: dict[str, str] = {
     # their own edits in the 3.0.0 fix batch and their entries were dropped.
     # noah.cu: 07eaae5abfe (2026-11-02) cites the -O2 referee disassembly in a
     # comment naming one lab host; its bytes bind the 3.0.0 cold-start kernel
-    # packs (opus/rel30-packs 62189113d77) and the Noah frame recordings, so
+    # packs (rel30-packs 62189113d77) and the Noah frame recordings, so
     # the next edit to noah.cu rewords that comment and drops this entry.
     "gpuwm/core/kernels/noah.cu": "ef57884c3f55818b9f6cb920d2c5734f5b019967bf0deb917b944cb67df95094",
 }

@@ -3,11 +3,11 @@
   "solvers": {
     "waves": {
       "factory": "gpuwm.ocean.waves:create_solver",
-      "report_lane": "astra-cap-waves"
+      "report_lane": "waves-solver"
     },
     "surge": {
       "factory": "gpuwm.ocean.surge:create_solver",
-      "report_lane": "astra-cap-surge"
+      "report_lane": "surge-solver"
     }
   },
   "sources": {

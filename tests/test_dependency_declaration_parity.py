@@ -193,6 +193,22 @@ _GUARANTORS: dict[str, tuple[str, str]] = {
     ),
 }
 
+#: Version constraints on a distribution a declared dependency already installs.  Nothing imports them by
+#: name: the line only narrows what the guarantor resolves.  Each row names the guarantor and the breakage.
+_CONSTRAINTS: dict[str, tuple[str, str]] = {
+    "nvidia-cuda-nvrtc": (
+        "cupy-cuda13x",
+        "cupy-cuda13x[ctk] installs NVRTC through cuda-toolkit; [gpu-cu13] keeps it below 13.5 because no "
+        "kernel ULP row, frame recording or startup image is recorded for NVRTC 13.5 (2.9.13 GPU gate, "
+        "tests/_toolchain_rows.py: no row for NVRTC 13.5 on sm_120).",
+    ),
+    "nvidia-nvjitlink": (
+        "cupy-cuda13x",
+        "cuda-toolkit 13.4.3 pins every component but nvJitLink (>=13.4.92,<14); [gpu-cu13] keeps it with NVRTC "
+        "below 13.5 so the batch kernels' PTX link uses the compiler that wrote it (2.9.13 R6).",
+    ),
+}
+
 #: Consumers an AST walk cannot see, because the import lives inside a
 #: *string* that some other process executes.  Recorded rather than waved
 #: through: :func:`test_generated_source_consumers_still_exist` re-checks that
@@ -803,6 +819,9 @@ def test_every_declaration_is_imported(shipped_imports, test_suite_imports,
         wanted |= set(_providers(module))
     for module in _GUARANTORS:                      # guarantors are consumed
         wanted.add(_canonical(_GUARANTORS[module][0]))
+    for distribution, (guarantor, _why) in _CONSTRAINTS.items():   # a constraint narrows its guarantor
+        assert _canonical(guarantor) in declaration["all"], (distribution, guarantor)
+        wanted.add(_canonical(distribution))
 
     unused = sorted(declaration["all"] - wanted)
     assert not unused, (

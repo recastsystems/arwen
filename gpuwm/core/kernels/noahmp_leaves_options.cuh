@@ -96,3 +96,4 @@ void noahmp_leaf_atm_selected(const real* __restrict__ xs, const int* __restrict
     y[15] = fpice;
     y[16] = prcp;
 }
+

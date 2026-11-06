@@ -171,7 +171,7 @@ BASELINE_PINNED: dict[str, str] = {
     "climate_diagnostics": "da46de7a67990141cb1d4a64f2e97672adbce7a01fe911d258ce02312736158d",
     # golden/ports-rad: four translation units that joined with their ports,
     # each graded word for word against WRF v4.6.1's own routines on its lane
-    # (OPUS-PORTS-2026-10-08 receipts) and re-run at this tip's GPU legs.
+    # (port receipts of 2026-10-08) and re-run at this tip's GPU legs.
     # New Goddard radiation (ra_lw/ra_sw_physics = 5), lane ra5-goddard.
     # Re-pinned in the 2.9.0 round-2 merge: five constant divisions spelled
     # __fdiv_rn (A146; the unit compiles on the -ftz=true route, where NVVM
@@ -401,7 +401,7 @@ BASELINE_PINNED: dict[str, str] = {
     # descending after a valid downdraft-origin adjustment instead of
     # breaking out of the pass, as WRF does; it moved the strict A071 hour's
     # first wind difference from step 87 to step 169 against stock WRF
-    # 4.6.1 (SOL-POOL-2026-10-09 exact-chain-resume).  Previously ad4148a8.
+    # 4.6.1 (2026-10-09 exact-chain-resume).  Previously ad4148a8.
     "gf":
         "1dfaed78588a04d58d6fb5d544cc1d989df6e08505d5c403618488c936eaa668",
     # 1ee7f0be0 tiles: name the streamed-run config table, and part it from cycle streaming

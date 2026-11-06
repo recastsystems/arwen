@@ -1,6 +1,6 @@
 """Soil moisture across land-surface models: index remap and same-model donors.
 
-The defect this module fixes (WEATHER-AGI-2026-10-26 cold-teacher): a run
+The defect this module fixes (2026-10-26 cold-start study): a run
 started from ERA5 copied ERA5's HTESSEL volumetric soil moisture straight into
 RUC.  HTESSEL rates the Oklahoma soils of 2024-05-06 at field capacity (top
 level 0.36); HRRR's own cycled RUC analysis puts the same cells at 0.21.  With

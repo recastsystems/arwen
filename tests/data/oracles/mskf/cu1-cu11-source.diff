@@ -55,7 +55,7 @@
 +! Adapted to WRF3.8 by Kiran Alapaty
 +!  !ckay = !dkay = Kiran Alapaty, EPA
 +! PSH : Sep 2015: copuled with CESM global climatological aerosol data
-+! TWG : Jun 2016: porting to WRFV3.8
++! TWG : Jun 2016: porting to WRFV3.8 
 +! TWG & cKAY: Feb 2017: replaced sheet cloud microphysics with that of cumulus clouds
 +
 +! Purpose:
@@ -74,9 +74,9 @@
 +  use error_function, only: erf,erfc
 +
 +!wrf  use rad_constituents, only: rad_cnst_get_clim_info,
-+!rad_cnst_get_clim_aer_props
++!rad_cnst_get_clim_aer_props 
 +!xsong 2013-08-22  use module_ra_cam_support, only: naer_cu, idxsul,
-+!idxDUSTfirst, idxbcphi
++!idxDUSTfirst, idxbcphi 
 +
 +  implicit none
 +  private
@@ -86,7 +86,7 @@
 +
 +! Private module data
 +
-+  integer, parameter :: naer_cu = 10
++  integer, parameter :: naer_cu = 10        
 +  integer, parameter :: pcols = 1
 +
 +!constants remaped
@@ -99,9 +99,9 @@
 +  real(r8), private::   rhow               !density of liquid water
 +  real(r8), private::  xlf !latent heat of freezing
 +
-+!from physconst
++!from physconst 
 +  real(r8), private, parameter ::  gravit = 9.80616_r8      ! acceleration of gravity ~ m/s^2
-+  real(r8), private, parameter ::  rair   = 287.04239_r8    ! Dry air gas constant     ~ J/K/kg
++  real(r8), private, parameter ::  rair   = 287.04239_r8    ! Dry air gas constant     ~ J/K/kg 
 +  real(r8), private, parameter ::  tmelt  = 273.15_r8       ! freezing T of fresh water  ~ K
 +  real(r8), private, parameter ::  cpair  = 1.00464e3_r8    ! specific heat of dry air   ~ J/kg/K
 +  real(r8), private, parameter ::  rh2o   = 461.915_r8      ! Water vapor gas constant ~ J/K/kg
@@ -110,13 +110,13 @@
 +  real(r8), private, parameter ::  rhoh2o = 1.000e3_R8      ! density of fresh water     ~ kg/m^3
 +  real(r8), private, parameter ::  latvap = 2.501e6_r8      ! latent heat of evaporation ~ J/kg
 +  real(r8), private, parameter ::  latice = 3.337e5_r8      ! latent heat of fusion      ~ J/kg
-+  real(r8), private, parameter ::  epsilo = 0.622_r8        ! ratio of h2o to dry air molecular weights
++  real(r8), private, parameter ::  epsilo = 0.622_r8        ! ratio of h2o to dry air molecular weights         
 +
 +!from 'microconstants'
 +  real(r8), private:: rhosn  ! bulk density snow
 +  real(r8), private:: rhoi   ! bulk density ice
 +
-+  real(r8), private:: ac,bc,as,bs,ai,bi,ar,br  !fall speed parameters
++  real(r8), private:: ac,bc,as,bs,ai,bi,ar,br  !fall speed parameters 
 +  real(r8), private:: ci,di    !ice mass-diameter relation parameters
 +  real(r8), private:: cs,ds    !snow mass-diameter relation parameters
 +  real(r8), private:: cr,dr    !drop mass-diameter relation parameters
@@ -125,7 +125,7 @@
 +  real(r8), private:: Ecr      !collection efficiency cloud droplets/rain
 +  real(r8), private:: DCS      !autoconversion size threshold
 +  real(r8), private:: F14      !Ferrier (1994) Time scale parameter
-+  real(r8), private:: qsmall   !min mixing ratio
++  real(r8), private:: qsmall   !min mixing ratio 
 +  real(r8), private:: bimm,aimm !immersion freezing
 +  real(r8), private:: rhosu     !typical 850mn air density
 +  real(r8), private:: mi0       ! new crystal mass
@@ -143,7 +143,7 @@
 +      integer, private:: psat
 +      parameter (psat=6) ! number of supersaturations to calc ccn concentration
 +      real(r8), private:: aten
-+!
++!      
 +      real(r8), private:: alogsig(naer_cu) ! natl log of geometric standard dev of aerosol
 +      real(r8), private:: exp45logsig(naer_cu)
 +      real(r8), private:: argfactor(naer_cu)
@@ -167,7 +167,7 @@
 +
 +!wrf      integer :: naer_all    ! number of aerosols affecting climate
 +!xsong 2013-08-22---------------
-+      integer :: idxsul = 1 ! index in aerosol list for sulfate
++      integer :: idxsul = 1 ! index in aerosol list for sulfate  
 +      integer :: idxdst1 = 3 ! index in aerosol list for dust1
 +      integer :: idxdst2 = 4 ! index in aerosol list for dust2
 +      integer :: idxdst3 = 5 ! index in aerosol list for dust3
@@ -205,14 +205,14 @@
 +
 +subroutine mskf_mphyi
 +
-+!-----------------------------------------------------------------------
-+!
++!----------------------------------------------------------------------- 
++! 
 +! Purpose:
 +! initialize constants for the cumulus microphysics
 +! called from zm_conv_init() in zm_conv_intr.F90
 +!
 +! Author: Xiaoliang Song, June 2010
-+!
++! 
 +!-----------------------------------------------------------------------
 +
 +!     save    ! sep6
@@ -238,7 +238,7 @@
 +!   rhow = rhoh2o              !density of liquid water
 +
 +!NOTE:
-+! latent heats should probably be fixed with temperature
++! latent heats should probably be fixed with temperature 
 +! for energy conservation with the rest of the model
 +! (this looks like a +/- 3 or 4% effect, but will mess up energy balance)
 +
@@ -309,11 +309,11 @@
 +
 +! Ferrier [1994] time period parameter ! TWG Feb17
 +         F14 = 100.0 !180.0 Original
-+
++         
 +
 +! smallest mixing ratio considered in microphysics
 +
-+        qsmall = 1.e-28_r8 !Shaocai   !1.e-18_r8
++        qsmall = 1.e-28_r8 !Shaocai   !1.e-18_r8  
 +
 +! immersion freezing parameters, bigg 1953
 +
@@ -412,11 +412,11 @@
 +
 +! input variables
 +
-+  integer, parameter :: naer_cu = 10
++  integer, parameter :: naer_cu = 10   
 +  integer, parameter :: pcols = 1
 +
 +  integer :: pver                  ! number of vertical levels(mid-layer)
-+  integer :: pverp                 ! number of vertical levels(interface)
++  integer :: pverp                 ! number of vertical levels(interface)      
 +  real(r8) :: su(pcols,pver)        ! normalized dry stat energy of updraft
 +  real(r8) :: qu(pcols,pver)        ! spec hum of updraft
 +  real(r8) :: mu(pcols,pver)        ! updraft mass flux
@@ -486,7 +486,7 @@
 +  real(r8) :: dlfn  (pcols,pver)    !num tendency due to detrainment of droplet
 +  real(r8) :: autoim(pcols,pver)    !mass tendency due to autoconversion of cloud ice to snow
 +  real(r8) :: accsim(pcols,pver)    !mass tendency due to accretion of cloud ice by snow
-+  real(r8) :: difm  (pcols,pver)    !mass tendency due to detrainment of cloud ice
++  real(r8) :: difm  (pcols,pver)    !mass tendency due to detrainment of cloud ice 
 +  real(r8) :: nuclin(pcols,pver)    !num tendency due to ice nucleation
 +  real(r8) :: nuclim(pcols,pver)    !mass tendency due to ice nucleation
 +  real(r8) :: collrm(pcols,pver)    !mass tendency due to rain-ice collection
@@ -526,7 +526,7 @@
 +  real(r8) :: omsm                  ! number near unity for round-off issues
 +  real(r8) :: dum                   ! temporary dummy variable
 +  real(r8) :: arg                   ! argument of erfc
-+  real(r8) :: dum1                  ! temporary dummy variable
++  real(r8) :: dum1                  ! temporary dummy variable 
 +  real(r8) :: dum2                  ! temporary dummy variable
 +
 +  real(r8) :: q(pcols,pver)         ! water vapor mixing ratio (kg/kg)
@@ -612,7 +612,7 @@
 +  real(r8) :: qre                   ! dummy qr for conservation check
 +  real(r8) :: nre                   ! dummy nr for conservation check
 +  real(r8) :: qnie                  ! dummy qni for conservation check
-+  real(r8) :: nse                   ! dummy ns for conservation check
++  real(r8) :: nse                   ! dummy ns for conservation check      
 +  real(r8) :: ratio                 ! parameter for conservation check
 +
 +! sum of source/sink terms for cloud hydrometeor
@@ -632,7 +632,7 @@
 +! aerosol variables
 +  real(r8) :: naermod(naer_cu)      ! aerosol number concentration (/m3)
 +  real(r8) :: naer2(pcols,pver,naer_cu)    ! new aerosol number concentration (/m3)
-+  real(r8) :: naer2h(pcols,pver,naer_cu)   ! new aerosol number concentration (/m3)
++  real(r8) :: naer2h(pcols,pver,naer_cu)   ! new aerosol number concentration (/m3) 
 +  real(r8) :: maerosol(1,naer_cu)   ! aerosol mass conc (kg/m3)
 +  real(r8) naer(pcols)
 +
@@ -689,7 +689,7 @@
 +  real(r8) p(pcols,pver)
 +  real(r8) ph(pcols,pver)
 +
-+  real(r8) :: rhoh(pcols,pver)    ! air density (kg m-3) at interface
++  real(r8) :: rhoh(pcols,pver)    ! air density (kg m-3) at interface 
 +  real(r8) :: rhom(pcols,pver)    ! air density (kg m-3) at mid-level
 +  real(r8) :: tu(pcols,pver)      ! temperature in updraft (K)
 +
@@ -836,7 +836,7 @@
 +            rho(i,k) = rhoh(i,k)
 +
 +! air density adjustment for fallspeed parameters
-+! add air density correction factor to the power of
++! add air density correction factor to the power of 
 +! 0.54 following Heymsfield and Bansemer 2006
 +
 +            arn(i,k)=ar*(rhosu/rho(i,k))**0.54
@@ -865,8 +865,8 @@
 +
 +              maerosol(1,m)=aer_mmr(i,k,m)*rhom(i,k)
 +
-+!------------------------------------------------------------------
-+
++!------------------------------------------------------------------           
++        
 +! set number nucleated for sulfate based on Lohmann et al. 2000 (JGR) Eq.2
 +!    Na=340.*(massSO4)^0.58  where Na=cm-3 and massSO4=ug/m3
 +! convert units to Na [m-3] and SO4 [kgm-3]
@@ -1007,7 +1007,7 @@
 +
 +!---------------------Shaocai
 +!        goto 9910  !Stop2
-+
++        
 +         do k = pver,msg+2,-1
 +
 +!within the cloud processing...
@@ -1053,7 +1053,7 @@
 +             qric(i,k) = qr(i,k)
 +             nsic(i,k) = ns(i,k)
 +             nric(i,k) = nr(i,k)
-+           else  ! for it
++           else  ! for it 
 +             if (k.le.kqc(i)) then
 +                qcic(i,k) = qc(i,k)
 +                ncic(i,k) = nc(i,k)
@@ -1119,7 +1119,7 @@
 +         end if
 +
 +!***************************************************************************
-+! get size distribution parameters based on in-cloud cloud water/ice
++! get size distribution parameters based on in-cloud cloud water/ice 
 +! these calculations also ensure consistency between number and mixing ratio
 +!***************************************************************************
 +! cloud ice
@@ -1199,7 +1199,7 @@
 +          end if
 +
 +!**************************************************************************
-+! begin micropysical process calculations
++! begin micropysical process calculations 
 +!**************************************************************************
 +
 +!.................................................................
@@ -1255,7 +1255,7 @@
 +              ! nprci(k) = n0i(k)/(lami(k)*180._r8)*exp(-lami(k)*dcs)
 +              nprci(k) = n0i(k)/(lami(k)*F14)*exp(-lami(k)*dcs)
 +             ! prci(k) = pi*rhoi*n0i(k)/(6._r8*180._r8)* &
-+               prci(k) = pi*rhoi*n0i(k)/(6._r8*F14)* &
++               prci(k) = pi*rhoi*n0i(k)/(6._r8*F14)* &  
 +                  (dcs**3/lami(k)+3._r8*dcs**2/lami(k)**2+ &
 +                  6._r8*dcs/lami(k)**3+6._r8/lami(k)**4)*exp(-lami(k)*dcs)
 +           else
@@ -1263,7 +1263,7 @@
 +              nprci(k)=0._r8
 +           end if
 +
-+! provisional snow mixing ratio and number concentration (qniic and nsic)
++! provisional snow mixing ratio and number concentration (qniic and nsic) 
 +! at boundary are estimated via autoconversion
 +
 +           if (k.eq.kqi(i) .and. it.eq.1) then
@@ -1282,7 +1282,7 @@
 +              nric(i,k)=0._r8
 +           end if
 +
-+! make sure number concentration is a positive number to avoid
++! make sure number concentration is a positive number to avoid 
 +! taking root of negative later
 +           nric(i,k)=max(nric(i,k),0._r8)
 +           nsic(i,k)=max(nsic(i,k),0._r8)
@@ -1390,7 +1390,7 @@
 +
 +              psacws(k) = pi/4._r8*asn(i,k)*qcic(i,k)*rho(i,k)* &
 +                  n0s(k)*Eci*mskf_GAMMA(bs+3._r8)/ &
-+                  lams(k)**(bs+3._r8)
++                  lams(k)**(bs+3._r8)   
 +              npsacws(k) = pi/4._r8*asn(i,k)*ncic(i,k)*rho(i,k)* &
 +                  n0s(k)*Eci*mskf_GAMMA(bs+3._r8)/ &
 +                  lams(k)**(bs+3._r8)
@@ -1399,7 +1399,7 @@
 +              npsacws(k)=0._r8
 +           end if
 +
-+! secondary ice production due to accretion of droplets by snow
++! secondary ice production due to accretion of droplets by snow 
 +! (Hallet-Mossop process) (from Cotton et al., 1986)
 +           if((t(i,k).lt.270.16_r8) .and. (t(i,k).ge.268.16_r8)) then
 +              ni_secp   = 3.5e8_r8*(270.16_r8-t(i,k))/2.0_r8*psacws(k)
@@ -1489,7 +1489,7 @@
 +              .and.t(i,k).le.273.15_r8) then
 +              prai(k) = pi/4._r8*asn(i,k)*qiic(i,k)*rho(i,k)* &
 +                   n0s(k)*Eii*mskf_GAMMA(bs+3._r8)/ &
-+                   lams(k)**(bs+3._r8)
++                   lams(k)**(bs+3._r8)  
 +              nprai(k) = pi/4._r8*asn(i,k)*niic(i,k)* &
 +                   rho(i,k)*n0s(k)*Eii*mskf_GAMMA(bs+3._r8)/ &
 +                   lams(k)**(bs+3._r8)
@@ -1595,7 +1595,7 @@
 +!..............................................................................
 +!ice nucleation
 +
-+       esi(i,k)= mskf_polysvp(t(i,k),1)      ! over ice
++       esi(i,k)= mskf_polysvp(t(i,k),1)      ! over ice          
 +       es(i,k) = mskf_polysvp(t(i,k),0)
 +       qs(i,k) = 0.622_r8*es(i,k)/(ph(i,k) - (1.0_r8-0.622_r8)*es(i,k))
 +       qs(i,k) = min(1.0_r8,qs(i,k))
@@ -1632,7 +1632,7 @@
 +!ckay
 +!       print *,'nucleated ccn=',dum2i(i,k),k
 +
-+! ice nucleation if activated nuclei exist at t<0C
++! ice nucleation if activated nuclei exist at t<0C 
 +
 +        if (dum2i(i,k).gt.0._r8.and.t(i,k).lt.tmelt.and. &
 +           relhum(i,k)*es(i,k)/esi(i,k).gt. 1.05_r8  .and. k.gt.jt(i)+1) then
@@ -1680,7 +1680,7 @@
 +                      +naer2h(i,k,idxdst2)+naer2h(i,k,idxdst3)+              &
 +                       naer2h(i,k,idxdst4)))/ntaerh(i,k)             !m-3
 +              if (ttend(k) .lt. 0._r8) then
-+                 nnuccc(k) = -naimm*exp(273.15_r8-t(i,k))*ttend(k)*qcic(i,k)/rhow   ! kg-1s-1
++                 nnuccc(k) = -naimm*exp(273.15_r8-t(i,k))*ttend(k)*qcic(i,k)/rhow   ! kg-1s-1                        
 +                 mnuccc(k) = nnuccc(k)*qcic(i,k)/ncic(i,k)
 +              end if
 +          else
@@ -1699,7 +1699,7 @@
 +! contact freezing (Young, 1974) with hooks into simulated dust
 +
 +           tcnt=(270.16_r8-t(i,k))**1.3_r8
-+           viscosity=1.8e-5_r8*(t(i,k)/298.0_r8)**0.85_r8    ! Viscosity (kg/m/s)
++           viscosity=1.8e-5_r8*(t(i,k)/298.0_r8)**0.85_r8    ! Viscosity (kg/m/s)          
 +           mfp=2.0_r8*viscosity/(ph(i,k)  &                  ! Mean free path (m)
 +               *sqrt(8.0_r8*28.96e-3_r8/(pi*8.314409_r8*t(i,k))))
 +
@@ -1767,7 +1767,7 @@
 +       mtimec=deltat/900._r8
 +
 +       mtime = max(1.0_r8,mtime)   !TWG remove time scale limitation from CAM5
-+       mtimec = max(1.0_r8,mtimec)
++       mtimec = max(1.0_r8,mtimec)    
 +
 +! conservation of qc
 +
@@ -1970,7 +1970,7 @@
 +        accsln(i,k) = -npsacws(k)*arcf(i,k)*rho(i,k)
 +        activn(i,k) = npccn(k)*mtimec*arcf(i,k)*rho(i,k)
 +        dlfn  (i,k) = -du(i,k)*nc(i,k)*rho(i,k)
-+!cloud ice------------------------
++!cloud ice------------------------        
 +        autoim(i,k) = -prci(k)*arcf(i,k)
 +        accsim(i,k) = -prai(k)*arcf(i,k)
 +        difm  (i,k) = -du(i,k)*qi(i,k)             !TWG 2017 change -du(i,k+1)*qi(i,k)
@@ -2056,7 +2056,7 @@
 +!        if( qr(i,k-1) .le. 0._r8) then
 +!          qr(i,k-1)=0._r8
 +!          nr(i,k-1)=0._r8
-+!        end if
++!        end if  
 +
 +! cloud water
 +         if ( k.le.kqc(i) ) then
@@ -2143,10 +2143,10 @@
 +! these calculations also ensure consistency between number and mixing ratio
 +
 +! following equation(2,3,4) of Morrison and Gettelman, 2008, J. Climate.
-+! Gamma(n)= (n-1)!
++! Gamma(n)= (n-1)! 
 +! lamc <-> lambda for cloud liquid water
 +! pgam <-> meu    for cloud liquid water
-+! meu=0 for ice,rain and snow
++! meu=0 for ice,rain and snow         
 +!*******************************************************************************
 +!songxl 2011-12-31
 +
@@ -2193,7 +2193,7 @@
 +
 +! get pgam from fit to observations of martin et al. 1994
 +
-+              pgam(k-1)=0.0005714_r8*(nc(i,k-1)/1.e6_r8*rho(i,k-1))+0.2714_r8 !TWG 2017 change / to * in front of rho
++              pgam(k-1)=0.0005714_r8*(nc(i,k-1)/1.e6_r8*rho(i,k-1))+0.2714_r8 !TWG 2017 change / to * in front of rho 
 +              pgam(k-1)=1._r8/(pgam(k-1)**2)-1._r8
 +              pgam(k-1)=max(pgam(k-1),2._r8)
 +              pgam(k-1)=min(pgam(k-1),15._r8)
@@ -2307,7 +2307,7 @@
 +!dkay
 +!dkay       print *,'k,rprd,qrtend,qcic
 +!=',k,rprd(i,k-1),qrtend(i,k-1),qcic(i,k-1)
-+!dkay
++!dkay 
 +     end if  ! k<jlcl
 +
 +! if rain/snow mix ratio is zero so should number concentration
@@ -2331,7 +2331,7 @@
 +           nc(i,k-1)=0._r8
 +         end if
 +
-+! make sure number concentration is a positive number to avoid
++! make sure number concentration is a positive number to avoid 
 +! taking root of negative
 +
 +         nr(i,k-1)=max(nr(i,k-1),0._r8)
@@ -2340,7 +2340,7 @@
 +         nc(i,k-1)=max(nc(i,k-1),0._r8)
 +!!......................................................................
 +!dkay
-+  !      frz(i,k) = amin1(1.E-07, frz(i,k))  ! constrain frz
++  !      frz(i,k) = amin1(1.E-07, frz(i,k))  ! constrain frz 
 +       end do ! k loop
 +!dkay          print *,'jb, jt=',jb(i), jt(i)
 +       end do ! it loop, iteration
@@ -2967,8 +2967,8 @@
 +!++ag replace sg erf with hm derf pre 1.68
 +!               nact=nact+0.5*(1.-derf(x))*na(m)
 +!++ag 1.68 new error function
-+                nact=nact+0.5*(1.-erf(x))*na(m)
-+!               nact=nact+0.5*(1.-derf(x))*na(m)
++                nact=nact+0.5*(1.-erf(x))*na(m)  
++!               nact=nact+0.5*(1.-derf(x))*na(m)  
 +!       write(*,*)'nact',nact,derf(x),na(m),m
 +!       write(*,*) 'lnsmloc(m)',lnsmloc(m),lnsmax,alogsig(m)
 +!                write(*,*) 'wbar=',wbar
@@ -3239,7 +3239,7 @@
 +    onihf=nihf*1.e+6_r8/rhoair
 +
 +!     print *,'inputs=',wbar, tair, relhum,  qc,  rhoair, &
-+!      na,  naer_all, nuci,onimey,onidep,oniimm,onihf
++!      na,  naer_all, nuci,onimey,onidep,oniimm,onihf 
 +!     print *,'na,tari,nuci.. =', na,tair,nuci,onimey,onidep,oniimm,onihf
 +  return
 +  end subroutine mskf_nucleati
@@ -3317,7 +3317,7 @@
 +      Ni = 0.0_r8
 +
 +!----------------------------
-+!<Eq.6 of Liu et al., J. Climate, 2007
++!<Eq.6 of Liu et al., J. Climate, 2007 
 +! w~m/s, T~degree C, RHw~% => RHw*0.01~fraction  >
 +!RHw xiaohong's parameter
 +      A = 6.0e-4_r8*log(ww)+6.6e-3_r8
@@ -3339,7 +3339,7 @@
 +            A2_fast=A22_fast
 +            B2_fast=B22_fast
 +          endif
-+!<Eq.7 of Liu et al., J. Climate, 2007>
++!<Eq.7 of Liu et al., J. Climate, 2007> 
 +          k1_fast = exp(A2_fast + B2_fast*T + C2_fast*log(ww))
 +          k2_fast = A1_fast+B1_fast*T+C1_fast*log(ww)
 +
@@ -3406,20 +3406,20 @@
 +!.........................................
 +
 +MODULE module_cu_mskf
-
+ 
     USE module_wrf_error
 -
 -!
 -!  V3.3: A new trigger function is added based Ma and Tan (2009):
--!   Ma, L.-M. and Z.-M. Tan, 2009: Improving the behavior of
--!   the cumulus parameterization for tropical cyclone prediction:
+-!   Ma, L.-M. and Z.-M. Tan, 2009: Improving the behavior of 
+-!   the cumulus parameterization for tropical cyclone prediction: 
 -!   Convection trigger. Atmospheric Research, 92, 190 - 211.
 -!
 -!ckay
--!  WRF v3.5 with diagnosed deep and shallow KF cloud fraction using
+-!  WRF v3.5 with diagnosed deep and shallow KF cloud fraction using 
 -!  CAM3-CAM5 methodology, along with captured liquid and ice condensates.
 -!    JAH & KA (U.S. EPA) -- May 2013
-+
++ 
 +   !dkay
 +   USE module_cu_mp
  !
@@ -3431,9 +3431,9 @@
        REAL, DIMENSION(KFNP),PRIVATE, SAVE :: THE0K
        REAL, DIMENSION(200),PRIVATE, SAVE :: ALU
 @@ -26,7 +3421,7 @@
-
+ 
  CONTAINS
-
+ 
 -   SUBROUTINE KF_eta_CPS(                                    &
 +   SUBROUTINE MSKF_CPS(                                      &
                ids,ide, jds,jde, kds,kde                      &
@@ -3459,7 +3459,7 @@
               ,UER_KF,DER_KF                                  &
 -             ,TIMEC_KF,KF_EDRATES                            &
 -                                                             )
-+             ,TIMEC_KF,KF_EDRATES                            &
++             ,TIMEC_KF,KF_EDRATES                            & 
 +             ,ZOL,HFX,UST,PBLH                               &   !ckay
 +             ,aerocu,no_src_types_cu,aercu_fct,aercu_opt     & !PSH/TWG
 +             ,EFCS,EFIS,EFSS                                 &
@@ -3487,14 +3487,14 @@
 @@ -100,22 +3506,16 @@
     REAL,    DIMENSION( ims:ime , jms:jme ),                  &
              INTENT(INOUT) ::                            NCA
-
+ 
 -   REAL,    DIMENSION( ims:ime , jms:jme ), OPTIONAL,        &
 -        INTENT(INOUT) ::                            SHALL !BSINGH -  For WRFCuP scheme
--
+-   
     REAL, DIMENSION( ims:ime , jms:jme ),                     &
            INTENT(OUT) ::                              CUBOT, &
-                                                       CUTOP
-
+                                                       CUTOP    
+ 
     LOGICAL, DIMENSION( ims:ime , jms:jme ),                  &
            INTENT(INOUT) :: CU_ACT_FLAG
 -
@@ -3521,7 +3521,7 @@
 @@ -146,6 +3548,22 @@
                                                        qc_KF, &
                                                        qi_KF
-
+ 
 +   REAL,  DIMENSION( ims:ime , kms:kme , jms:jme )         , &
 +          INTENT(INOUT) ::                                   &
 +                                                      qr_KF, & ! TWG
@@ -3543,7 +3543,7 @@
            INTENT(INOUT) ::                         &
 @@ -159,6 +3577,14 @@
                                                     TIMEC_KF
-
+ 
     INTEGER, INTENT(IN) ::              KF_EDRATES
 +
 +!ckay
@@ -3553,9 +3553,9 @@
 +                                                        UST, &
 +                                                       PBLH, &
 +                                                       XLAND
-
+ 
  ! LOCAL VARS
-
+ 
 @@ -198,10 +3624,15 @@
     integer :: ibegh,iendh,jbegh,jendh
     integer :: istart,iend,jstart,jend
@@ -3563,7 +3563,7 @@
 -   INTEGER :: ishall !BSINGH -  For WRFCuP Scheme
     REAL    :: lastdt = -1.0
     REAL    :: W0AVGfctr, W0fctr, W0den
-
+    
 +!JTR 06/26/19: Added tendency variables and CMT flag
 +   REAL, DIMENSION( kts:kte ) :: DUDT, DVDT
 +   LOGICAL :: cmt_opt_flag
@@ -3572,7 +3572,7 @@
 +   cmt_opt_flag = .TRUE.
  !
     DXSQ=DX*DX
-
+ 
 @@ -248,6 +3679,8 @@
           ENDDO
        ENDDO
@@ -3580,7 +3580,7 @@
 +
 +
     lastdt = dt
-
+ 
  ! New trigger function
 @@ -418,13 +3851,29 @@
                 DQRDT(k)=0.
@@ -3658,13 +3658,13 @@
 -
 -
 -            IF(PRESENT(rthcuten).AND.PRESENT(rqvcuten)) THEN
-+                 TIMEC_KF,KF_EDRATES,               &
++                 TIMEC_KF,KF_EDRATES,               &                 
 +                 ZOL,HFX,UST,PBLH,                  &
 +                 aerocu,no_src_types_cu,aercu_fct,  &
 +                 aercu_opt,EFCS,EFIS,EFSS,          & !PSH/TWG
 +                 DUDT, DVDT, cmt_opt_flag,XLAND)      !JTR
 +
-+!JTR: Pass 1D tendency arrays to 3D arrays
++!JTR: Pass 1D tendency arrays to 3D arrays              
 +              IF(cmt_opt_flag) THEN
 +                 DO K=kts,kte
 +                    RUCUTEN(I,K,J) = DUDT(K)
@@ -3687,9 +3687,9 @@
                  ENDDO
                ENDIF
 -            ENDIF
-
+ 
  !......     QSTEN STORES GRAUPEL TENDENCY IF IT EXISTS, OTHERISE SNOW (V2)
-
+ 
 -
 -            IF(PRESENT( rqicuten )) THEN
                IF ( F_QI ) THEN
@@ -3708,7 +3708,7 @@
                ENDIF
 -            ENDIF
 -!
--         ENDIF
+-         ENDIF 
 +!
 +         ENDIF
         ENDDO     ! i-loop
@@ -3749,7 +3749,7 @@
 +                      DUDT,DVDT,cmt_opt_flag,XLAND)          !JTR
 +
  !-----------------------------------------------------------
- !***** The KF scheme that is currently used in experimental runs of EMCs
+ !***** The KF scheme that is currently used in experimental runs of EMCs 
  !***** Eta model....jsk 8/00
  !
        IMPLICIT NONE
@@ -3760,7 +3760,7 @@
 @@ -586,8 +4051,21 @@
        REAL,  INTENT(IN   ) :: XLV0,XLV1,XLS0,XLS1,CP,R,G
        REAL,  INTENT(IN   ) :: EP2,SVP1,SVP2,SVP3,SVPT0
-
+ 
 -!
 -      INTEGER, INTENT(INOUT) :: ISHALL
 +      INTEGER, INTENT(IN   ) :: no_src_types_cu  !PSH/TWG
@@ -3784,7 +3784,7 @@
 @@ -599,12 +4077,28 @@
        REAL,    DIMENSION( ims:ime , jms:jme ),             &
              INTENT(INOUT) ::                          NCA
-
+ 
 +      REAL,    DIMENSION( ims:ime , jms:jme ),             & !TWG
 +            INTENT(INOUT) ::                      ainc_frac
 +
@@ -3821,7 +3821,7 @@
 +!EBD TWG
              QLQOUT,QICOUT,PPTLIQ,PPTICE,DETLQ,DETIC,       &
              DETLQ2,DETIC2,RATIO,RATIO2
-
+ 
 @@ -689,7 +4188,81 @@
     REAL    :: CHMIN,PM15,CHMAX,DTRH,RAD,DPPP
     REAL    :: TVDIFF,DTTOT,ABSOMG,ABSOMGTC,FRDP
@@ -3902,7 +3902,7 @@
 +   Integer KQ, JK, JBB(1), JTT(1), JLCL(1), msg1, il2g , JZM, KA
 +   Integer NLEVZM, NLEVZMP1, KKAY, Miter, Itest, KC
 +!dkay
-
+ 
        INTEGER :: KX,K,KL
  !
 @@ -703,10 +4276,28 @@
@@ -3970,20 +3970,20 @@
 -                ! wig, 29-Aug-2006: I think this is where no convecion occurs. So, force
 -                ! ishall to a flag value to indicate this for accounting purposes.
 -                ishall = 2
--                !BSINGH -ENDS
+-                !BSINGH -ENDS                
                 RETURN
               ENDIF
-            ENDIF
+            ENDIF      
 @@ -857,13 +4456,13 @@
             DPTHMX=0.
             NK=LC-1
             IF ( NK+1 .LT. KTS ) THEN
 -             WRITE(message,*)'WOULD GO OFF BOTTOM: KF_ETA_PARA I,J,NK',I,J,NK
 +             WRITE(message,*)'WOULD GO OFF BOTTOM: MSKF_PARA I,J,NK',I,J,NK
-              CALL wrf_message (TRIM(message))
+              CALL wrf_message (TRIM(message)) 
             ELSE
-              DO
-                NK=NK+1
+              DO 
+                NK=NK+1   
                 IF ( NK .GT. KTE ) THEN
 -                 WRITE(message,*)'WOULD GO OFF TOP: KF_ETA_PARA I,J,DPTHMX,DPMIN',I,J,DPTHMX,DPMIN
 +                 WRITE(message,*)'WOULD GO OFF TOP: MSKF_PARA I,J,DPTHMX,DPMIN',I,J,DPTHMX,DPMIN
@@ -3991,22 +3991,22 @@
                   EXIT
                 ENDIF
 @@ -875,10 +4474,6 @@
-              END DO
+              END DO    
             ENDIF
-            IF(DPTHMX.LT.DPMIN)THEN
+            IF(DPTHMX.LT.DPMIN)THEN 
 -              !BSINGH - For WRFCuP scheme
 -              ! wig, 29-Aug-2006: Indicate no convection occurred in ishall.
 -              ishall = 2
 -              !BSINGH -ENDS
               RETURN
             ENDIF
-            KPBL=LC+NLAYRS-1
+            KPBL=LC+NLAYRS-1   
 @@ -945,15 +4540,7 @@
           KLCL = NK
           IF ( ZLCL.LE.Z0(NK) )  EXIT
       END DO
 -     IF ( ZLCL.GT.Z0(KL) ) then
--        !BSINGH - For WRFCuP scheme
+-        !BSINGH - For WRFCuP scheme 
 -        !BSINGH - Improvised based on the following reason
 -        !Before every "RETURN" statement assign ishall=2
 -        ! wig, 29-Aug-2006: Indicate no convection occurred in ishall.
@@ -4015,13 +4015,13 @@
 -        RETURN
 -     endif
 +     IF ( ZLCL.GT.Z0(KL) )  RETURN
-
+ 
            K=KLCL-1
  ! calculate DLP using Z instead of log(P)
 @@ -965,63 +4552,53 @@
            QENV=Q0(K)+(Q0(KLCL)-Q0(K))*DLP
            TVEN=TENV*(1.+0.608*QENV)
- !
+ !     
 -!...CHECK TO SEE IF CLOUD IS BUOYANT USING FRITSCH-CHAPPELL TRIGGER
 -!...FUNCTION DESCRIBED IN KAIN AND FRITSCH (1992)...W0 IS AN
 -!...APROXIMATE VALUE FOR THE RUNNING-MEAN GRID-SCALE VERTICAL
@@ -4031,7 +4031,7 @@
 -!...SUCCESS AT GRID LENGTHS NEAR 25 km.  FOR DIFFERENT GRID-LENGTHS,
 -!...ADJUST VERTICAL VELOCITY TO EQUIVALENT VALUE FOR 25 KM GRID
 -!...LENGTH, ASSUMING LINEAR DEPENDENCE OF W ON GRID LENGTH...
--!
+-!     
 +! ww: this needs to be initialized
 +          DTRH = 0.
 +
@@ -4047,7 +4047,7 @@
 +              DTLCL = (DTLCL)**0.3333
 +           end if
 +
-+           DTLCL = 6.0 * tempKay * DTLCL
++           DTLCL = 6.0 * tempKay * DTLCL 
 +!
 +! old trigger
 +! Stick with the old trigger for now... CGM July 2015
@@ -4063,15 +4063,15 @@
 +           WKL=(W0AVG1D(K)+(W0AVG1D(KLCL)-W0AVG1D(K))*DLP)*DX/25.E3-WKLCL
 +         else
 +           WKL=(W0AVG1D(K)+(W0AVG1D(KLCL)-W0AVG1D(K))*DLP)-WKLCL
-+         end if
++         end if 
 +!TWG ckay, Modified WKL
            IF(WKL.LT.0.0001)THEN
              DTLCL=0.
--          ELSE
+-          ELSE 
 +          ELSE
              DTLCL=4.64*WKL**0.33      ! Kain (2004) Eq. 1
            ENDIF
-
+ 
 -! New trigger function
 -           IF(trigger.eq.2) then
 -              DTLCL=amax1(TPART_H0(KLCL)+TPART_V0(KLCL),0.0)
@@ -4098,14 +4098,14 @@
 -            ELSE
 -               DTRH = 0.
 -            ENDIF
--          ENDIF
+-          ENDIF   
 -        endif   ! trigger 3
 +
  !         IF(ISHALL.EQ.1)IPRNT=.TRUE.
  !         IPRNT=.TRUE.
  !         IF(TLCL+DTLCL.GT.TENV)GOTO 45
--
--trigger2:  IF(TLCL+DTLCL+DTRH.LT.TENV)THEN
+- 
+-trigger2:  IF(TLCL+DTLCL+DTRH.LT.TENV)THEN   
 -!
 -! Parcel not buoyant, CYCLE back to start of trigger and evaluate next potential USL...
 +
@@ -4117,7 +4117,7 @@
              CYCLE usl
  !
 @@ -1051,14 +4628,17 @@
- !
+ !        
              LCL=KLCL
              LET=LCL
 -! make RAD a function of background vertical velocity...    (Kain (2004) Eq. 6)
@@ -4138,8 +4138,8 @@
 +
 +            RAD = AMIN1(4000.,RAD)  ! max trap
 +            RAD = AMAX1(500.,RAD)  ! min trap
-+
- !
++ 
+ !     
  !*******************************************************************
  !                                                                  *
 @@ -1073,6 +4653,7 @@
@@ -4266,7 +4266,7 @@
 +             IFLAG=1
 +            ENDIF
 +           END IF
-+!END TWG
++!END TWG 
  !
  !  DETERMINE THE EFFECTS OF LIQUID WATER FREEZING WHEN TEMPERATURE
  !...IS BELOW TTFRZ...
@@ -4296,7 +4296,7 @@
 +              IF(DX.GE.24.999E3) then
 +                RATE_kay = RATE
 +              else
-+                RATE_kay = RATE / Scale_Fac
++                RATE_kay = RATE / Scale_Fac 
 +               end if
                CALL CONDLOAD(QLIQ(NK1),QICE(NK1),WTW,DZZ,BOTERM,ENTERM,      &
 -                        RATE,QNEWLQ,QNEWIC,QLQOUT(NK1),QICOUT(NK1),G)
@@ -4317,7 +4317,7 @@
 +
 +              TOKIOKA = 0.03
 +              TOKIOKA = TOKIOKA * Scale_Fac
-+              REI=VMFLCL*DP(NK1)*TOKIOKA/RAD
++              REI=VMFLCL*DP(NK1)*TOKIOKA/RAD         
 +!ckay
                TVQU(NK1)=TU(NK1)*(1.+0.608*QU(NK1)-QLIQ(NK1)-QICE(NK1))
                IF(NK.EQ.K)THEN
@@ -4464,7 +4464,7 @@
 +2023          format(2(1x,e13.6))
 +               end do
 +                end if ! itest
-+
++            
 +
 +               if(DCCMP) then
 +              do kq=KTS,KTE
@@ -4505,7 +4505,7 @@
 +                 EFFCH(KQ) = max(2.49_r8, min(effc(1,JK), 50._r8))
 +                 EFFIH(KQ) = max(4.99_r8, min(effi(1,JK), 125._r8))
 +                 EFFSH(KQ) = max(9.99_r8, min(effs(1,JK), 999._r8))
-+! END TWG
++! END TWG        
 +                  DETLQ(KQ)= QLIQ(KQ)*UDR(KQ)
 +                  DETIC(KQ)= QICE(KQ)*UDR(KQ)
 +!               print *,'zm qliq=', QLIQ(KQ)
@@ -4535,7 +4535,7 @@
 +
 +              end if  ! dccmp
 +!dkay
-+
++     
 +2999         CONTINUE
 +     END IF
 +
@@ -4584,12 +4584,12 @@
 +!ckay ; get vertically averaged envRHavg
 +         envRHavg = envRHavg / float(LTOP-K+1+2)
 +2020     continue
-
- !
- !...If cloud top height is less than the specified minimum for deep
+ 
+ !     
+ !...If cloud top height is less than the specified minimum for deep 
 @@ -1363,8 +5278,14 @@
  !...            3.) cloud top is within updraft source layer, or
- !...            4.) cloud-top detrainment layer begins within
+ !...            4.) cloud-top detrainment layer begins within 
  !...                updraft source layer.
 -!
 -            IF(LTOP.LE.KLCL .or. LTOP.LE.KPBL .or. LET+1.LE.KPBL)THEN  ! No Convection Allowed
@@ -4623,7 +4623,7 @@
 +              END IF
 +! END TWG
                ENDDO
- !
+ !        
              ELSEIF(CLDHGT(LC).GT.CHMIN .and. ABE.GT.1)THEN      ! Deep Convection allowed
 @@ -1413,10 +5348,24 @@
                    cldfra_sh_KF(I,NK,J)=0.
@@ -4728,7 +4728,7 @@
 +         SCLvel = WST**3
 +         ZLCL_KAY = amax1(ZLCL,Z0(KPBL))
 +         SCLvel = SCLvel/PBLH(I,J)
-+         SCLvel = SCLvel*ZLCL_kay
++         SCLvel = SCLvel*ZLCL_kay   
 +         SCLvel = SCLvel**0.333   ! Wsb=SubCloudLayerVelocity for ConvectivePBL
 +         if(ZOL(i,J).le.0.0) then
 +           FRC2=3.8*Ust(I,J)*Ust(I,J)
@@ -4739,23 +4739,23 @@
 +           FRC2 = FRC2 + ZLCL_KAY
 +         else
 +           FRC2=3.8*Ust(I,J)*Ust(I,J)
-+         end if
++         end if 
 +
-+          FRC2 = SQRT(FRC2)
++          FRC2 = SQRT(FRC2)  
 +          SCLvel =  FRC2  ! Wsb=new subcloud layer velocity scale for all conditions
 +         IF(SCLvel.lt.0.1) SCLvel = 0.1
-+         if(ABE.le.0.0) ABE = 1.0
++         if(ABE.le.0.0) ABE = 1.0 
 +         TIMEC = TIMEC/((0.03*SCLvel*ABE)**0.3333)
 +
 +!ckay: this dynTau is good for the Deep as well as Shallow Cu clouds
 +        TIMEC = AMAX1(TADVEC, TIMEC)
-+
++ 
 +         NIC=NINT(TIMEC/DT)
 +         TIMEC=FLOAT(NIC)*DT
 +         TIMEC=MIN(TIMEC,86400.)  !JRJ Ramboll: cap convective time scale at 24 hrs
- !
+ !     
  !...COMPUTE WIND SHEAR AND PRECIPITATION EFFICIENCY.
- !
+ !     
 @@ -1782,7 +5801,7 @@
            ENDIF
          ENDIF
@@ -4769,12 +4769,12 @@
  !           DETLQ(NK)=DETLQ(NK)*UPDINC
  !           DETIC(NK)=DETIC(NK)*UPDINC
  !         ENDDO
--!
+-!     
 +!
-+
++  
  !...ZERO OUT THE ARRAYS FOR DOWNDRAFT DATA AT LEVELS ABOVE AND BELOW THE
  !...DOWNDRAFT...
- !
+ !     
 @@ -2153,6 +6173,16 @@
            ABEG=0.
            DO NK=K,LTOPM1
@@ -4809,7 +4809,7 @@
 -             ! wig, 29-Aug-2006: Indicate no convection occurred in ishall.
 -             ishall = 2
 -             !BSINGH -ENDS
-             RETURN
+             RETURN  
            ENDIF
            IF(NCOUNT.NE.1)THEN
 @@ -2248,13 +6273,6 @@
@@ -4827,7 +4827,7 @@
              ENDIF
  !            AINC=AMAX1(AINC,0.05)                        ! JSK MODS
 @@ -2279,27 +6297,54 @@
- !
+ !     
            ENDIF
          ENDDO iter
 +
@@ -4838,8 +4838,8 @@
 +           IF (aercu_opt .GT. 0) THEN
 +            ainc_frac(I,J) = 1.0-updil !TWG
 +           END IF
-+            updil = updil*dxsq
-+            Drag = 0.5
++            updil = updil*dxsq  
++            Drag = 0.5   
 +
          IF(ISHALL.EQ.1) THEN
 -          DO NK=KLCL-1, LTOP1
@@ -4854,7 +4854,7 @@
 +            DMF_new=DMF(NK)/updil
 +            FXM_new=FXM(NK)/dxsq
            ENDDO
-         ELSE
+         ELSE 
 -          DO NK=KLCL-1, LTOP1
 -            UMF_new = UMF(NK)/DXSQ
 +          DO NK=KLCL, LTOP
@@ -4878,11 +4878,11 @@
 +           envRH  = Q0(NK)/envQsat
 +            envRHavg = envRHavg + envRH
 +          END DO
-
+ 
  !kf_edrates
  !Save up/down entrainment/detrainment rates as 3D variables
 -        IF (KF_EDRATES == 1) THEN
-+        IF (KF_EDRATES == 1) THEN
++        IF (KF_EDRATES == 1) THEN 
             DO NK=1,LTOP
               UDR_KF(I,NK,J)=UDR(NK)
               DDR_KF(I,NK,J)=DDR(NK)
@@ -4891,9 +4891,9 @@
             ENDDO
          ENDIF
 +
- !
+ !     
  !...COMPUTE HYDROMETEOR TENDENCIES AS IS DONE FOR T, QV...
- !
+ !     
 @@ -2386,6 +6432,7 @@
          IF (KF_EDRATES == 1) THEN
             TIMEC_KF(I,J)=TIMEC
@@ -4903,7 +4903,7 @@
  !...CLEAN THINGS UP, CALCULATE CONVECTIVE FEEDBACK TENDENCIES FOR THIS
  !...GRID POINT...
 @@ -2406,7 +6453,7 @@
-        IF(IPRNT)then
+        IF(IPRNT)then 
  !    if(I.eq.16 .and. J.eq.41)then
  !      IF(ISTOP.EQ.1)THEN
 -         write(98,*)
@@ -4912,7 +4912,7 @@
           write(message,*)'P(LC), DTP, WKL, WKLCL =',p0(LC)/100.,       &
                       TLCL+DTLCL+dtrh-TENV,WKL,WKLCL
 @@ -2488,8 +6535,8 @@
- ! 4422       format(i6)
+ ! 4422       format(i6) 
              DO 310 NK = 1,KL
                k = kl - nk + 1
 -              write(98,4455) p0(k)/100.,t0(k)-273.16,q0(k)*1000.,       &
@@ -4928,16 +4928,16 @@
          RNC=RAINCV(I,J)*NIC
 -       IF(ISHALL.EQ.0.AND.IPRNT)write (98,909)I,J,RNC
 +!       IF(ISHALL.EQ.0.AND.IPRNT)write (98,909)I,J,RNC
-
+ 
  !     WRITE(98,1095)CPR*AINC,TDER+PPTFLX+CNDTNF
- !
+ !     
 @@ -2525,13 +6572,13 @@
          QFNL=QFNL+PPTFLX*TIMEC*(1.-FBFRC)       !  PPT FB MODS
  !        QFNL=QFNL+PPTFLX*TIMEC                 !  PPT FB MODS
          ERR2=(QFNL-QINIT)*100./QINIT
 -       IF(IPRNT)WRITE(98,1110)QINIT,QFNL,ERR2
 +!       IF(IPRNT)WRITE(98,1110)QINIT,QFNL,ERR2
-       IF(ABS(ERR2).GT.0.05 .AND. ISTOP.EQ.0)THEN
+       IF(ABS(ERR2).GT.0.05 .AND. ISTOP.EQ.0)THEN 
  !       write(99,*)'!!!!!!!! MOISTURE BUDGET ERROR IN KFPARA !!!'
  !       WRITE(99,1110)QINIT,QFNL,ERR2
 -        IPRNT=.TRUE.
@@ -4958,7 +4958,7 @@
 +!                     U0(K),V0(K),W0AVG1D(K),dp(k)/100.,tke(k)
   311        CONTINUE
  !           flush(98)
-
+ 
 @@ -2556,9 +6603,9 @@
            RELERR=0.
          ENDIF
@@ -4970,7 +4970,7 @@
 +!        WRITE(98,*)'TDER, CPR, TRPPT =',              &
 +!          TDER,CPR*AINC,TRPPT*AINC
       ENDIF
- !
+ !     
  !...FEEDBACK TO RESOLVABLE SCALE TENDENCIES.
 @@ -2569,7 +6616,7 @@
          IF(TADVEC.LT.TIMEC)NIC=NINT(TADVEC/DT)
@@ -5027,12 +5027,12 @@
 +                 JDD(1) = KTE-LFS+1
 +                 JTT(1) = KTE-LTOP+1
 +!ckay
-+                  if(JDD(1).LT.JTT(1).or.JDD(1).GT.JBB(1)) then
++                  if(JDD(1).LT.JTT(1).or.JDD(1).GT.JBB(1)) then 
 +                      JDD(1)=JBB(1)-1  ! for cases no downdraft
 +                   end if
 +                  if(jtt(1).gt.jbb(1))  then
 +                   JTT(1) = JBB(1)
-+                  end if
++                  end if     
 +
 +!JTR Begin CMT Variable Prep
 +! CKAY fill in grid-scale values for below cloud and above cloud portions
@@ -5052,7 +5052,7 @@
 +                        TUP(KQ) = TU(KQ)
 +                 endif
 +               end do
-+
++               
 +               !JTRnew: Pulled this out of the main loop so the entire column
 +               !gets defined before use in the main loop
 +               DO KQ=KTS,KTE
@@ -5068,23 +5068,23 @@
 +                 DPDY(1,JK) = 0.0
 +
 +                 zf_wrf(KQ) = zf_wrf(KQ-1)+DZQ(KQ)
-+                 zfu(1,JK) = zf_wrf(KQ)
++                 zfu(1,JK) = zf_wrf(KQ) 
 +
 +                 IF(KQ.EQ.KTE) THEN
 +                     qhat(1,JK) = Q0(KQ)
 +                     shat(1,JK) = stat_energy(KQ)
 +                 ELSE
-+                     qhat(1,JK) = 0.5*(Q0(KQ)/(1.+Q0(KQ)) + Q0(KQ+1)/(1.+Q0(KQ+1)))
++                     qhat(1,JK) = 0.5*(Q0(KQ)/(1.+Q0(KQ)) + Q0(KQ+1)/(1.+Q0(KQ+1))) 
 +                     shat(1,JK) = 0.5*(stat_energy(KQ) + stat_energy(KQ+1))
 +                 ENDIF
-+
++                  
 +!ckay fill in clear and cloudy layers properly
 +               IF(KQ.LT.KLCL .OR. KQ.GT.LTOP) then  ! subcloud layer or above-cloud layer
 +                   QUP(1,JK) = Q0(KQ)/(1.+Q0(KQ))
 +                   QDN(1,JK) = Q0(KQ)/(1.+Q0(KQ))
 +                   SUU(1,JK) = CP*(T0(KQ)*(1.0+0.622*Q0(KQ))) + G*Zf_wrf(KQ)
 +                   SDD(1,JK) = CP*(T0(KQ)*(1.0+0.622*Q0(KQ))) + G*Zf_wrf(KQ)
-+               Else
++               Else  
 +                 QUP(1,JK) = QU(KQ)/(1.+QU(KQ))
 +                 QDN(1,JK) = QD(KQ)/(1.+QD(KQ))
 +
@@ -5142,7 +5142,7 @@
 +                print *,'IL2G',IL2G
 +                print *,'ILG',ILG
 +              end if ! CMTpring
-+
++           
 +                CALL MSKF_CMT(DUDTnew,DVDTnew,dpdx,dpdy,     &
 +                       DPconvF,DERconvF,UERconvF,          &
 +                       MC,DMFconvF,                        &
@@ -5164,7 +5164,7 @@
 +              end if ! for CMTprint
 +        ENDIF  ! for cmt flag
 +!JTR End CMT
-+
++        
          PRATEC(I,J)=PPTFLX*(1.-FBFRC)/DXSQ
          RAINCV(I,J)=DT*PRATEC(I,J)
  !        RAINCV(I,J)=.1*.5*DT*PPTFLX/DXSQ               !  PPT FB MODS
@@ -5226,7 +5226,7 @@
     REAL,         INTENT(IN   )   :: P,QFRZ,ALIQ,BLIQ,CLIQ,DLIQ
     REAL,         INTENT(INOUT)   :: TU,THTEU,QU,QICE
 @@ -2865,6 +7102,7 @@
-
+ 
  !-----------------------------------------------------------------------
     IMPLICIT NONE
 +!  SAVE !TWG 2017 add to avoid memory issues
@@ -5258,7 +5258,7 @@
     REAL,         INTENT(IN   )   :: P1,T1,Q1,ALIQ,BLIQ,CLIQ,DLIQ
     REAL,         INTENT(INOUT)   :: THT1
 @@ -3081,15 +7322,17 @@
-   END SUBROUTINE ENVIRTHT
+   END SUBROUTINE ENVIRTHT                                                              
  ! ***********************************************************************
  !====================================================================
 -   SUBROUTINE kf_eta_init(RTHCUTEN,RQVCUTEN,RQCCUTEN,RQRCUTEN,      &
@@ -5280,7 +5280,7 @@
 @@ -3097,13 +7340,16 @@
                                        its, ite, jts, jte, kts, kte
     INTEGER , INTENT(IN)           ::  P_QI,P_QS,P_FIRST_SCALAR
-
+ 
 +
     REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(OUT) ::       &
                                                            RTHCUTEN, &
@@ -5292,9 +5292,9 @@
 +                                                          RQSCUTEN, &
 +                                                           RUCUTEN, &
 +                                                           RVCUTEN
-
+ 
     REAL ,   DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(OUT) :: W0AVG
-
+ 
 @@ -3125,6 +7371,9 @@
           RQVCUTEN(i,k,j)=0.
           RQCCUTEN(i,k,j)=0.
@@ -5306,9 +5306,9 @@
        ENDDO
        ENDDO
 @@ -3165,13 +7414,14 @@
-
+ 
     endif
-
+  
 -   CALL KF_LUTAB(SVP1,SVP2,SVP3,SVPT0)
 -
 -   END SUBROUTINE kf_eta_init
@@ -5316,14 +5316,14 @@
 +
 +
 +   END SUBROUTINE mskf_init
-
+ 
  !-------------------------------------------------------
-
+ 
 -      subroutine kf_lutab(SVP1,SVP2,SVP3,SVPT0)
 +      subroutine mskf_lutab(SVP1,SVP2,SVP3,SVPT0)
  !
  !  This subroutine is a lookup table.
- !  Given a series of series of saturation equivalent potential
+ !  Given a series of series of saturation equivalent potential 
 @@ -3179,6 +7429,7 @@
  !
  !--------------------------------------------------------------------
@@ -5334,7 +5334,7 @@
  !     INTEGER, SAVE, PARAMETER :: KFNT=250,KFNP=220
 @@ -3298,6 +7549,493 @@
           alu(i)=alog(a1)
-        enddo
+        enddo   
  !
 -   END SUBROUTINE KF_LUTAB
 -
@@ -5359,7 +5359,7 @@
 +! ongxl      PARAMETER(NBF=10)
 +! ongxl      PARAMETER(JLG=128, JLEV=18)
 +! ongxl 20060901---------------------
-+
++         
 +    real(r8) DUDT(ILG,ILEV),  DVDT(ILG,ILEV), &
 +    dpdx(ILG,ILEV),  dpdy(ILG,ILEV), &
 +    ALPHA(ILG,ILEV), DP(ILG,ILEV), &
@@ -5675,16 +5675,16 @@
 +            AA(IL,MSG+1,N)=0._r8
 +            BB(IL,MSG+1,N)=1._r8/ DZF(IL,MSG+2)
 +            CC(IL,MSG+1,N)=-1._r8/ DZF(IL,MSG+2)
-+
++              
 +            AA(IL,ILEV,N)=1._r8/ DZF(IL,ILEV)
 +            BB(IL,ILEV,N)=-1._r8/ DZF(IL,ILEV)
 +            CC(IL,ILEV,N)=0._r8
-+
++              
 +            DX(IL,MSG+1,N)=B1(IL,MSG+2)*ALFA1(N)*2._r8 &
 +            *COSA(IL)/BSJ0(N)**2
 +            DX(IL,ILEV,N)=B1(IL,ILEV)*ALFA1(N)*2._r8 &
 +            *COSA(IL)/BSJ0(N)**2
-+
++              
 +            DY(IL,MSG+1,N)=B1(IL,MSG+2)*ALFA1(N)*2._r8 &
 +            *SINA(IL)/BSJ0(N)**2
 +            DY(IL,ILEV,N)=B1(IL,ILEV)*ALFA1(N)*2._r8 &
@@ -5698,7 +5698,7 @@
 +                BB(IL,J,N)=-( 1._r8/DZ(IL,J)*(1._r8/DZF(IL,J)+1._r8/DZF(IL,J+1)) &
 +                +(TAU(N)/RMAX)**2 )
 +                CC(IL,J,N)=1._r8/( DZ(IL,J)*DZF(IL,J+1) )
-+
++                  
 +                DX(IL,J,N)=FX(IL,J,N)
 +                DY(IL,J,N)=FY(IL,J,N)
 +    550 END DO

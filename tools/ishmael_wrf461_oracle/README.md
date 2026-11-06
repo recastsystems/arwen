@@ -66,7 +66,7 @@ named missing habit-volume closure refusal. No general observation-based
 forecast skill or full native trajectory bit identity is claimed.
 
 Commands, configurations, logs, native capture packets and figures live in
-~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-mp55-ishmael/. Raw full
+<reports>/WRF-PORTS-2026-11-01/evidence/port-mp55-ishmael/. Raw full
 forecast frames are removed after reporting. thin_history.rs,
 station_overlay.rs and history_words.rs provide Rust data-path evidence
 helpers; render_evidence.py in the receipts drives gpuwm.rustwx.

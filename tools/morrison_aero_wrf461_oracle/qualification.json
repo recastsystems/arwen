@@ -72,7 +72,7 @@
     "aercu_opt_1_2": "Exact licence/provenance of external CESM_RCP4.5_Aerosol_Data.dat not established. Native pairing is cu_physics=11 and mp_physics=40. No aerosol table is shipped.",
     "mixed_scheme_nests": "MP40 passive QNC cross-scheme closure has no validated native authority."
   },
-  "evidence_directory": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-mp40-morrison-aero/",
+  "evidence_directory": "<reports>/WRF-PORTS-2026-11-01/evidence/port-mp40-morrison-aero/",
   "evidence_files": [
     "resume-replay-native-final.json",
     "resume-native-completion.json",

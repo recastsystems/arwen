@@ -1225,7 +1225,7 @@ def preprocess_land_surface_soil(
     soil for a RUC run over CONUS) then replaces it on the land it covers.
     Named breakage: an ERA5 start put HTESSEL soil moisture into RUC as is,
     0.36 against HRRR's 0.21, and T2 ran 1-2 C cold with no storms
-    (WEATHER-AGI-2026-10-26 cold-teacher).
+    (2026-10-26 cold-start study).
     """
 
     if not isinstance(fractional_seaice, bool):

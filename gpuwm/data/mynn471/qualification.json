@@ -10,7 +10,7 @@
     "exclusions": []
   },
   "forecast_status": "All 14 real fast option forecasts completed and meet the 1.2x stage bar. Two-minute cases do not establish option skill.",
-  "report": "~/lanes/downloads/WRF-PORTS-2026-11-01/port-mynn-subopts.md",
+  "report": "<reports>/WRF-PORTS-2026-11-01/port-mynn-subopts.md",
   "adapter_replay": {
     "rows": 14,
     "columns_per_row": 90,

@@ -3,7 +3,7 @@ ldd (Ubuntu GLIBC 2.39-0ubuntu8.9) 2.39
 module_bl_temf.F 0c4d731ca3124198342a3a2f90e0a43f34ddf5731b545460fb27bf794ed77475
 module_sf_temfsfclay.F 70f2ed6bc48aad5b1bf68be4e01753a132f2ecdb4fa6d95c0ecce5d5554fcd94
 WRF FCOPTIM on this box: -O2 -fno-fast-math -ffp-contract=off -fno-tree-vectorize
-libm entries the modules call:  _gfortran_st_write _gfortran_st_write_done _gfortran_transfer_character_write _gfortran_transfer_real_write atan2f atanf expf free log10f logf malloc memcpy memset powf sincosf wrf_debug_
+libm entries the modules call:  _gfortran_st_write _gfortran_st_write_done _gfortran_transfer_character_write _gfortran_transfer_real_write atan2f atanf expf free log10f logf malloc memcpy memset powf sincosf wrf_debug_ 
 fma instructions in arm stock: 0
 fma instructions in arm fixed: 0
 fma instructions in arm stock-O0: 0

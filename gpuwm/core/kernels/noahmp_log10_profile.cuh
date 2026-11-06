@@ -137,3 +137,4 @@ __device__ static float noahmp_native_log10(float x) {
     }
   return ub;
 }
+

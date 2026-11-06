@@ -217,7 +217,7 @@ def run(outdir: str | Path, *, duration_seconds: float = 9.0,
         output_interval_seconds: float | None = None,
         health_interval_seconds: float = 60.0,
         streaming_lbc: bool = False, mp_physics: int = 10,
-        cloud_seed_kgkg: float = 0.0) -> dict[str, object]:
+        cloud_bump_kgkg: float = 0.0) -> dict[str, object]:
     import cupy as cp
     from gpuwm.core.dycore import stability_report, step
     from gpuwm.core.grid import make_base_state, make_vertical_coord
@@ -285,13 +285,13 @@ def run(outdir: str | Path, *, duration_seconds: float = 9.0,
         coord, lambda z: wk82.wk82_sounding(z)[0],
         p_surf=parent_cfg.p_surf, ztop=parent_cfg.ztop)
     parent = wk82.build(parent_cfg, coord, base)
-    if cloud_seed_kgkg:
-        if not 0.0 < cloud_seed_kgkg <= 1.0e-3:
-            raise ValueError("cloud_seed_kgkg must be in (0, 0.001]")
+    if cloud_bump_kgkg:
+        if not 0.0 < cloud_bump_kgkg <= 1.0e-3:
+            raise ValueError("cloud_bump_kgkg must be in (0, 0.001]")
         # Transfer vapour to cloud water in the lower cloud layer. This
         # makes number-carrier inheritance observable in the archive.
-        parent.qc[3:parent_cfg.nz // 2] += cp.float32(cloud_seed_kgkg)
-        parent.qv[3:parent_cfg.nz // 2] -= cp.float32(cloud_seed_kgkg)
+        parent.qc[3:parent_cfg.nz // 2] += cp.float32(cloud_bump_kgkg)
+        parent.qv[3:parent_cfg.nz // 2] -= cp.float32(cloud_bump_kgkg)
     initialize_physics(parent, parent_cfg)
     parent_memory_initial = _memory_snapshot(cp)
     parent_pool_reserved_peak = parent_memory_initial["pool_reserved_bytes"]
@@ -437,7 +437,7 @@ def run(outdir: str | Path, *, duration_seconds: float = 9.0,
         "result": "PASS" if not child_health["nan"] else "FAIL",
         "pipeline": f"gpuwm-mp{mp_physics}-parent-history-to-standalone-mp{mp_physics}-child",
         "mp_physics": mp_physics,
-        "cloud_seed_kgkg": cloud_seed_kgkg,
+        "cloud_bump_kgkg": cloud_bump_kgkg,
         "online_parent_present_during_child": False,
         "parent_frames": [str(path) for path in parent_paths],
         "parent_frame_bytes": [path.stat().st_size for path in parent_paths],
@@ -503,7 +503,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m gpuwm.offline_child_smoke")
     parser.add_argument("--outdir", type=Path, required=True)
     parser.add_argument("--mp-physics", type=int, choices=(10, 40), default=10)
-    parser.add_argument("--cloud-seed-kgkg", type=float, default=0.0)
+    parser.add_argument("--cloud-bump-kgkg", type=float, default=0.0)
     parser.add_argument("--duration-seconds", type=float, default=9.0)
     parser.add_argument("--boundary-interval-seconds", type=float,
                         default=3.0)
@@ -517,7 +517,7 @@ def main(argv=None) -> int:
         output_interval_seconds=args.output_interval_seconds,
         health_interval_seconds=args.health_interval_seconds,
         streaming_lbc=args.streaming_lbc, mp_physics=args.mp_physics,
-        cloud_seed_kgkg=args.cloud_seed_kgkg)
+        cloud_bump_kgkg=args.cloud_bump_kgkg)
     return 0 if report["result"] == "PASS" else 1
 
 

@@ -1708,7 +1708,7 @@ def _coord_from_parent(state: DomainState, parent_cfg) -> VerticalCoord:
         c4h=np.array(_host(state.c4h), copy=True))
 
 
-#: WRF ``start_domain``'s seeding pairs: the RK time-t copy each current
+#: WRF ``start_domain``'s start-up pairs: the RK time-t copy each current
 #: field is taken from.  Named rather than inlined because a child's state
 #: is seeded on TWO occasions -- when it is cold-started from its parent,
 #: and when a discrete relocation stamps an integrated state onto a child

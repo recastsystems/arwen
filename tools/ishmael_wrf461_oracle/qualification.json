@@ -4,7 +4,7 @@
   "selector": 55,
   "status": "supported",
   "scientific_evidence": "none",
-  "evidence_directory": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-mp55-ishmael",
+  "evidence_directory": "<reports>/WRF-PORTS-2026-11-01/evidence/port-mp55-ishmael",
   "replay": {
     "compared_words": 213156,
     "total_words": 0,

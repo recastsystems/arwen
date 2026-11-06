@@ -192,7 +192,7 @@ The MP52 lane uses the WRF v4.6.1 public-domain source and tables. The P3
 source in the native v4.7.1 build is byte-identical to that pin. Source and
 asset hashes, commands, private instrumentation, configs, logs and Rust
 figures are retained in the lane evidence under
-`~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-mp52-p3-2cat/`.
+`<reports>/WRF-PORTS-2026-11-01/evidence/port-mp52-p3-2cat/`.
 `qualification_20261101.json` records the portable receipt totals.
 
 The real case is 2024-05-25 18–21 UTC, Oklahoma/north Texas, 150×150 mass

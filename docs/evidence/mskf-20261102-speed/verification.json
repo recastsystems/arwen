@@ -187,7 +187,7 @@
     "255-register kernel and uncoalesced traffic remain",
     "not general forecast skill or aerosol-coupled qualification"
   ],
-  "evidence_root": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/spd-cu11-mskf",
+  "evidence_root": "<reports>/WRF-PORTS-2026-11-01/evidence/spd-cu11-mskf",
   "startup_commit": "00e3703ca28c6e07f2b110b45a49ccfcfefed022",
   "native_cpu_profile": {
     "status": "partial; wrapper exited137 during a global OOM event; attribution to OOM is an inference",

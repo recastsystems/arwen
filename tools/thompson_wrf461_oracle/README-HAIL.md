@@ -143,7 +143,7 @@ candidate `4123f1916e3c95984862cd9b21f2fc1e8dd5f850` on identical sealed
 inputs. All four history files are byte-identical, as is the final canonical
 carried state. The lane report records the full commands, configs, source
 identities, performance samples, figures and limitations under
-`~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-mp38-thompson-gh/`.
+`<reports>/WRF-PORTS-2026-11-01/evidence/port-mp38-thompson-gh/`.
 
 ## GPU stage timing
 

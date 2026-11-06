@@ -116,5 +116,5 @@ model step times. The profile tools beside this file take the owned case root.
 
 The dated lane report and small receipts, exact commands, stock namelists,
 Rust figures, source licence checks and source hashes are delivered locally
-under `~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-cloud-aerosol/`.
+under `<reports>/WRF-PORTS-2026-11-01/evidence/port-cloud-aerosol/`.
 Regenerable forecast output is removed after retaining that paper evidence.

@@ -87,7 +87,7 @@ the map displays wind speed in knots.
 
 <!-- earth2-models:begin -->
 Generated from `gpuwm/authorities/earth2-models.v1.json`.
-Authority SHA-256: `9a1a228e8878039a8457cea7e047971365160db1d85e47176f01c2070602579d`.
+Authority SHA-256: `774e56548edd6cff296d707d590380102508312a9a8385feb9e551a950ef81ee`.
 
 These are authority declarations, not a list of measured forecasts.
 Gated rows declared here: none.

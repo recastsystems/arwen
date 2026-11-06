@@ -30,6 +30,12 @@ def test_mrf_history_diagnostics_round_trip(tmp_path):
     from test_wrf_output_schema import _schema_frame, _write
 
     netcdf = pytest.importorskip("netCDF4")
+    from gpuwm.io import nc_writer_bridge
+    # The default wrfout engine is the Rust NetCDF writer cdylib; public ci's Windows cpu leg builds only the
+    # table fetcher, so the writer is absent there (public ci 41990710176, RuntimeError at _write).
+    missing = nc_writer_bridge.unavailable_reason()
+    if missing:
+        pytest.skip(f"the Rust NetCDF writer library is not built: {missing}")
     frame = _schema_frame(5, 4, 6)
     frame["HOL"] = np.linspace(-1., 1., 20, dtype=np.float32).reshape(4, 5)
     path = tmp_path / "wrfout_mrf"
@@ -332,7 +338,9 @@ def test_mrf_constants_use_the_pinned_table_asset(tmp_path):
     assert "#define MRF_CFAC    7.8f" in header
     assert "#define MRF_CFAC" not in (ROOT / "gpuwm/core/kernels/mrf.cu").read_text("utf-8")
     (tmp_path / "mrf").mkdir()
-    (tmp_path / "mrf/constants.cuh").write_text(header.replace("7.8f", "7.9f"))
+    # Bytes, not text: a text-mode write turns LF into CRLF on Windows, so the size check refused the file before
+    # the SHA-256 check this test is about (public ci 41990710176, windows-2025).
+    (tmp_path / "mrf/constants.cuh").write_bytes(header.replace("7.8f", "7.9f").encode("utf-8"))
     with pytest.raises(ValueError, match="SHA-256"):
         _table_header_text("mrf", data_root=tmp_path)
 

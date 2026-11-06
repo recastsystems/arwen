@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.9.13 (2026-11-05)
+
+Fixed:
+- Pinned physics tables, kernel sources and verbatim WRF sources keep their exact bytes in the published packages, so the opt-in K-epsilon PBL (`keps`) loads again.
+- A CF product table row's `scale` honours `mask_below`, so a dry precipitation window draws a blank map instead of a solid first colour.
+- Internal working names and paths no longer appear in shipped files.
+- A fresh `gpuwm[gpu-cu13]` install keeps NVRTC and nvJitLink below 13.5: 13.5 arrived on PyPI after this line's kernels were measured and has no recorded kernel results yet.
+- Two MRF tests run on Windows.
+
 ## 2.9.12 (2026-11-03)
 
 New:

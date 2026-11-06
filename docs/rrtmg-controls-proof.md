@@ -76,7 +76,7 @@ unchanged. The six complete three-hour wall samples range from 2.6 to 19.9 s
 under shared load; their median tuned/untuned ratio is 1.93 and is not a stable
 physics timing. No claim of a full-forecast 1.2x guarantee is made.
 
-Evidence root: `~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/lic-audit/`.
+Evidence root: `<reports>/WRF-PORTS-2026-11-01/evidence/lic-audit/`.
 Every launch has a JSON command/environment receipt and a log. Relevant files:
 `rrtmg-tests-final.log`, `real-radius-*-results.json`, `gpu-tuned-go.json`,
 `native-stock-cached-endian-final.json`, `forecast-metrics.json`,

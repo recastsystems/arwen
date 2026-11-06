@@ -71,7 +71,7 @@
     "Mixed-scheme nest edges and offline-parent ingestion lack a verified category-partition contract and refuse.",
     "No whole-model bitwise native trajectory or observation skill is claimed."
   ],
-  "evidence_root": "~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-mp52-p3-2cat/",
+  "evidence_root": "<reports>/WRF-PORTS-2026-11-01/evidence/port-mp52-p3-2cat/",
   "receipts": {
     "real-replay.json": {
       "sha256": "3d7f57bd1cf4de021df186f23bd693c548c4d90a7511b4318086d9d401319946",

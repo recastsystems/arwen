@@ -343,7 +343,7 @@ def make_radiation(cfg, start_time, latitude_deg, longitude_deg, *,
             # worker, priced by preflight at cam3_memory.DEFAULT_WORKERS.  The
             # shared RRTMGP chunk (3125 by default) cut the RTX 4090 12 km
             # forecast to 98 blocks of 32 threads and 88 ms per call instead
-            # of 51 ms (2026-11-02, opus/cam-speed receipts).
+            # of 51 ms (2026-11-02, cam-speed receipts).
             return Cam3Radiation(*args,icloud=cfg.icloud,
                                  longwave=longwave,shortwave=shortwave)
         if selector == 5:

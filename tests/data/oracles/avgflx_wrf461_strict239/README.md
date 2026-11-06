@@ -20,5 +20,5 @@ change the module's update expressions.
 
 Commands, capture source changes, source provenance, full-forecast results
 and inspection receipts are retained under
-`~/lanes/downloads/WRF-SETTINGS-2026-10-31/wrfs-avgflx/`.
+`<reports>/WRF-SETTINGS-2026-10-31/wrfs-avgflx/`.
 The executable identity is recorded there in `native-toolchain.txt`.

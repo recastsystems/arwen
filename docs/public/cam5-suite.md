@@ -123,9 +123,9 @@ two-moment cloud physics. Instrumentation preserves every output word.
 These measurements explain substantial native work; they do not prove
 that no further faithful GPU optimization is possible.
 
-The original port report and small evidence live under
-`~/lanes/downloads/WRF-PORTS-2026-11-01/port-cam5-mg-zm.md` and
-`evidence/port-cam5-mg-zm/`. The later CU7 and SHCU2 speed report is
+The original port report and small evidence are kept with the maintainers
+(`port-cam5-mg-zm.md` and
+`evidence/port-cam5-mg-zm/`). The later CU7 and SHCU2 speed report is
 `spd-cam5-zm-uw.md`, with evidence under `evidence/spd-cam5-zm-uw/`.
 These two rows qualify only for the named opt-in physics-cost exception;
 neither meets the 1.2x speed target. MP11 has a separate speed lane.

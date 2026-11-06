@@ -5138,7 +5138,7 @@ def _rte_rrtmgp_cloud_optics_constraints(registry: dict) -> None:
 #: read this row instead of a hand-kept scheme pair.  ``mixes_in_scheme``
 #: names the one producer whose wrapper already runs the solve itself (MYNN,
 #: gpuwm/core/mynn_pbl_runtime.py), so the post-PBL owner never runs it twice.
-#: Ported from the scalar-pblmix-any-pbl lane (SOL-POOL-2026-10-07), whose MYJ
+#: Ported from the scalar-pblmix-any-pbl lane (2026-10-07), whose MYJ
 #: EXCH_H column check matched stock diff4d at 0 ULP.
 _SCALAR_DIFFUSION_EXCHANGE: dict[str, dict[str, object]] = {
     "temf": {"writes_exch_h": False, "levels": None, "field": None,
@@ -7287,7 +7287,7 @@ def _single_moment_column_options(registry: dict) -> None:
 
     No preset is generated: the radiation-off template the WSM lane generated here
     made radiation.off reachable from a registered suite (spot-check FAIL,
-    RELEASE-2.8.9-CANDIDATE/C-ports/SPOT-RESULTS-290.md).  A row is reachable as a
+    the 2.8.9 ports spot-check results).  A row is reachable as a
     component override, exactly like WSM3, WSM6R, Lin and Ferrier-Aligo.
     """
     from gpuwm.core.column_schemes import COLUMN_SCHEMES

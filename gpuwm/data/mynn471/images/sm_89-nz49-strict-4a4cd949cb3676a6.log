@@ -198,3 +198,4 @@ Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
 /workspace/runs/port-mynn-subopts/fold-data/images/sm_89-nz49-strict-4a4cd949cb3676a6.cu(12811): warning #177-D: variable "m471_n" was declared but never referenced
   unsigned char*m471_work=arena;int m471_n=n;
                                     ^
+

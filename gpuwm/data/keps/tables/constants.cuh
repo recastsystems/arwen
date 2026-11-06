@@ -36,3 +36,4 @@
 #define KE_4VK      0x1.99999ap+0f    // 4.*vk
 #define KE_TKEEPS_LO 0x1.99999ap-7f   // 0.025/2.
 #define KE_TKEEPS_HI 0.125f           // 0.25/2.
+

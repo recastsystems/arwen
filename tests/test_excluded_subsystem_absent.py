@@ -2,7 +2,7 @@
 
 WHAT THIS BRANCH IS.  ``integration/engine-258-clean`` was built by
 RE-APPLYING engine work onto a clean base, not by scrubbing a branch that
-carried an excluded weather-modification subsystem.  That distinction is
+carried an excluded private subsystem.  That distinction is
 the whole point: a branch that never contained the thing cannot leak it,
 while a scrubbed branch is only ever as good as the scrub.  This file is
 what keeps the first sentence true after today.
@@ -204,7 +204,7 @@ except FileNotFoundError:
     _GENERATED = {"reason": MESSAGE_ALLOWANCE_REASON, "commits": []}
 #: The IDENTITY half of the generated allowance (lead ruling 2026-10-07).
 #: About 558 engine commits from 2026-09-20 on carry the org-prefixed author
-#: address below because agent and Codex lane environments inherited that git
+#: address below because automated build environments inherited that git
 #: identity; their content is WOOF engine work and ports of public WRF
 #: sources, and some shipped in 2.8.6 as snapshot content.  The ruling
 #: registers that IDENTITY up to a recorded identity cutoff: a commit there
@@ -557,7 +557,7 @@ def test_no_tracked_source_contains_the_excluded_subsystem():
         if len(offenders) > 40:
             break
     assert not offenders, (
-        "the excluded weather-modification subsystem is back in tracked "
+        "the excluded private subsystem is back in tracked "
         "source.  This is how it returns: a merge or a cherry-pick from "
         "the branch this work was extracted from, or from a lane still cut "
         "off it, carrying a few guarded lines that read as ordinary physics "

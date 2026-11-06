@@ -43,7 +43,7 @@ nearest-cell, not conservative. No bitwise WRF parity is claimed.
 
 Full provenance, source licences, resource samples, per-stage timings,
 observation pairs, source hashes and pictures are retained in the private
-lane delivery, `SOL-POOL-20261020/astra-cap-slab-ocean/`. Qualification does
+slab-ocean port delivery. Qualification does
 not establish prognostic sea ice, ice-sheet runoff or seasonal ocean skill.
 
 The installed duration-default path was then run for the complete same

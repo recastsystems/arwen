@@ -42,8 +42,8 @@ temperature gradient, warmer south/east, with rain over Arkansas and
 west Tennessee and no missing tiles. Sf89 shows a broad temperature
 gradient and patchy rain bands, with two small warm spots west and
 southwest of Little Rock and no missing tiles. Full logs, timing streams,
-configs, scripts and images are retained under
-`~/lanes/downloads/WRF-PORTS-2026-11-01/evidence/port-misc-schemes/`.
+configs, scripts and images are retained by the maintainers
+(`evidence/port-misc-schemes/`).
 
 The option-off comparison against the matching upstream engine has zero
 differences across 133,938,800 stored field bytes in four forecast frames,

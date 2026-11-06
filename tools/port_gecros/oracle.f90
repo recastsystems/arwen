@@ -22,7 +22,7 @@ open(11,file=trim(output),access='stream',form='unformatted',status='replace')
                laii   = clvi/cfv*sla0
                nrti   = npl * seedw * eg * seednc - nlvi
                slnbi  = nlvi/laii
-
+    
 
 do
  read(10,iostat=ios)x,s
@@ -37,7 +37,7 @@ call gecros_init(40.,hti,rdi,clvi,crti,nlvi,laii,nrti,slnbi,s)
 write(12)s
 close(12)
 contains
-SUBROUTINE gecros_init(xlat,hti,rdi,clvi,crti,nlvi,laii,nrti,slnbi,state_gecros)
+SUBROUTINE gecros_init(xlat,hti,rdi,clvi,crti,nlvi,laii,nrti,slnbi,state_gecros)   
 implicit none
 REAL, INTENT(IN)     :: HTI
 REAL, INTENT(IN)     :: RDI
@@ -50,20 +50,20 @@ REAL, INTENT(IN)     :: SLNBI
 REAL, INTENT(IN)     :: XLAT
 REAL, DIMENSION(1:60), INTENT(INOUT) :: STATE_GECROS
 
-  !Inititalization of Gecros variables
+  !Inititalization of Gecros variables  
   STATE_GECROS(1) = 0.      !DS
   STATE_GECROS(2) = 0.      !CTDURDI, HTI, CLVI, CRTI, NLVI, LAII, NRTI, SLNBI,
   STATE_GECROS(3) = 0.      !CVDU
-  STATE_GECROS(4) = CLVI    !CLV
-  STATE_GECROS(5) = 0.      !CLVD
-  STATE_GECROS(6) = 0.      !CSST
+  STATE_GECROS(4) = CLVI    !CLV 
+  STATE_GECROS(5) = 0.      !CLVD  
+  STATE_GECROS(6) = 0.      !CSST  
   STATE_GECROS(7) = 0.      !CSO
-  STATE_GECROS(8) = CRTI    !CSRT
-  STATE_GECROS(9) =  0.     !CRTD
-  STATE_GECROS(10) = 0.     !CLVDS
+  STATE_GECROS(8) = CRTI    !CSRT 
+  STATE_GECROS(9) =  0.     !CRTD 
+  STATE_GECROS(10) = 0.     !CLVDS 
   STATE_GECROS(11) = NRTI   !NRT
   STATE_GECROS(12) = 0.     !NST
-  STATE_GECROS(13) = NLVI   !NLV
+  STATE_GECROS(13) = NLVI   !NLV 
   STATE_GECROS(14) = 0.     !NSO
   STATE_GECROS(15) = NLVI   !TNLV
   STATE_GECROS(16) = 0.     !NLVD
@@ -101,14 +101,14 @@ REAL, DIMENSION(1:60), INTENT(INOUT) :: STATE_GECROS
   STATE_GECROS(48) = 0.     !StrawNC
   STATE_GECROS(49) = 0.01   !GLAI
   STATE_GECROS(50) = 0.01   !TLAI
-  STATE_GECROS(51) = HTI    !Fields 51-58 set for reinitialization
-  STATE_GECROS(52) = RDI
-  STATE_GECROS(53) = CLVI
-  STATE_GECROS(54) = CRTI
-  STATE_GECROS(55) = NRTI
-  STATE_GECROS(56) = NLVI
-  STATE_GECROS(57) = SLNBI
-  STATE_GECROS(58) = LAII
-
+  STATE_GECROS(51) = HTI    !Fields 51-58 set for reinitialization  
+  STATE_GECROS(52) = RDI    
+  STATE_GECROS(53) = CLVI   
+  STATE_GECROS(54) = CRTI   
+  STATE_GECROS(55) = NRTI   
+  STATE_GECROS(56) = NLVI   
+  STATE_GECROS(57) = SLNBI  
+  STATE_GECROS(58) = LAII   
+    
 END SUBROUTINE gecros_init
 end program oracle

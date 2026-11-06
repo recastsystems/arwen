@@ -56,7 +56,7 @@ VORTEX_PRESET = {
     "cadence_seconds": 900.0, "max_move_parent_cells": 12,
     "min_overlap_fraction": 0.7,
     # MSLP minimum, with the 850 hPa circulation as fallback when no
-    # qualifying minimum is found (parked lane astra-trailer-ian).
+    # qualifying minimum is found (the parked trailer-tracking study).
     "pressure_center": "minimum", "fallback_level_hpa": 850.0,
     "fallback_deficit_m": 25.0,
 }

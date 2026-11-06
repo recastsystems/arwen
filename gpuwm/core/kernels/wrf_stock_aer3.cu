@@ -181,3 +181,4 @@ extern "C" __global__ void wrf_stock_aer3_optics(
         zomga[base + (size_t)b * nlayers] = ssa;
     }
 }
+

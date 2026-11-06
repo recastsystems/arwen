@@ -22,7 +22,7 @@ do
 enddo
 close(10);close(11)
 contains
-SUBROUTINE gecros_reinit(STATE_GECROS)
+SUBROUTINE gecros_reinit(STATE_GECROS)   
 implicit none
 REAL, DIMENSION(1:60), INTENT(INOUT) :: STATE_GECROS
 
@@ -30,16 +30,16 @@ REAL, DIMENSION(1:60), INTENT(INOUT) :: STATE_GECROS
   STATE_GECROS(1) = 0.               !DS
   STATE_GECROS(2) = 0.               !CTDU
   STATE_GECROS(3) = 0.               !CVDU
-  STATE_GECROS(4) = STATE_GECROS(53) !CLV
-  STATE_GECROS(5) = 0.               !CLVD
-  STATE_GECROS(6) = 0.               !CSST
+  STATE_GECROS(4) = STATE_GECROS(53) !CLV 
+  STATE_GECROS(5) = 0.               !CLVD  
+  STATE_GECROS(6) = 0.               !CSST  
   STATE_GECROS(7) = 0.               !CSO
-  STATE_GECROS(8) = STATE_GECROS(54) !CRT
-  STATE_GECROS(9) = 0.               !CRTD
-  STATE_GECROS(10) = 0.              !CLVDS
+  STATE_GECROS(8) = STATE_GECROS(54) !CRT 
+  STATE_GECROS(9) = 0.               !CRTD 
+  STATE_GECROS(10) = 0.              !CLVDS 
   STATE_GECROS(11) = STATE_GECROS(55)!NRT
   STATE_GECROS(12) = 0.              !NST
-  STATE_GECROS(13) = STATE_GECROS(56)!NLV
+  STATE_GECROS(13) = STATE_GECROS(56)!NLV 
   STATE_GECROS(14) = 0.              !NSO
   STATE_GECROS(15) = STATE_GECROS(56)!TNLV
   STATE_GECROS(16) = 0.              !NLVD
@@ -76,9 +76,9 @@ REAL, DIMENSION(1:60), INTENT(INOUT) :: STATE_GECROS
   STATE_GECROS(48) = 0.              !StrawNC
   STATE_GECROS(49) = 0.01            !GLAI
   STATE_GECROS(50) = 0.01            !TLAI
-
+  
 END SUBROUTINE gecros_reinit
-function checkIfHarvest(STATE_GECROS, DT, harvestDS1, harvestDS2, harvestDS1ExtraDays, harvestDS2ExtraDays)
+function checkIfHarvest(STATE_GECROS, DT, harvestDS1, harvestDS2, harvestDS1ExtraDays, harvestDS2ExtraDays) 
 implicit none
 real :: DT, harvestDS1, harvestDS2
 real :: daysSinceDS1, daysSinceDS2
@@ -89,20 +89,20 @@ REAL, DIMENSION(1:60), INTENT(INOUT) :: STATE_GECROS
 
  !***check whether maturity (DS1) has been reached
  if (STATE_GECROS(1) >= harvestDS1) then
-
+ 
     if (STATE_GECROS(38) >= harvestDS1ExtraDays) then
         checkIfHarvest=1
  !if we are > DS1, but not over the limit, increase the counter of days
     else
         STATE_GECROS(38) = STATE_GECROS(38) + DT/86400.
     endif
- else
-
+ else 
+ 
  !if maturity has not been reached, but we are close (> DS2)
  !check the number of days for which we have been > DS2
- !and harvest in case we are over the limit given for that stage
+ !and harvest in case we are over the limit given for that stage 
  !(in case that maturity will not be reached at all)
-
+ 
  checkIfHarvest=0
  if (STATE_GECROS(1) >= harvestDS2 ) then
 

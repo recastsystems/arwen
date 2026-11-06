@@ -27,6 +27,12 @@ pub struct ProductRow {
 pub struct CfScale {
     pub levels: Vec<f64>,
     pub colors: Vec<[u8; 3]>,
+    /// Values under this (display units) are left blank instead of clamped into the first colour. Without it a
+    /// dry precipitation window (a field of zeros) painted the whole domain in the first band, which reads as
+    /// rain (WOOF-NAM qpf_1h dry hours on gpuwm 2.9.11/2.9.12, 2026-11-05: the key was silently dropped).
+    /// Absent = no mask, as before.
+    #[serde(default)]
+    pub mask_below: Option<f64>,
 }
 impl CfScale {
     fn color_scale(&self) -> Result<ColorScale, String> {
@@ -35,11 +41,14 @@ impl CfScale {
             || self.levels.windows(2).any(|v| v[0] >= v[1]) {
             return Err("CF scale needs increasing finite levels and one RGB color per interval".into());
         }
+        if self.mask_below.is_some_and(|v| !v.is_finite()) {
+            return Err("CF scale mask_below must be a finite value in display units".into());
+        }
         Ok(ColorScale::Discrete(DiscreteColorScale {
             levels: self.levels.clone(),
             colors: self.colors.iter().map(|[r,g,b]| Color::rgba(*r,*g,*b,255)).collect(),
             extend: ExtendMode::Both,
-            mask_below: None,
+            mask_below: self.mask_below,
         }))
     }
 }
@@ -588,10 +597,27 @@ mod cf_physical_scale_tests {
     use super::*;
     #[test]
     fn signed_physical_ladder_validates_before_render() {
-        let scale = CfScale { levels: vec![-1., 0., 1.], colors: vec![[0,0,255],[255,0,0]] };
+        let scale = CfScale { levels: vec![-1., 0., 1.], colors: vec![[0,0,255],[255,0,0]], mask_below: None };
         assert!(scale.color_scale().is_ok());
         for levels in [vec![0., 0., 1.], vec![0., f64::NAN, 1.], vec![0., 1.]] {
-            assert!(CfScale { levels, colors: scale.colors.clone() }.color_scale().is_err());
+            assert!(CfScale { levels, colors: scale.colors.clone(), mask_below: None }.color_scale().is_err());
+        }
+        let bad = CfScale { mask_below: Some(f64::NAN), ..scale.clone() };
+        assert!(bad.color_scale().is_err());
+    }
+    #[test]
+    fn a_row_scale_mask_below_reaches_the_colour_scale() {
+        // 2.9.11/2.9.12 dropped the key, so a field of zeros painted the whole domain in the first colour.
+        let row: CfScale = serde_json::from_str(
+            r#"{"levels": [0.01, 0.1, 1.0], "colors": [[150,230,150],[30,150,30]], "mask_below": 0.01}"#).unwrap();
+        match row.color_scale().unwrap() {
+            ColorScale::Discrete(scale) => assert_eq!(scale.mask_below, Some(0.01)),
+            _ => panic!("a CF row scale is discrete"),
+        }
+        let plain: CfScale = serde_json::from_str(r#"{"levels": [0.0, 1.0], "colors": [[0,0,0]]}"#).unwrap();
+        match plain.color_scale().unwrap() {
+            ColorScale::Discrete(scale) => assert_eq!(scale.mask_below, None),
+            _ => panic!("a CF row scale is discrete"),
         }
     }
 }

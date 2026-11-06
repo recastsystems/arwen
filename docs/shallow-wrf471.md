@@ -143,7 +143,7 @@ stage is empty. The reference alone never feeds the forecast.
 
 The retained replay inputs/outputs, hashes and rerun commands are in
 `~/weather/data/datasets/paper/wrf-ports/port-shcu/shcu1/MANIFEST.md`.
-The lane receipt is `~/lanes/downloads/WRF-PORTS-2026-11-01/port-shcu.md`;
+The lane receipt is `<reports>/WRF-PORTS-2026-11-01/port-shcu.md`;
 its `evidence/port-shcu/stage1.json` holds all alternating samples and
 `go-shcu1-qualified.log` records the one-hour real CLI run.
 

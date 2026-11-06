@@ -386,10 +386,18 @@ def test_every_gpu_extra_has_one_current_resolved_toolchain_pin():
     assert sorted(pin.extra for pin in current) == sorted(extras), (
         "exactly one current pin per gpu-cu* extra")
     for pin in current:
-        assert extras[pin.extra] == [pin.requirement], (
+        # The CuPy requirement is the extra's first entry; what follows may only narrow the NVRTC it resolves
+        # (gpu-cu13 keeps NVRTC below 13.5, 2.9.13), and the narrowed range must still admit the pinned build.
+        assert extras[pin.extra][:1] == [pin.requirement], (
             f"pyproject's {pin.extra} is {extras[pin.extra]}; the declared "
             f"resolution is of {pin.requirement!r}.  Re-resolve with "
             "`python tools/measure_noahmp_frames.py resolve` and re-declare")
+        from packaging.requirements import Requirement
+        for extra_line in extras[pin.extra][1:]:
+            constraint = Requirement(extra_line)
+            assert constraint.name in ("nvidia-cuda-nvrtc", "nvidia-nvjitlink"), (pin.extra, extra_line)
+            assert constraint.specifier.contains(pin.nvrtc_build), (
+                f"{pin.extra}'s {extra_line} excludes the pinned NVRTC {pin.nvrtc_build}; re-resolve and re-declare")
     for pin in kfr.RESOLVED_TOOLCHAIN_PINS:
         assert isinstance(pin, kfr.ResolvedToolchainPin)
         assert pin.requirement in extras.get(pin.extra, ()), pin
