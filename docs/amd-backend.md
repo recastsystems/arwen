@@ -16,7 +16,7 @@ For ROCm 7.0, the published CuPy 14.2.0 wheel is available for CPython
 3.10–3.14 (including 3.14t):
 
 ```sh
-python -m pip install 'gpuwm[rocm]==2.9.13' 'gpuwm-hex[rocm]==0.4.13'
+python -m pip install 'gpuwm[rocm]==3.0.0' 'gpuwm-hex[rocm]==0.5.0'
 gpuwm doctor --backend amd --json
 gpuwm-hex doctor --backend amd --json
 ```
@@ -37,7 +37,7 @@ export LD_LIBRARY_PATH="$ROCM_PATH/lib:${LD_LIBRARY_PATH:-}"
 export CUPY_INSTALL_USE_HIP=1 HCC_AMDGPU_TARGET=gfx942
 export CUPY_NUM_BUILD_JOBS=2 CUPY_NUM_NVCC_THREADS=1
 python -m pip install --no-binary=cupy 'cupy==14.2.0'
-python -m pip install 'gpuwm==2.9.13' 'gpuwm-hex==0.4.13'
+python -m pip install 'gpuwm==3.0.0' 'gpuwm-hex==0.5.0'
 gpuwm doctor --backend amd --json
 gpuwm-hex doctor --backend amd --json
 ```

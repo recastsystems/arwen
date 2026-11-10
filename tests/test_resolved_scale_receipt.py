@@ -88,7 +88,7 @@ def test_published_items_still_carry_the_authorized_prose():
 
     # The README links the scale note at this release's own tag (bump_version moves it every release).
     version = (REPO_ROOT / "gpuwm-data/gpuwm_data/VERSION").read_text().strip()
-    assert (f"[scale note](https://github.com/FahrenheitResearch/arwen/blob/v{version}/docs/public/RESOLVED-SCALE.md)"
+    assert (f"[scale note](https://github.com/recastsystems/arwen/blob/v{version}/docs/public/RESOLVED-SCALE.md)"
             in (REPO_ROOT / "README.md").read_text())
     readme = find_item(REPO_ROOT / SCALE_PAGE, "- **Resolved scale.**")
     assert readme["item_count"] == 1

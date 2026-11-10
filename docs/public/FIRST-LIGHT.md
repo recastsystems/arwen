@@ -64,7 +64,7 @@ version:
 POSIX:
 
 ```bash
-git clone https://github.com/FahrenheitResearch/arwen gpuwm && cd gpuwm
+git clone https://github.com/recastsystems/arwen gpuwm && cd gpuwm
 python -m venv .venv && source .venv/bin/activate
 python -m pip install -e gpuwm-data
 python -m pip install -e '.[gpu-cu12,render]'   # or gpu-cu13
@@ -79,7 +79,7 @@ gpuwm doctor
 Windows (PowerShell):
 
 ```powershell
-git clone https://github.com/FahrenheitResearch/arwen gpuwm; cd gpuwm
+git clone https://github.com/recastsystems/arwen gpuwm; cd gpuwm
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e gpuwm-data
 python -m pip install -e '.[gpu-cu12,render]'   # or gpu-cu13

@@ -338,7 +338,7 @@ def test_the_default_published_bases_are_this_release_then_the_first_carrier(mon
     monkeypatch.delenv(fork.FORK_RELEASE_BASE_ENV, raising=False)
     monkeypatch.setattr(gpuwm, "__version__", version)
     root = RELEASE_ASSET_BASE_URL.rsplit("/", 1)[0]
-    assert root == "https://github.com/FahrenheitResearch/arwen/releases/download"
+    assert root == "https://github.com/recastsystems/arwen/releases/download"
     assert fork._published_bases() == tuple(f"{root}/{tag}" for tag in tags)
 
 

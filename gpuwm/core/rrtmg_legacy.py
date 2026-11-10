@@ -1970,6 +1970,11 @@ class RRTMGLegacyRadiation:
                 self.start_time.second/3600.+self.start_time.microsecond/3.6e9)
             xt_mid = F(float(elapsed)/60.)+F(cfg.radt if cfg.radt>0 else cfg.radt_minutes)*F(.5)
             generation = getattr(cfg,'solar_generation','wrf_480')
+            if generation == 'wrf_480':
+                # WRF's frame JULIAN/XTIME/GMT (gpuwm.core.solar.radiation_calendar).
+                from gpuwm.core.solar import radiation_calendar
+                julian,xtime_w,gmt = radiation_calendar(self.start_time,float(elapsed))
+                xt_mid = F(xtime_w+F(cfg.radt if cfg.radt>0 else cfg.radt_minutes)*F(.5))
             if ENABLED and generation == 'wrf_461':
                 coszen_d,_,declin,solcon = solar_geometry_device(
                     julian,xt_mid,gmt,self._graph_lat,self._graph_lon)
@@ -2196,6 +2201,13 @@ class RRTMGLegacyRadiation:
                 + valid_time.second / 3600.0
                 + valid_time.microsecond / 3.6e9)
         julian = F((julday - 1) + hour / 24.0)
+        _wrf_frame = getattr(cfg, "solar_generation", "wrf_480") == "wrf_480"
+        if _wrf_frame:
+            # WRF's frame JULIAN/XTIME/GMT for the whole call: solar, ozone
+            # and aerosol read one word (gpuwm.core.solar.radiation_calendar).
+            from gpuwm.core.solar import radiation_calendar
+            julian, _frame_xtime, _frame_gmt = radiation_calendar(
+                self.start_time, float(state.elapsed_seconds))
         aer1_grid = None
         aodtot = None
         if self.shortwave and self.aer_opt == 1:
@@ -2212,6 +2224,8 @@ class RRTMGLegacyRadiation:
                 + self.start_time.second / 3600.0
                 + self.start_time.microsecond / 3.6e9)
         xtime = F(float(state.elapsed_seconds) / 60.0)
+        if _wrf_frame:
+            xtime, gmt = _frame_xtime, _frame_gmt
         radt_minutes = F(cfg.radt if cfg.radt > 0.0 else cfg.radt_minutes)
         # WRF: hour angle at the interval midpoint, declination/solcon at
         # call time (module_radiation_driver.F:1206-1208).  Evaluated on the

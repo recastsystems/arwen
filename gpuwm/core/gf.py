@@ -274,7 +274,9 @@ def is_native_gf_result(result, owner, state, cfg) -> bool:
     """Admit owned outputs only when provenance and layout match GF."""
     import cupy as cp
 
-    if (int(cfg.cu_physics) != 3 or type(owner) is not GrellFreitas
+    if (int(cfg.cu_physics) != 3
+            or (type(owner) is not GrellFreitas
+                and type(owner).__qualname__ != "GrellFreitasLi")
             or type(result) is not _native_result_type()
             or result._owner is not owner):
         return False

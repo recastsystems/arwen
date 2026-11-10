@@ -45,7 +45,7 @@
 # Environment:
 #   GPUWM_REPO_URL     clone source when run outside a checkout
 #                      (default:
-#                      https://github.com/FahrenheitResearch/arwen).
+#                      https://github.com/recastsystems/arwen).
 #   GPUWM_PYTHON       interpreter used to create .venv, same as
 #                      -Python (default: free-threaded CPython 3.14t,
 #                      see "Interpreter" below)
@@ -145,7 +145,7 @@ function Invoke-Step([string]$What, [scriptblock]$Step) {
 
 # ---------------------------------------------------------------- checkout
 $repoUrl = if ($env:GPUWM_REPO_URL) { $env:GPUWM_REPO_URL }
-           else { 'https://github.com/FahrenheitResearch/arwen' }
+           else { 'https://github.com/recastsystems/arwen' }
 if ((Test-Path 'pyproject.toml') -and (Test-Path 'gpuwm') -and
         (Test-Path 'tools\grib1_bridge')) {
     Say "using the existing checkout at $(Get-Location)"

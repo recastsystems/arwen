@@ -2280,7 +2280,12 @@ _ADAPTERS = (
             search_hours=168,
             basis="ERA5T preliminary is published about five days "
                   "behind real time, on the 6-hourly analysis grid "
-                  "this row's forcing_interval_seconds declares"),
+                  "this row's forcing_interval_seconds declares",
+            # ERA5 HRES has an analysis every hour (CDS reanalysis and
+            # ARCO full_37-1h both hourly; fetch._era5_times takes any
+            # exact hour), so a window may start at 16Z and take its
+            # 6 h boundaries at 22Z and 04Z.  ``latest`` stays 6-hourly.
+            analysis_hours=tuple(range(24))),
         notes=(
             "Certified slice: one specified Lambert domain, WSM6, YSU, "
             "classic MM5 surface layer (option 91), Noah, an explicit "

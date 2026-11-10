@@ -168,6 +168,8 @@ recursive-include gpuwm/data/keps/oracle *
 recursive-include gpuwm/data/lake/oracle *
 recursive-include gpuwm/data/mrf/oracle *
 recursive-include gpuwm/data/mynn/oracle *
+recursive-include gpuwm/data/mynn471/images *
+recursive-include gpuwm/data/mynn480/images *
 recursive-include gpuwm/data/noah/oracle *
 recursive-include gpuwm/data/noah/seaice_oracle *
 recursive-include gpuwm/data/noah/ua_oracle *

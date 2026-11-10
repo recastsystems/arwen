@@ -24,7 +24,8 @@ from gpuwm.namelist_import import (WRF_RELEASE_GENERATIONS,
 from gpuwm.verify_exact.replay import WRF_461_REFERENCE_GENERATIONS
 
 WRF_461 = {"solar_generation": "wrf_461", "ysu_version": "wrf_461",
-           "urban_water_balance": "wrf_471", "noahmp_snow_age": "wrf_461"}
+           "urban_water_balance": "wrf_471", "noahmp_snow_age": "wrf_461",
+           "cu_gf_version": "wrf_461"}
 
 
 @pytest.mark.parametrize("version, expected", [

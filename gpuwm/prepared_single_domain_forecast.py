@@ -804,7 +804,8 @@ def _lbc_field_inventories(cfg) -> tuple[list[str], ...]:
         moist=bool(getattr(cfg, "moist", True)),
         mp_physics=int(getattr(cfg, "mp_physics", 0)),
         aer_init_opt=int(getattr(cfg, "aer_init_opt", 0)),
-        mp28_aerosol_source=getattr(cfg, "mp28_aerosol_source", "auto"))
+        mp28_aerosol_source=getattr(cfg, "mp28_aerosol_source", "auto"),
+        use_rap_aero_icbc=bool(getattr(cfg, "use_rap_aero_icbc", False)))
     inventories = []
     for aerosol_from_input in (False, True):
         fields = sorted(
@@ -5121,6 +5122,13 @@ def _validate_packaged_mapped_evidence(
             prepared_root / "source-evidence" /
             "input-manifest.json").resolve():
         raise RuntimeError("mapped source manifest resolved unexpectedly")
+    if profile_id:
+        # A source with layout variants (a hex export's Noah or RUC soil,
+        # gpuwm.source_authorities PROFILE_VARIANTS) is held to the member
+        # its preparation bound, named by the composition it copied.
+        from gpuwm.source_authorities import packaged_variant_for_composition
+        profile_id = packaged_variant_for_composition(
+            profile_id, _sha256(composition_path))
     expected_authority_sha256 = (
         dict(packaged_authority_sha256(profile_id)) if profile_id else {
             "mapping": _require_digest(
@@ -9662,6 +9670,12 @@ def run_prepared_forecast(
     which step it is on cannot be driven from a script, and "the user
     did not pass a flag" is not a reason to withhold that.
     """
+    if restart is not None:
+        # A resume continues its checkpoint's TEMPO generation.
+        from dataclasses import replace as _replace_inputs
+        from gpuwm.core.tempo import adopt_checkpoint_generation
+        inputs = _replace_inputs(inputs, experiment=adopt_checkpoint_generation(
+            inputs.experiment, restart))
 
     from gpuwm.ensemble.runtime_context import current_session
     ensemble_session = current_session()
@@ -11099,6 +11113,9 @@ def run_prepared_forecast(
            else {"chem_ledger": chem_ledger}),
         "physics": {
             **dict(inputs.physics_receipt),
+            # The WRF pin the scheme generations amount to (4.8.0, 4.7.1
+            # or custom) and the generation keys themselves.
+            **_wrf_reference_receipt(cfg),
             "resolved_lw_sw": list(radiation_scheme_ids(cfg)),
             "radiation_update_count": _physics_update_count(
                 driver.radiation_callable),
@@ -12444,3 +12461,9 @@ def main(argv=None, *, observer=None, prestaged_boundaries=None,
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _wrf_reference_receipt(cfg) -> dict:
+    """gpuwm.wrf_reference.wrf_reference_receipt, for the report."""
+    from gpuwm.wrf_reference import wrf_reference_receipt
+    return wrf_reference_receipt(cfg)

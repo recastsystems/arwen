@@ -377,7 +377,7 @@ consumed `RunConfig` field -- the knob-parity battery
 consuming kernel/module rather than being decorative -- and every one
 is importable from a WRF namelist.
 
-**Which keys a `[[domain]]` table may override.** Exactly these 411,
+**Which keys a `[[domain]]` table may override.** Exactly these 422,
 and no others (`gpuwm/experiment.py`'s `_DOMAIN_RUN_OVERRIDES`):
 
     numbins  thbinsize  rbinsize  mindeepfreq  minshallowfreq  shallowcu_forced_ra
@@ -424,7 +424,9 @@ and no others (`gpuwm/experiment.py`'s `_DOMAIN_RUN_OVERRIDES`):
     lake_state_source  lake_state_path  lake_state_accept_licence  topo_wind
     gwd_opt  wind_farm_scheme  wind_farm_table  wind_farm_max_dx_m  wind_farms
     windfarm_tke_factor  windfarm_ij  windfarm_wake_model  windfarm_overlap_method
-    windfarm_deg  windfarm_induction  windturbines_spec  td_turbgridid  td_hubheight
+    windfarm_deg  windfarm_induction  windfarm_fitch_version  windturbines_spec
+    td_turbgridid  td_hubheight  gwdo_version  gwd_dx_factor  gwd_if_nonhyd
+    dyn_lightning_option  coul_pos  coul_neg  coul_neu  j_pos  j_neg  j_neu
     td_diameter  td_stdthrcoef  td_cutinspeed  td_cutoutspeed  td_power
     td_turbpercell  td_ewfx  td_ewfy  td_pwfx  td_pwfy  history_interval2_s
     history_interval_change_s  prec_acc_dt  prec_acc_dt1  gsd_diagnostics
@@ -674,6 +676,8 @@ wrong answer reported as a success. Put them in `[shared]`.
 | `mp_tend_lim` | `mp_tend_lim` | 10.0 | > 0, K/s | microphysics theta-tendency clamp |
 | `morr_rimed_ice` | `morr_rimed_ice` | 1 (hail) | 0, 1 | Morrison dense ice identity |
 | `wsm6_hail_opt` | `hail_opt` | 0 (graupel) | 0, 1 | WSM6 rimed-ice identity |
+| `ntu_version` | no stock namelist spelling | `"wrf_480"` | `"wrf_480"`, `"wrf_471"` | NTU (`mp_physics = 56`) source generation. `wrf_480` is WRF 4.8.0: the rain-graupel collection ratio is taken after its riming density is set. `wrf_471` reproduces the WRF 4.7.1 transcription, which reads that density before setting it. A namelist imported as WRF 4.7 or older selects `wrf_471`. A generation change is refused on restart; an older header without the key means `wrf_471`. |
+| `udm_version` | no stock namelist spelling | `"wrf_480"` | `"wrf_480"`, `"wrf_471"` | UDM (`mp_physics = 27`) source generation. `wrf_480` is WRF 4.8.0: hail deposition joins the ice-nucleation supersaturation budget, and the graupel and hail fall densities are zeroed each substep. `wrf_471` reproduces WRF 4.7.1. Import, restart and old-header rules as `ntu_version`. |
 | `ysu_topdown_pblmix` | `ysu_topdown_pblmix` | 1 | 0, 1 | YSU top-down radiation-driven mixing |
 | `ysu_version` | no stock namelist spelling | `"wrf_480"` | `"wrf_480"`, `"wrf_461"` | Corrected YSU default. WRF 4.8 MMM `550b5b4` removes the old efficiency offset and caps `0.2*8*tmp1` at 0.4. `[shared]` selects the generation; namelist import uses the corrected default and preserves an explicit physics-selector comment (`! gpuwm-physics-selectors-v1: {...}`). `wrf_461` under default arithmetic reproduces 2.8.9's YSU kernel, under its restart identity. Under `GPUWM_WRF_EXACT=1` it matches WRF 4.6.1 `bl_ysu_run` word for word on the 1,188-column test set, with the same declared exceptions as `wrf_480` (YSU surface drag removed on mixed BEP urban columns; the bounded PBL-height search on four-level columns), under its own restart identity, so a strict-mode `wrf_461` checkpoint from 2.9.0 or earlier is refused rather than continued with different arithmetic. Four-level shallow columns use the declared bounded PBL-height search and zero final TKE word. A generation change is refused on restart; old headers without a selector mean `wrf_461`. The corrected path uses the shared no-FTZ loader and WOOF's own math routines |
 | `do_avgflx_em` | `do_avgflx_em` (&dynamics) | 0 | 0, 1 | Per-domain history-window means of mass-coupled wind fluxes, on the GPU. Writes `AVGFLX_RUM`, `AVGFLX_RVM`, `AVGFLX_WWM`; see [averaged fluxes](../averaged-fluxes.md) for intervals, checkpoints and output coverage. |

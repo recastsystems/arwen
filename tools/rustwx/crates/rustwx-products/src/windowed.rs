@@ -1959,7 +1959,13 @@ fn build_windowed_render_request(
     source: SourceId,
 ) -> MapRenderRequest {
     let mut render_request = if product.is_uh() {
-        MapRenderRequest::for_core_weather_product(computed.field.clone(), WeatherProduct::Uh)
+        // The UH tracks: the UH ramp without the haze below 25 m2/s2, outlined
+        // at 75 (plot_design::apply_uh_track_style); RUSTWX_UH_FILL=off keeps
+        // the 2.9.13 look.
+        let mut tracks =
+            MapRenderRequest::for_core_weather_product(computed.field.clone(), WeatherProduct::Uh);
+        crate::plot_design::apply_uh_track_style(&mut tracks, &computed.field.values);
+        tracks
     } else {
         MapRenderRequest::from_core_field(computed.field.clone(), computed.scale.clone())
     };

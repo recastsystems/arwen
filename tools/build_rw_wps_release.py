@@ -1083,6 +1083,11 @@ _OPTIONAL_STAGED_IMPORTS = {
         "gpuwm.prepared_single_domain_forecast directly above: the "
         "preparation handoff asks missing_forecast_runners() before it "
         "resolves a bundle, so a finished preparation here imports neither",
+    ("gpuwm/stage_cli.py", "gpuwm.go_cli"):
+        "go's end-of-run render stage, imported inside _finish_sim_pictures, "
+        "which sim_main calls only after one of the two forecast runners "
+        "above returned 0.  Neither runner is in this package, so a "
+        "preparation-only install never reaches it",
     ("gpuwm/core/streaming.py", "gpuwm.core.pace"):
         "the step-cost sentence of an auto [tiles] refusal "
         "(_refused_tiling_clause), reached only from decide() after "

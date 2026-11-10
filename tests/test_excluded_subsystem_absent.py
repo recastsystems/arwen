@@ -234,8 +234,15 @@ del _GENERATED, _IDENTITY
 #: reproduce verbatim.  And "_aging" (2.9.12: static-fields' snow_aging module, the
 #: SNICAR snow grain-aging step): an English word that contains the agent
 #: abbreviation's identifier form.
+#: And, since 2026-11-10, the two public repositories that moved into the
+#: organisation (coordinator 07:36Z TRANSFERRED): exactly the repository paths
+#: of arwen and gpuwm-hex, which every README link, PyPI project URL and table
+#: download address of 3.0.0 names.  Breakage it prevents (3.0.0 pass 9d R2):
+#: the release surface could not carry its own address.  Any other repository
+#: or spelling under the prefix still fails.
 _FALSE_POSITIVE = re.compile("fore" + "cast" + "|" + "re" + "cast, transformed"
-                             + "|" + "_ag" + "ing", re.I)
+                             + "|" + "_ag" + "ing"
+                             + "|" + "re" + "cast" + r"systems/(?:arwen|gpuwm-hex)(?![A-Za-z0-9_-])", re.I)
 
 _TIER1_RE = re.compile("|".join(re.escape(t) for t in _TIER1), re.I)
 
@@ -961,3 +968,13 @@ def test_the_diff_scans_tier1_pattern_fires_on_a_code_line():
     """The whole diff rule is now Tier-1; prove the pattern bites raw code."""
     intruder = "let mass = " + "Ag" + "I" + " * rho;"
     assert _tier1_match(intruder) is not None
+
+
+def test_the_org_prefix_is_admitted_only_as_the_two_public_repository_paths():
+    """3.0.0 (2026-11-10): arwen and gpuwm-hex are public under the organisation; nothing else under it is."""
+
+    org = "re" + "cast" + "systems"
+    for public in (f"https://github.com/{org}/arwen/blob/v3.0.0/README.md", f"{org}/gpuwm-hex"):
+        assert _tier1_match(public) is None
+    for private in (f"{org}/" + "Re" + "cast-WOOF", f"{org}/arwen-private", org, "re" + "cast"):
+        assert _tier1_match(private) is not None

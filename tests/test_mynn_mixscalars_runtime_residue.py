@@ -172,7 +172,9 @@ def test_qn_solve_is_bitwise_on_the_gpu_solve_inputs(runtime_capture):
     tin = {k: (v[rows] if getattr(v, "ndim", 0) >= 1
                and v.shape[0] == ncol else v)
            for k, v in capture["tend_in"].items()}
-    cpu_out = mynn_tendencies_default(tin, **capture["tend_kw"])
+    # The CPU reference is the WRF 4.6.1 unit; the opt-in v6.1 switch is off here.
+    kw = {k: v for k, v in capture["tend_kw"].items() if k != "mynn_fixes_v61" or v}
+    cpu_out = mynn_tendencies_default(tin, **kw)
     for name in sorted(cpu_out):
         if name not in capture["tend_out"]:
             continue

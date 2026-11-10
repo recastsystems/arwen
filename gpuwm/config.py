@@ -90,6 +90,20 @@ class RunConfig:
         if isinstance(self.waves_options, dict):
             import json
             object.__setattr__(self, "waves_options", json.dumps(self.waves_options, sort_keys=True))
+        # Noah-MP separate surface/subsurface runoff (WRF 4.8.0 opt_runsrf /
+        # opt_runsub; re-implemented from published descriptions, not bitwise
+        # to upstream). Normalize once, before any consumer reads opt_run:
+        # opt_run becomes the surface option and opt_runsub the subsurface
+        # one only when the pair is really split. A stock pair, including
+        # opt_runsrf = opt_runsub = opt_run, leaves both at 0, so its
+        # configuration, identities and cache keys are those of opt_run alone.
+        if self.opt_runsrf or self.opt_runsub:
+            from gpuwm.core import noahmp_runoff_split as _runoff_split
+            run, runsub = _runoff_split.canonical(*_runoff_split.resolve(
+                self.opt_run, self.opt_runsrf, self.opt_runsub))
+            object.__setattr__(self, "opt_run", run)
+            object.__setattr__(self, "opt_runsrf", 0)
+            object.__setattr__(self, "opt_runsub", runsub)
         if self.wind_farms:
             if self.wind_farms == "off":
                 object.__setattr__(self, "wind_farm_scheme", "off")
@@ -116,6 +130,12 @@ class RunConfig:
             partial = self.bl_mynn_mixscalars == 1 and self.mp_physics in MYNN_QN_FLAG_SPECIES and self.mp_physics not in MYNN_QN_FAMILY_SCHEMES and bool(MYNN_QN_FLAG_SPECIES[self.mp_physics])
             if changed or self.bl_mynn_mixlength == 0 or self.tke_budget or partial:
                 object.__setattr__(self, "bl_mynn_version", "wrf_471")
+        # WRF v4.8.0's GFL (cu_gf_version default) never writes KTOP_DEEP, so
+        # PR92 lightning from the cumulus cloud top stays on the previous pin's
+        # GFDRV, which writes it (gpuwm/core/gfl.py, upstream defect 1).
+        if (self.cu_physics == GRELL_FREITAS_CU_PHYSICS and self.cu_gf_version == "gfl_873b414"
+                and self.lightning_option == 11):
+            object.__setattr__(self, "cu_gf_version", "wrf_461")
         # WRF resets its default shallow mass-flux switch outside QNSE.
         if self.bl_pbl_physics != 4 and self.mfshconv == 1:
             object.__setattr__(self, "mfshconv", 0)
@@ -323,6 +343,12 @@ class RunConfig:
     # CCN spectrum and cut-off tables from -- 1 marine, 2 clean
     # continental, 3 average continental, 4 urban (Whitby 1978).
     ntu_ccnty: int = _config_field(default=2, kw_only=True)
+    # WRF source generations of NTU (56) and UDM (27), gpuwm.mp_generations.
+    # ``wrf_480`` (default) runs WRF 4.8.0's statement fixes; ``wrf_471``
+    # reproduces the 4.7.1 transcription.  Keyword-only, so no positional
+    # index moves; a header without the key ran wrf_471.
+    ntu_version: str = _config_field(default="wrf_480", kw_only=True)
+    udm_version: str = _config_field(default="wrf_480", kw_only=True)
     # WRF-native split radiation selection.  ``-1/-1`` preserves the
     # historical gpuwm ``ra_physics`` aggregate exactly; new configurations
     # set BOTH values explicitly and leave ra_physics=0, or restate the
@@ -443,6 +469,12 @@ class RunConfig:
     opt_run: int = 3
     opt_sfc: int = 1
     opt_frz: int = 1
+    # Ground snow cover fraction: 1 = Niu and Yang 2007 with the land-type
+    # SCFFAC/MFSNO table values (WRF-lineage default); 2 = scale-aware
+    # parameters from the grid spacing (Abolafia-Rosenzweig et al. 2025,
+    # JAMES, Eq. 4-5), re-implemented from published descriptions, not
+    # bitwise to upstream.  Read by gpuwm/core/noahmp_energy_slab.py.
+    opt_scf: int = _config_field(default=1, kw_only=True)
     opt_inf: int = 1
     opt_rad: int = 3
     opt_alb: int = 2
@@ -453,10 +485,48 @@ class RunConfig:
     snicar_dust_ppm: float = _config_field(default=0.0, kw_only=True)
     snicar_ice_density: float = _config_field(default=900.0, kw_only=True)
     snicar_bubble_radius_um: float = _config_field(default=1000.0, kw_only=True)
+    # opt_alb=3 fresh-snow grain radius ramp: 1 = 54.526-204.526 um,
+    # 2 = Lin et al. 2025 MODSCAG retune 33-91 um (re-implemented from
+    # published descriptions, not bitwise to upstream).
+    snicar_fresh_grain_opt: int = _config_field(default=1, kw_only=True)
+    # clean-snicar-lap: light-absorbing particles in snow (opt_alb=3 only).
+    snicar_lap_opt: int = _config_field(default=0, kw_only=True)
+    snicar_lap_table: str = _config_field(default="", kw_only=True)
+    snicar_lap_series: str = _config_field(default="", kw_only=True)
+    # Re-implemented from published descriptions, not bitwise to upstream.
+    snicar_ice_ri_opt: int = _config_field(default=2, kw_only=True)
+    snicar_dust_optics_opt: int = _config_field(default=0, kw_only=True)
+    #: Noah-MP wetland scheme of Zhang et al. (2022, WRR 58, e2021WR030573),
+    #: re-implemented from published descriptions, not bitwise to upstream.
+    #: 0 off (the v4 port unchanged), 1 on: wetland saturated fraction from
+    #: first-layer wetness plus a fill-evaporate-spill wetland store, with
+    #: GLWD v2 / Copernicus GLO-90 static maps built at prep.  Needs
+    #: opt_run 1, 2 or 5 (gpuwm.core.noahmp_wetland).
+    noahmp_wetland: int = _config_field(default=0, kw_only=True)
+    # Incident spectrum (0 packaged G173; 1-6 RRTMGP/AFGL spectra) and band
+    # count (1 five bands, 2 480 bands); re-implemented from published
+    # descriptions, not bitwise to upstream. Read only by opt_alb=3.
+    snicar_solarspec_opt: int = _config_field(default=0, kw_only=True)
+    snicar_bandnumber_opt: int = _config_field(default=2, kw_only=True)
+    # clean-snicar-layers: re-implemented from published descriptions, not
+    # bitwise to upstream. 1 adding-doubling (default), 2 Toon 1989.
+    snicar_solver_opt: int = _config_field(default=1, kw_only=True)
     opt_snf: int = 1
     opt_tbot: int = 2
     opt_stc: int = 1
     opt_gla: int = 1
+    opt_tksno: int = _config_field(default=1, kw_only=True)
+    #: Noah-MP cold-start snow-layer temperatures (gpuwm.core.noahmp_snow_tinit):
+    #: 2 (default) conduction profile between skin and top soil; 1 is WRF's
+    #: SNOW_INIT (every layer at the skin temperature), the bitwise-to-WRF pin.
+    #: Default 2 because WRF's isothermal pack is a cold reservoir: deep-snow
+    #: night T2 vs ASOS +0.66 K (2022-02-03) and +0.70 K (2024-01-15), snow-free
+    #: stations within 0.06 K (the tksno-winter lane's two winter cases).
+    #: A strict WRF process (GPUWM_WRF_EXACT=1) defaults to 1, as the
+    #: correct-mode keys do: breakage prevented is a strict 0 ULP WRF proof
+    #: with Noah-MP over snow at a cold start silently running the new profile.
+    noahmp_snow_tinit: int = _config_field(
+        default=2 if _correct_mode.CORRECT_KEYS_DEFAULT else 1, kw_only=True)
     opt_rsf: int = 1
     opt_soil: int = 1
     opt_pedo: int = 1
@@ -1351,6 +1421,15 @@ class RunConfig:
     # keys, ahead of the chem block.
     tempo_ml_for_bl_nc: bool = False
     tempo_surface_emission_before: bool = False
+    #: TEMPO generation (named microphysics TEMPO only).  ``v3.2.5`` is the
+    #: latest NCAR/TEMPO release (c62699f) and the default; ``v3.0.3`` is
+    #: the RRFS v2 pin (9adf9ef) the bitwise claims are proven against.  A
+    #: checkpoint header without the key ran v3.0.3 (ECHO_ABSENT_RUN_VALUES).
+    #: Keyword-only, so the positional constructor is unchanged.
+    tempo_version: str = _config_field(default="v3.2.5", kw_only=True)
+    #: v3.2.x hail-hyperaware (graupel/hail split), on as upstream and the
+    #: RRFS fork have it; read by tempo_version = "v3.2.5" only.
+    tempo_hailhyperaware: bool = _config_field(default=True, kw_only=True)
     #: Optional directory of generation-specific Thompson table records.
     #: The WRF-folder door supplies its own directory for a known generation.
     #: Appended at None after the TEMPO arms, ahead of the chem block, so
@@ -1475,6 +1554,13 @@ class RunConfig:
     # WRF's tendency-only scalar ring.
     # Keyword-only, so the positional constructor is unchanged.
     hydrometeor_handover_numbers: bool = _config_field(
+        default=_correct_mode.CORRECT_KEYS_DEFAULT, kw_only=True)
+    # SN1 (2.9.14): Noah-MP's land snowmelt reset re-evaluates the ground
+    # saturation vapour pressure (and bare QSFC) at the reset temperature,
+    # as WRF's glacier reset does (kernels/noahmp_vegeflux.cu,
+    # noahmp_bareflux.cu, GPUWM_NOAHMP_MELT_RESET_ESAT).  Off is WRF's
+    # stale-ESTG arithmetic.
+    noahmp_melt_reset_esat: bool = _config_field(
         default=_correct_mode.CORRECT_KEYS_DEFAULT, kw_only=True)
     # WRF's Pollard and three-dimensional PWP oceans. New PWP controls
     # are keyword-only so the existing positional constructor is stable.
@@ -1904,7 +1990,10 @@ class RunConfig:
     windfarm_ij: int = _config_field(default=0, kw_only=True)
     windfarm_wake_model: int = _config_field(default=2, kw_only=True)
     windfarm_overlap_method: int = _config_field(default=4, kw_only=True)
-    windfarm_induction: int = _config_field(default=0, kw_only=True)
+    # WRF &physics windfarm_induction (Fitch axial induction correction).
+    # -1 = the selected Fitch pin's own Registry default: WRF v4.8.0 defines
+    # the key with default 1; v4.7.1 has no key (0). See windfarm_fitch_version.
+    windfarm_induction: int = _config_field(default=-1, kw_only=True)
     windfarm_deg: float = _config_field(default=0.0, kw_only=True)
     wind_farm_max_dx_m: float = _config_field(default=3000.0, kw_only=True)
     # Native WRF station diagnostics. Empty path preserves prior outputs.
@@ -2185,6 +2274,97 @@ class RunConfig:
     # UP_HELI_MAX by the nwp_diagnostics = 1 step.  Appended last,
     # keyword-only and off by default, so every earlier run is unchanged.
     uh_layers: int = _config_field(default=0, kw_only=True)
+    # MYNN-SFC (WRF v4.8.0 phys/MYNN-SFC b66187f5), read only under
+    # mynn_sfclay_variant = "mynnsfc_b66187f": the land and water roughness
+    # and zt/zq forms and the shallow-water z0 blend (Registry.EM_COMMON
+    # :2512-2513, :2649 defaults 0, 1 and 0).  Appended last, keyword-only;
+    # omitted from fingerprints at these defaults.
+    sf_mynn_sfcflux_land: int = _config_field(default=0, kw_only=True)
+    sf_mynn_sfcflux_water: int = _config_field(default=1, kw_only=True)
+    shalwater_z0: int = _config_field(default=0, kw_only=True)
+    # WRF v4.8.0 KIM turbulent orographic form drag in the revised MM5
+    # surface layer (Registry.EM_COMMON kim_tofd .false., tofd_factor .003;
+    # physics_mmm 550b5b4 sf_sfclayrev.F90:707-720, 779-783).  Option 1 only;
+    # reads geo_em VAR.  Appended last, keyword-only and off by default, so
+    # every earlier run is unchanged.
+    kim_tofd: bool = _config_field(default=False, kw_only=True)
+    tofd_factor: float = _config_field(default=0.003, kw_only=True)
+    # gwd_opt = 1 generation (gpuwm.core.terrain_drag): "wrf_480" is WRF
+    # v4.8.0's revised KIM drag (it reads ELVMAX, gwd_dx_factor and
+    # gwd_if_nonhyd), "wrf_471" the WRF v4.6.1/v4.7.1 scheme.  Read only
+    # under gwd_opt = 1.  Appended last, keyword-only.  The default stays
+    # "wrf_471" until the rw-wps ELVMAX producer lands (upstream lane L2,
+    # port/omax): without ELVMAX the 4.8.0 scheme turns the drag off on every
+    # column, so a default gwd_opt = 1 run would be refused.
+    gwdo_version: str = _config_field(default="wrf_471", kw_only=True)
+    #: WRF v4.8.0 ``&dynamics gwd_dx_factor`` (Registry.EM_COMMON:2902,
+    #: default 2.): the KIM base stress uses dx_eff = gwd_dx_factor*dx.
+    gwd_dx_factor: float = _config_field(default=2.0, kw_only=True)
+    #: WRF v4.8.0 ``&dynamics gwd_if_nonhyd`` (Registry.EM_COMMON:2903,
+    #: default .true.): the Xu et al. (2024) nonhydrostatic factor.
+    gwd_if_nonhyd: bool = _config_field(default=True, kw_only=True)
+    # Fitch wind-farm pin (windfarm_opt=1 with native WRF turbine files):
+    # "wrf_480" = WRF v4.8.0 module_wind_fitch.F (induction correction on by
+    # default, THRUST written on every Fitch run, the original branch run
+    # natively when induction is off); "wrf_471" = the previous pin, today's
+    # engine byte for byte. Appended last, keyword-only; absent from identity
+    # with farms off or at "wrf_471" (gpuwm.wind_table.drop_inert_config).
+    windfarm_fitch_version: str = _config_field(default="wrf_480", kw_only=True)
+    #: Which scheme ``cu_physics = 3`` runs.  ``gfl_873b414`` (default) is
+    #: WRF v4.8.0's Grell-Freitas-Li, NOAA GSL's GFL at 873b414
+    #: (gpuwm/core/gfl.py, module replay 0 different against native WRF
+    #: v4.8.0 strict; lane-interleaved scratch, cumulus stage 1.10x GFDRV).
+    #: ``wrf_461`` is the previous pin's GFDRV (WRF v4.6.1 = v4.7.1,
+    #: gpuwm/core/gf.py), byte for byte, and is what 4.6.1/4.7.1-named
+    #: namelists resolve to.  GF SPP (``spp_conv``) needs
+    #: ``wrf_461`` (WRF v4.8.0's GFL call carries no SPP pattern; refused by
+    #: name otherwise), and PR92 lightning from the cumulus cloud top
+    #: (``lightning_option = 11``) stays on ``wrf_461`` because GFL never
+    #: writes KTOP_DEEP.  A checkpoint header
+    #: without the key ran ``wrf_461`` (io/restart.py ECHO_ABSENT_RUN_VALUES).
+    #: Appended last and keyword-only.
+    cu_gf_version: str = _config_field(default="gfl_873b414", kw_only=True)
+    #: Shin-Hong (bl_pbl_physics = 11) generation: ``wrf_480`` is WRF
+    #: 4.8.0's physics_mmm rewrite (kernels/shinhong_480.cu); ``wrf_461``
+    #: reproduces the 4.6.1/4.7.1 module (one file in both releases).
+    #: Appended last and keyword-only (WRF-480 assembly).
+    shinhong_version: str = _config_field(default="wrf_480", kw_only=True)
+    #: WRF 4.8.0's three Shin-Hong namelist logicals (Registry defaults);
+    #: read only under ``shinhong_version = "wrf_480"``.
+    shinhong_nonlocal_flux: bool = _config_field(default=True, kw_only=True)
+    shinhong_scu_mixing: bool = _config_field(default=False, kw_only=True)
+    shinhong_ke_dissipation: bool = _config_field(default=False, kw_only=True)
+    #: WRF v4.8.0 dynamic lightning (Registry/registry.dyn_light; Lynn et al.
+    #: 2012): charging energy, flash counts and LPI from the microphysics
+    #: driver. Off by default; keyword-only so positional construction keeps
+    #: every earlier field. gpuwm/core/dyn_lightning.py.
+    #: Appended last (WRF-480 assembly).
+    dyn_lightning_option: int = _config_field(default=0, kw_only=True)
+    coul_pos: float = _config_field(default=0.25e-4, kw_only=True)
+    coul_neg: float = _config_field(default=0.25e-4, kw_only=True)
+    coul_neu: float = _config_field(default=0.25e-4, kw_only=True)
+    j_pos: float = _config_field(default=5.e9, kw_only=True)
+    j_neg: float = _config_field(default=1.e9, kw_only=True)
+    j_neu: float = _config_field(default=1.e9, kw_only=True)
+    #: Opt-in upstream MYNN v6.1 bug fixes on the WRF 4.6.1 MYNN route
+    #: (NCAR/MYNN-EDMF v6.1.1 and NCAR/MYNN-SFC v6.1.0, Apache-2.0;
+    #: gpuwm/core/mynn_pbl_v61.py lists each fix and what is not carried):
+    #: dew/frost no longer deleted, the surface-density virtual-temperature
+    #: factor, ground-Exner surface theta, the PBL-height search start, and
+    #: no surface-layer cold-start reset on a cycled start.  Labelled
+    #: "upstream MYNN v6.1 fixes, not bitwise to WRF".  Appended last,
+    #: keyword-only and off by default, so every earlier run is unchanged.
+    mynn_fixes_v61: bool = _config_field(default=False, kw_only=True)
+    #: Noah-MP snow compaction overburden parameter C_bd.  1 is WRF v4's
+    #: fixed 0.021 m3/kg (default, byte-identical); 2 is C_bd(T_air, p_sfc)
+    #: after Abolafia-Rosenzweig et al. 2024 (JAMES, Eq. 11-12),
+    #: re-implemented from published descriptions, not bitwise to upstream.
+    #: Appended last and keyword-only, so every earlier run is unchanged.
+    opt_snow_compact: int = _config_field(default=1, kw_only=True)
+    # Appended last, keyword-only. WRF 4.8.0 / Noah-MP v5 separate surface and subsurface runoff options;
+    # 0 inherits opt_run. Normalized in __post_init__ (see there).
+    opt_runsrf: int = _config_field(default=0, kw_only=True)
+    opt_runsub: int = _config_field(default=0, kw_only=True)
 
 @dataclass(frozen=True)
 class _DfiBackwardRunConfig(RunConfig):
@@ -2228,7 +2408,8 @@ CORRECT_MODE_RESTART_BREAK_NOTICE = (
     "scheme reads to false explicitly (wsm6_conservative_surface, "
     "wdm6_conservative_surface, wsm3_conservative_surface, "
     "wsm5_conservative_surface, wsm7_conservative_surface, "
-    "ntiedtke_dry_mass_coupling, hydrometeor_handover_numbers); otherwise "
+    "ntiedtke_dry_mass_coupling, hydrometeor_handover_numbers, "
+    "noahmp_melt_reset_esat); otherwise "
     "restart from t = 0.")
 
 #: The same accuracy for the 2.8.9 WRF-folder default (D8): a fixed-step
@@ -2327,6 +2508,9 @@ NOAHMP_OPTION_IDENTITY_EVIDENCE: dict[str, tuple[object, str]] = {
     "opt_sfc": (1, "fixture; SFCDIF1 default. Native SFCDIF2 reaches both flux "
                    "tiles and has a real whole-module replay"),
     "opt_frz": (1, "fixture; NY06 supercooled liquid"),
+    "opt_scf": (1, "fixture; Niu-Yang 2007 ground SCF with table SCFFAC/MFSNO. "
+                   "Scale-aware SCF (2, Abolafia-Rosenzweig et al. 2025 Eq. 4-5) is "
+                   "re-implemented from published descriptions, not bitwise to upstream"),
     "opt_inf": (1, "fixture; NY06 frozen-soil permeability"),
     "opt_rad": (3, "fixture; gap = 1 - FVEG"),
     "opt_alb": (2, "fixture; CLASS default. BATS (1) has a real WRF "
@@ -2335,13 +2519,30 @@ NOAHMP_OPTION_IDENTITY_EVIDENCE: dict[str, tuple[object, str]] = {
     "snicar_snowshape_opt": (3, "paper reconstruction; four He grain habits"),
     "snicar_snowbc_intmix": (True, "paper reconstruction; He internal BC fit"),
     "snicar_snowdust_intmix": (False, "paper reconstruction; He internal dust fit"),
+    "snicar_fresh_grain_opt": (1, "paper reconstruction; 2 = Lin 2025 MODSCAG fresh grains "
+                                  "33-91 um, re-implemented from published descriptions, not bitwise to upstream"),
+    "snicar_lap_opt": (0, "off by default; re-implemented from published descriptions, not bitwise to upstream: BC/OC and five dust bins tracked layer by layer in the snow from deposition, 1 table fluxes, 2 deposition series (GEOS-FP or MERRA-2, Rust producer)"),
+    "snicar_ice_ri_opt": (2, "re-implemented from published descriptions, not bitwise to upstream; "
+                             "1 Warren 1984, 2 Warren and Brandt 2008, 3 Picard 2016 merge"),
+    "snicar_dust_optics_opt": (0, "re-implemented from published descriptions, not bitwise to upstream; "
+                                  "0 Zhang 2024, 1 Saharan, 2 Colorado, 3 Greenland"),
+    "snicar_solarspec_opt": (0, "packaged ASTM G173; 1-6 are AFGL atmospheres through RRTMGP, re-implemented from published descriptions, not bitwise to upstream"),
+    "snicar_bandnumber_opt": (2, "480 bands; 1 is five flux-weighted bands, re-implemented from published descriptions, not bitwise to upstream"),
+    "snicar_solver_opt": (1, "adding-doubling default; 2 = Toon 1989 two-stream, "
+                             "re-implemented from published descriptions, not bitwise to upstream"),
     "opt_snf": (1, "fixture; Jordan91 default. Values 2-5 have real "
                    "whole-module replay and forecast proof, plus complete "
                    "native ATM threshold/species checks"),
+    "opt_snow_compact": (1, "fixture; WRF v4 fixed overburden C_bd 0.021. Value 2 is "
+                            "C_bd(T_air, p_sfc) after Abolafia-Rosenzweig et al. 2024: "
+                            "re-implemented from published descriptions, not bitwise to upstream"),
     "opt_tbot": (2, "fixture; Noah lower boundary at ZBOT"),
     "opt_stc": (1, "fixture; semi-implicit snow/soil temperature"),
     "opt_gla": (1, "default glacier path; GLA2 has a strict real native glacier "
                    "module replay, complete Greenland forecast and resident lifecycle proof"),
+    "opt_tksno": (1, "Yen 1965 snow conductivity, the v4 formula, by default. "
+                     "2 Anderson 1976, 3 constant 0.35, 4 Verseghy 1991, 5 Yen 1981/Douville 1995: "
+                     "re-implemented from published descriptions, not bitwise to upstream"),
     "opt_rsf": (1, "fixture; Sakaguchi/Zeng by default. Values 2/3/4 have "
                    "real WRF whole-module replay and forecast proof"),
     "opt_soil": (1, "fixture; uniform category by default. Depth categories and "
@@ -2359,6 +2560,11 @@ NOAHMP_OPTION_IDENTITY_EVIDENCE: dict[str, tuple[object, str]] = {
     "opt_infdv": (0, "inactive outside RUN8; methods 1/2/3 implement the complete "
                      "native Philip, Green-Ampt and Smith-Parlange infiltration"),
     "opt_tdrn": (0, "complete native simple and Hooghoudt tile drainage at 1/2; inactive when run is not 3 or mapped fraction is below the native threshold"),
+    "opt_runsrf": (0, "WRF 4.8.0 surface runoff option; normalized into opt_run when the "
+                      "configuration is built, so the engine reads 0 here"),
+    "opt_runsub": (0, "stock pair at 0 (opt_run alone); 1-8 select a separate subsurface "
+                      "runoff scheme, re-implemented from published descriptions, not "
+                      "bitwise to upstream (gpuwm/core/noahmp_runoff_split.py)"),
     "soiltstep": (0.0, "native decimated soil clock and nine persisted ACC arrays; "
                        "zero retains the original per-step default"),
     "noahmp_output": (1, "native output level 3 carries the complete water and energy accumulator block"),
@@ -2393,18 +2599,30 @@ NOAHMP_OPTION_VALUES: dict[str, tuple[int, ...]] = {
     "snicar_snowshape_opt": (1, 2, 3, 4),
     "snicar_snowbc_intmix": (True, False),
     "snicar_snowdust_intmix": (True, False),
+    "snicar_fresh_grain_opt": (1, 2),
+    "snicar_lap_opt": (0, 1, 2),
+    "snicar_ice_ri_opt": (1, 2, 3),
+    "snicar_dust_optics_opt": (0, 1, 2, 3),
+    "snicar_solarspec_opt": (0, 1, 2, 3, 4, 5, 6),
+    "snicar_bandnumber_opt": (1, 2),
+    "snicar_solver_opt": (1, 2),
     "opt_inf": (1, 2),
     "opt_run": (1, 2, 3, 4, 5, 6, 7, 8),
     "opt_infdv": (0, 1, 2, 3),
+    "opt_runsrf": (0, 1, 2, 3, 4, 5, 6, 7, 8),
+    "opt_runsub": (0, 1, 2, 3, 4, 5, 6, 7, 8),
     "opt_rad": (1, 2, 3),
     "opt_frz": (1, 2),
+    "opt_scf": (1, 2),
     "opt_stc": (1, 2, 3),
+    "opt_tksno": (1, 2, 3, 4, 5),
     "opt_tbot": (1, 2),
     "dveg": (1, 2, 3, 4, 5, 6, 7, 8, 9),
     "opt_btr": (1, 2, 3),
     "opt_rsf": (1, 2, 3, 4),
     "opt_alb": (1, 2, 3),
     "opt_snf": (1, 2, 3, 4, 5),
+    "opt_snow_compact": (1, 2),
 }
 
 
@@ -2412,6 +2630,13 @@ NOAHMP_OPTION_VALUES: dict[str, tuple[int, ...]] = {
 #: value.  ``validate_run_config`` refuses anything else *before* a run
 #: starts, so the driver's own refusal is a second line rather than the
 #: first. Options with multiple implemented values are validated below.
+#: The MYNN generation each WRF reference pin resolves to (PLAN section 4,
+#: the ``wrf_reference`` selector lane L13 owns). "4.7.1" is today's engine
+#: byte for byte: None keeps the existing resolution (wrf_461, or wrf_471
+#: when a 4.7.1-only control is named). "4.8.0" is the MYNN-EDMF 8f8e8b59
+#: column, replay-qualified against native WRF 4.8.0 strict.
+MYNN_VERSION_BY_WRF_REFERENCE: dict[str, str | None] = {"4.7.1": None, "4.8.0": "wrf_480"}
+
 MYNN471_OPTION_VALUES = {
     "bl_mynn_closure": (2.5, 2.6, 3.0), "bl_mynn_cloudpdf": (0, 1, 2),
     "bl_mynn_edmf": (0, 1), "bl_mynn_edmf_mom": (0, 1),
@@ -2724,7 +2949,8 @@ def validate_mynn_generation_spp(cfg) -> None:
 def validate_spp_config(cfg) -> None:
     """Require an actual physics consumer for each requested SPP pattern."""
     consumers = {
-        "spp_conv": (("cu_physics", 3),),
+        # WRF v4.8.0's GFL call carries no SPP pattern; GFDRV (wrf_461) does.
+        "spp_conv": (("cu_physics", 3), ("cu_gf_version", "wrf_461")),
         "spp_pbl": (("bl_pbl_physics", 5), ("sf_sfclay_physics", 5)),
         "spp_lsm": (("sf_surface_physics", 3),),
     }
@@ -3353,6 +3579,15 @@ CU_STOCK_CALLABLES = {
     16: "gpuwm.core.ntiedtke.NewTiedtke",
     94: "gpuwm.core.sas.GfsSas",
     93: "gpuwm.core.gf.GrellDevenyi",
+}
+
+#: ``cu_gf_version`` values: which scheme ``cu_physics = 3`` runs.
+CU_GF_VERSIONS = frozenset({"gfl_873b414", "wrf_461"})
+
+#: Versioned cumulus callables: (cu_physics, cu_gf_version) rows that replace
+#: the CU_STOCK_CALLABLES row of their scheme.
+CU_VERSIONED_CALLABLES = {
+    (GRELL_FREITAS_CU_PHYSICS, "gfl_873b414"): "gpuwm.core.gfl.GrellFreitasLi",
 }
 
 #: The Grell-family keys, each with the WRF Registry default it is judged
@@ -4093,6 +4328,27 @@ def thompson_aerosol_aware(mp_physics) -> bool:
         return False
 
 
+def carries_aerosol_numbers(mp_physics) -> bool:
+    """Whether ``mp_physics`` carries prognostic nwfa AND nifa.
+
+    ONE SPELLING of the question aer_opt = 3 asks, for the config battery
+    and the namelist importer alike: the aerosol-aware Thompson family, or
+    a named scheme whose capability row lists both tracers (TEMPO).  Named
+    breakage: the importer asked only the Thompson family, so a TEMPO
+    namelist with aer_opt = 3 (the HRRR route's own emission of a TEMPO
+    TOML) was refused although the config battery admits it.
+    """
+    try:
+        value = int(mp_physics)
+    except (TypeError, ValueError):
+        return False
+    if value in THOMPSON_AEROSOL_FAMILY:
+        return True
+    from gpuwm.microphysics_schemes import SCHEMES_BY_ID
+    named = SCHEMES_BY_ID.get(value)
+    return named is not None and {"nwfa", "nifa"} <= set(named.aerosol_species)
+
+
 def thompson_hail_aware(mp_physics) -> bool:
     """Whether ``mp_physics`` carries the hail-aware graupel (mp=38)."""
     member = THOMPSON_AEROSOL_FAMILY.get(int(mp_physics or 0))
@@ -4500,11 +4756,7 @@ def validate_radiation_driver_options(cfg: RunConfig) -> None:
             "is not wired ahead of the fit here, so the direct-beam fit "
             "would run on a zero SWDDIR")
     if aer == 3:
-        from gpuwm.microphysics_schemes import SCHEMES_BY_ID
-        named = SCHEMES_BY_ID.get(int(cfg.mp_physics))
-        carries_numbers = (int(cfg.mp_physics) in THOMPSON_AEROSOL_FAMILY or
-                           (named is not None and {"nwfa", "nifa"} <= set(named.aerosol_species)))
-        if not carries_numbers:
+        if not carries_aerosol_numbers(cfg.mp_physics):
             raise ValueError(
                 f"aer_opt=3 needs water-friendly and ice-friendly aerosol numbers "
                 f"(Thompson aerosol-aware mp_physics=28, or a named aerosol-aware "
@@ -4552,8 +4804,8 @@ def validate_aerosol_source_options(cfg: RunConfig) -> None:
     something under mp=28 ride silently into an mp=28 restart or nest.
     """
     source = str(getattr(cfg, "mp28_aerosol_source", "auto") or "auto")
-    if bool(cfg.use_rap_aero_icbc) and int(cfg.mp_physics) not in THOMPSON_AEROSOL_FAMILY:
-        raise ConfigurationRefused("use_rap_aero_icbc requires mp_physics=28 or mp_physics=38; other schemes carry no QNWFA/QNIFA to initialize or force")
+    if bool(cfg.use_rap_aero_icbc) and not carries_aerosol_numbers(cfg.mp_physics):
+        raise ConfigurationRefused("use_rap_aero_icbc requires a scheme that carries QNWFA/QNIFA (mp_physics=28 or 38, or TEMPO); other schemes have no aerosol number to initialize or force")
     if source not in MP28_AEROSOL_SOURCES:
         raise ConfigurationRefused(
             f"mp28_aerosol_source={source!r} is not one of "
@@ -5197,6 +5449,13 @@ def load_config(path: str | Path, *, accept_epssm_auto: bool = False,
     known_keys = {f.name for f in fields(RunConfig)}
     merged: dict = {}
     key_table: dict[str, str] = {}
+    # wrf_reference in [run] pins the scheme generations that WRF release
+    # runs, resolved into the per-scheme keys of the same table (an
+    # explicit key wins); absent, nothing changes (gpuwm.wrf_reference).
+    if isinstance(raw.get("run"), dict) and "wrf_reference" in raw["run"]:
+        from gpuwm.wrf_reference import resolve_wrf_reference
+        raw["run"] = dict(raw["run"])
+        resolve_wrf_reference(raw["run"], where=f"[run] of config file {path}")
     for table in _RUN_CONFIG_TABLES:
         entries = raw.get(table, {})
         unknown_keys = [key for key in entries if key not in known_keys]
@@ -7513,6 +7772,28 @@ def validate_irrigation_config(cfg) -> None:
         raise ValueError('sprinkler irrigation requires moist state and active microphysics to consume its QR water')
 
 
+def validate_shinhong_generation(cfg) -> None:
+    """The Shin-Hong generation and its WRF 4.8.0 options (validate_run_config)."""
+    from gpuwm.core.shinhong_generations import SHINHONG_GENERATIONS
+    if cfg.shinhong_version not in SHINHONG_GENERATIONS:
+        raise ConfigurationRefused(
+            f"shinhong_version must be one of {SHINHONG_GENERATIONS}, got "
+            f"{cfg.shinhong_version!r}.")
+    for key in ("shinhong_nonlocal_flux", "shinhong_scu_mixing",
+                "shinhong_ke_dissipation"):
+        if type(getattr(cfg, key)) is not bool:
+            raise TypeError(f"{key} must be a bool")
+    if cfg.shinhong_version == "wrf_461" and (
+            not cfg.shinhong_nonlocal_flux or cfg.shinhong_scu_mixing
+            or cfg.shinhong_ke_dissipation):
+        raise ConfigurationRefused(
+            "shinhong_nonlocal_flux/shinhong_scu_mixing/"
+            "shinhong_ke_dissipation are WRF 4.8.0 Shin-Hong options; the "
+            "wrf_461 generation has none of them, so a non-default value "
+            "would be silently ignored.  Select shinhong_version = "
+            "\"wrf_480\" or leave them at their defaults.")
+
+
 def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> RunConfig:
     """The RunConfig invariant battery, shared by BOTH loaders.
 
@@ -7543,6 +7824,8 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
     validate_trajectory(cfg)
     from gpuwm.lightning_contract import validate_lightning
     validate_lightning(cfg)
+    from gpuwm.core.dyn_lightning import validate_dyn_lightning
+    validate_dyn_lightning(cfg)
     if type(cfg.hailcast_opt) is not int or cfg.hailcast_opt not in (-1, 0, 1):
         raise ConfigurationRefused("hailcast_opt must be -1 (automatic), 0 or 1")
     if not math.isfinite(cfg.haildt) or not 0 <= cfg.haildt <= 60:
@@ -7581,6 +7864,13 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
         sf_urban_physics=cfg.sf_urban_physics)
     if why is not None:
         raise ConfigurationRefused(why)
+    from gpuwm.core.terrain_drag import gwdo_options
+    try:
+        gwdo_options(gwdo_version=cfg.gwdo_version,
+                     dx_factor=cfg.gwd_dx_factor,
+                     if_nonhyd=cfg.gwd_if_nonhyd)
+    except ValueError as error:
+        raise ConfigurationRefused(str(error)) from None
     validate_fog_kfeta_config(cfg)
     validate_radiation_driver_options(cfg)
     for name in ("slope_rad", "topo_shading"):
@@ -8200,6 +8490,12 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
             raise ValueError("bmj_rad_feedback requires cu_physics=2: other schemes do not publish BMJ cloud fields")
         if not bmj_feedback_radiation_supported(radiation_scheme_ids(cfg)):
             raise ValueError("bmj_rad_feedback requires physical cloud radiation or disabled streams: the selected radiation adapter does not merge the carried convective cloud")
+    if getattr(cfg, "kim_tofd", False) and not float(cfg.tofd_factor) > 0.0:
+        raise ConfigurationRefused(
+            "tofd_factor must be positive with kim_tofd on: the form-drag "
+            "roughness height zf = VAR*tofd_factor sits inside log((za+zf)/zf), "
+            "so zero divides by zero and a negative factor puts NaN into CD "
+            f"and UST; got tofd_factor={cfg.tofd_factor}.")
     if cfg.sf_sfclay_physics not in (1, 91) and (
             cfg.isftcflx or cfg.iz0tlnd):
         raise ConfigurationRefused(
@@ -8209,6 +8505,18 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
         )
     from gpuwm.ysu_generations import ysu_generation
     ysu_generation(cfg.ysu_version)
+    validate_shinhong_generation(cfg)
+    from gpuwm.mp_generations import MP_GENERATION_SELECTORS, generation
+    for selector in MP_GENERATION_SELECTORS:
+        try:
+            generation(selector, getattr(cfg, selector))
+        except ValueError as exc:
+            raise ConfigurationRefused(str(exc)) from None
+    if cfg.cu_gf_version not in CU_GF_VERSIONS:
+        raise ConfigurationRefused(
+            f"cu_gf_version={cfg.cu_gf_version!r} must be one of {sorted(CU_GF_VERSIONS)}: "
+            "'gfl_873b414' is WRF v4.8.0's cu_physics=3 (Grell-Freitas-Li), 'wrf_461' the "
+            "previous pin's Grell-Freitas (WRF v4.6.1/v4.7.1 GFDRV)")
     if cfg.ysu_topdown_pblmix not in (0, 1):
         raise ConfigurationRefused(
             "ysu_topdown_pblmix must be 0 or 1, got "
@@ -8227,6 +8535,14 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
         if name == 'icloud_bl' and cfg.shcu_physics == 5 and value == 0 and type(value) is int:
             continue
         if type(value) is not type(admitted) or (value not in MYNN471_OPTION_VALUES[name] if cfg.bl_mynn_version == "wrf_471" else value != admitted):
+            if cfg.bl_mynn_version == "wrf_480" and type(value) is type(admitted) and value in MYNN471_OPTION_VALUES[name]:
+                # Implemented by the 4.8.0 column, but only the default
+                # identity has a native 4.8.0 replay witness so far.
+                raise ConfigurationRefused(
+                    f"{name}={value!r} with bl_mynn_version='wrf_480': the WRF 4.8.0 "
+                    "MYNN column is replay-qualified against native 4.8.0 for the "
+                    "default option identity only; this setting would run "
+                    "unqualified code under the 4.8.0 name. Use wrf_471 for it.")
             implemented = (
                 f"{name} in {MYNN471_OPTION_VALUES[name]!r}"
                 if cfg.bl_mynn_version == "wrf_471" else f"{name}={admitted!r}")
@@ -8347,8 +8663,28 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
             )
     from gpuwm.core.noahmp_groundwater_slab import validate as groundwater_validate
     groundwater_validate(cfg.wtddt)
+    from gpuwm.core.noahmp_wetland import validate as wetland_validate
+    try:
+        wetland_validate(wetland=cfg.noahmp_wetland,
+                         sf_surface_physics=cfg.sf_surface_physics,
+                         opt_run=cfg.opt_run, soiltstep=cfg.soiltstep)
+    except ValueError as refusal:
+        raise ConfigurationRefused(str(refusal)) from None
+    if cfg.noahmp_wetland:
+        from gpuwm.core.noahmp_wetland import LABEL
+        from gpuwm.explain import warn
+        warn("noahmp_wetland=1: Zhang et al. (2022) wetland scheme, " + LABEL)
     if cfg.sf_surface_physics==4 and cfg.opt_run==8 and cfg.opt_infdv==0:
         raise ConfigurationRefused("Noah-MP opt_run=8 requires opt_infdv=1,2,3: native FSUR is unassigned at zero")
+    if cfg.sf_surface_physics==4 and cfg.opt_runsub:
+        from gpuwm.core import noahmp_runoff_split as _runoff_split
+        try:
+            _runoff_split.validate(cfg.opt_run, cfg.opt_runsub, opt_tdrn=cfg.opt_tdrn, opt_infdv=cfg.opt_infdv)
+        except _runoff_split.RunoffSplitRefused as exc:
+            raise ConfigurationRefused(str(exc)) from None
+        from gpuwm.explain import warn
+        warn(f"opt_runsrf={cfg.opt_run} opt_runsub={cfg.opt_runsub}: separate surface and subsurface "
+             f"runoff, {_runoff_split.LABEL}")
     if cfg.sf_surface_physics==4 and cfg.opt_soil==4:
         from gpuwm.core.noahmp_soil_options import SOIL4_LABEL
         from gpuwm.explain import warn
@@ -8372,6 +8708,9 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
             if name == "opt_crop" and value == 2:
                 from gpuwm.explain import warn
                 warn("opt_crop=2: native WRF 4.7.1 fails here; this fixes it, not bitwise to WRF. Measured active-crop step cost is 1.4283x CROP1 on a shared GPU. Cold start is sowing; emergence uses native thermal time.")
+            if name == "opt_snow_compact" and value == 2:
+                from gpuwm.explain import warn
+                warn("opt_snow_compact=2: snow compaction C_bd(T_air, p_sfc) after Abolafia-Rosenzweig et al. 2024 (JAMES); re-implemented from published descriptions, not bitwise to upstream.")
             continue
         if name in NOAHMP_OPTIONS_WITHOUT_CONSUMER:
             # No breakage to name: the knob reaches no gpuwm code at
@@ -8498,15 +8837,57 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
             f"{cfg.mp_physics} would run its WRF v4.6.1 kernels under the "
             "fork's name.  Use mp_physics = 28, or leave thompson_version "
             "at 'wrf_461'.")
-    if cfg.bl_mynn_version not in ("wrf_461", "wrf_471", "gsd_41"):
+    if cfg.bl_mynn_version == "wrf_480" and int(cfg.bl_pbl_physics) == 5:
+        if cfg.bl_mynn_mixlength != 1 or cfg.tke_budget or cfg.bl_mynn_tkeadvect or cfg.spp_pbl:
+            raise ConfigurationRefused(
+                "bl_mynn_version='wrf_480' is replay-qualified against native WRF 4.8.0 "
+                "for the default identity (bl_mynn_mixlength=1, tke_budget=0, "
+                "bl_mynn_tkeadvect=false, spp_pbl=0) only; another setting would run "
+                "unqualified code under the 4.8.0 name. Use wrf_471 for it.")
+        if mynn_mixscalars_active(cfg) or int(cfg.bl_mynn_mixscalars) != 0:
+            raise ConfigurationRefused(
+                "bl_mynn_mixscalars=1 with bl_mynn_version='wrf_480': WRF 4.8.0's "
+                "key mixes only the generic scalar array (number species moved to "
+                "bl_mynn_mixnumcon/bl_mynn_mixaerosols); the engine's qn staging "
+                "for that key is the 4.6.1/4.7.1 meaning.")
+        if {"qnwfa", "qnifa"} & set(MYNN_QN_FLAG_SPECIES.get(int(cfg.mp_physics), ())):
+            raise ConfigurationRefused(
+                f"bl_mynn_version='wrf_480' with mp_physics={cfg.mp_physics}: WRF 4.8.0 "
+                "mixes the aerosol numbers by default (bl_mynn_mixaerosols=1) and the "
+                "engine does not stage qnwfa/qnifa into the 4.8.0 MYNN column yet, so "
+                "the run would claim 4.8.0 MYNN without its aerosol mixing.")
+    if cfg.bl_mynn_version not in ("wrf_461", "wrf_471", "wrf_480", "gsd_41"):
         raise ConfigurationRefused(
             f"bl_mynn_version={cfg.bl_mynn_version!r} must be 'wrf_461' "
-            "(WRF v4.6.1 MYNN) or 'gsd_41' (the GSD MYNN v4.1 of the "
+            "(WRF v4.6.1 MYNN), 'wrf_471', 'wrf_480' or 'gsd_41' (the GSD MYNN v4.1 of the "
             "NOAA-EMC WRF 3.9 branch): the two delete or keep a dew flux "
             "and mix with different lengths, so an unknown name cannot "
             "select either.")
     if type(cfg.cycling) is not bool:
         raise TypeError("cycling must be a bool")
+    if type(cfg.mynn_fixes_v61) is not bool:
+        raise ConfigurationRefused(
+            "mynn_fixes_v61 must be true or false: it selects the upstream "
+            "MYNN v6.1 fixes or the WRF 4.6.1 MYNN as written.")
+    if cfg.mynn_fixes_v61:
+        mynn_pbl = cfg.bl_pbl_physics == 5
+        mynn_sfc = cfg.sf_sfclay_physics == 5
+        if not (mynn_pbl or mynn_sfc):
+            raise ConfigurationRefused(
+                "mynn_fixes_v61 needs the MYNN PBL (bl_pbl_physics = 5) or "
+                "the MYNN surface layer (sf_sfclay_physics = 5): with neither "
+                "the run would claim fixes it never runs.")
+        if mynn_pbl and cfg.bl_mynn_version != "wrf_461":
+            raise ConfigurationRefused(
+                f"mynn_fixes_v61 with bl_mynn_version={cfg.bl_mynn_version!r}: "
+                "the fixes are marked edits of the WRF 4.6.1 MYNN unit "
+                "(gpuwm/core/mynn_pbl_v61.py); the wrf_471 and gsd_41 "
+                "generations are other sources and would run without them.")
+        if mynn_sfc and cfg.mynn_sfclay_variant != "wrf_461":
+            raise ConfigurationRefused(
+                f"mynn_fixes_v61 with mynn_sfclay_variant="
+                f"{cfg.mynn_sfclay_variant!r}: the surface-layer fix is "
+                "written for the WRF 4.6.1 SFCLAY_mynn first-step block.")
     if cfg.bl_mynn_cloud_tendency_form not in ("wrf_461", "gsd_41"):
         raise ConfigurationRefused("bl_mynn_cloud_tendency_form must be 'wrf_461' or 'gsd_41'")
     if cfg.bl_mynn_cloud_tendency_form == "gsd_41" and cfg.bl_mynn_version != "gsd_41":
@@ -8530,12 +8911,28 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
             "carries the v4.6.1 shallow-cumulus cloud only, so a gsd_41 run "
             "would hand radiation grid-mean plume water as in-cloud water.")
     validate_mynn_generation_spp(cfg)
-    if cfg.mynn_sfclay_variant not in ("wrf_461", "gsl_wrf39"):
+    if cfg.mynn_sfclay_variant not in ("wrf_461", "gsl_wrf39", "mynnsfc_b66187f"):
         raise ConfigurationRefused(
             f"mynn_sfclay_variant={cfg.mynn_sfclay_variant!r} must be "
-            "'wrf_461' (WRF v4.6.1's MYNN surface layer) or 'gsl_wrf39' "
-            "(the GSL WRF 3.9 fork's): the two solve different equations "
-            "for z/L, so an unknown name cannot select either.")
+            "'wrf_461' (WRF v4.6.1's MYNN surface layer), 'gsl_wrf39' "
+            "(the GSL WRF 3.9 fork's) or 'mynnsfc_b66187f' (WRF v4.8.0's "
+            "MYNN-SFC): they solve different equations for z/L, so an "
+            "unknown name cannot select any of them.")
+    if cfg.shalwater_z0 != 0:
+        raise ConfigurationRefused(
+            f"shalwater_z0={cfg.shalwater_z0!r}: WRF's shallow-water "
+            "roughness blend reads the water_depth bathymetry static, which "
+            "our init does not produce; no surface layer here reads it.")
+    if cfg.mynn_sfclay_variant == "mynnsfc_b66187f":
+        from gpuwm.core.mynnsfc_b66187f import validate_mynnsfc_b66187f
+        validate_mynnsfc_b66187f(cfg)
+    elif (cfg.sf_mynn_sfcflux_land, cfg.sf_mynn_sfcflux_water,
+          cfg.shalwater_z0) != (0, 1, 0) and int(cfg.sf_sfclay_physics) == 5:
+        raise ConfigurationRefused(
+            "sf_mynn_sfcflux_land/sf_mynn_sfcflux_water/shalwater_z0 are read "
+            "only by WRF v4.8.0's MYNN-SFC (mynn_sfclay_variant = "
+            f"'mynnsfc_b66187f'); {cfg.mynn_sfclay_variant!r} runs "
+            "isftcflx/iz0tlnd instead, so the values would be ignored.")
     if cfg.ruc_soilprop not in ("wrf_45", "wrf_461"):
         raise ConfigurationRefused(
             f"ruc_soilprop={cfg.ruc_soilprop!r} must be 'wrf_45' (the WRF "
@@ -8941,6 +9338,21 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
             raise ValueError(f"{option} must be logical; interpreting a string would select the wrong TEMPO coupling")
         if getattr(cfg, option) and cfg.mp_physics != 900:
             raise ValueError(f"{option} selects TEMPO behavior but mp_physics={cfg.mp_physics} does not execute it")
+    # gpuwm.core.tempo_runtime.TEMPO_VERSIONS (that module imports CuPy).
+    _TEMPO_VERSIONS = ("v3.2.5", "v3.0.3")
+    if cfg.tempo_version not in _TEMPO_VERSIONS:
+        raise ValueError(
+            f"tempo_version must be one of {list(_TEMPO_VERSIONS)}, got "
+            f"{cfg.tempo_version!r}: another name would run a TEMPO "
+            "generation nobody selected")
+    if type(cfg.tempo_hailhyperaware) is not bool:
+        raise ValueError("tempo_hailhyperaware must be logical; a string would "
+                         "switch the hail category on while the file says off")
+    if not cfg.tempo_hailhyperaware and cfg.tempo_version == "v3.0.3":
+        raise ValueError(
+            "tempo_hailhyperaware = false selects a v3.2.x switch but "
+            "tempo_version = \"v3.0.3\" has no hail category to switch off; "
+            "it would be recorded and never read")
     for _correct_key in _correct_mode.CORRECTION_KEYS:
         # A string "false" from a hand-built mapping is truthy in Python and
         # would switch the correction ON while the file says off.
@@ -9171,8 +9583,14 @@ def validate_run_config(cfg: RunConfig, *, native_fire_ideal: bool = False) -> R
         raise ValueError("gsd_diagnostics must be 0 or 1; research package 2 is not carried")
     if type(cfg.reset_interval1) is not int or cfg.reset_interval1 <= 0:
         raise ValueError("reset_interval1 must be positive whole minutes")
-    if cfg.gsd_diagnostics and cfg.mp_physics not in (0, 8, 28):
-        raise ValueError("gsd_diagnostics hail PSD supports mp_physics 8/28; other fork PSD tables are not carried")
+    # TEMPO (gpuwm id 900) carries its own hail PSD -- the fork Thompson
+    # 99th-percentile bin search on its two-moment, variable-density graupel
+    # (TEMPO diags.F90 max_hail_diameter) -- and feeds HAIL_MAXK1/HAIL_MAX2D
+    # from it (gpuwm/core/tempo.py), so the HRRR recipe's gsd_diagnostics = 1
+    # runs under TEMPO.  Named breakage for the rest: the fork's single-moment
+    # graupel table would be read as their hail.
+    if cfg.gsd_diagnostics and cfg.mp_physics not in (0, 8, 28, 900):
+        raise ValueError("gsd_diagnostics hail PSD supports mp_physics 8/28 and TEMPO; other fork PSD tables are not carried")
     for key in ("prec_acc_dt", "prec_acc_dt1"):
         value = getattr(cfg, key)
         if not math.isfinite(value) or value < 0:

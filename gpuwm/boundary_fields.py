@@ -127,6 +127,21 @@ def boundary_hydrometeor_fields(cfg, species) -> tuple[str, ...]:
     return (*masses, *numbers)
 
 
+def tempo_analyzed_aerosol_boundaries(cfg) -> bool:
+    """TEMPO under use_rap_aero_icbc: nwfa/nifa ride every boundary frame.
+
+    The analysis's QNWFA/QNIFA are installed on each forcing frame by the
+    shared number install (gpuwm.ingest.wrfinput active_moisture_inventory),
+    and the request is WRF's analyzed IC/BC promise.  Named breakage
+    without it: the switch was refused for TEMPO, and admitting it alone
+    would have let boundaries hold the initial aerosol while the run
+    claimed analyzed boundaries.  Off (every GFS-started TEMPO run), the
+    inventory is exactly what it was.
+    """
+    return (int(getattr(cfg, "mp_physics", 0) or 0) == 900
+            and bool(getattr(cfg, "use_rap_aero_icbc", False)))
+
+
 def external_scalar_fields(cfg, *, aerosol_from_input: bool | None = None,
                            boundary_species=()):
     """Ordered scalar inventory, with an optional resolved ingest decision.
@@ -145,6 +160,8 @@ def external_scalar_fields(cfg, *, aerosol_from_input: bool | None = None,
             or getattr(cfg, "mp28_aerosol_source", "auto") == "climatology")
     hydrometeors = boundary_hydrometeor_fields(cfg, boundary_species)
     if int(cfg.mp_physics) in (28, 38) and aerosol_from_input:
+        return ("qv", *hydrometeors, *AEROSOL_BOUNDARY_FIELDS)
+    if tempo_analyzed_aerosol_boundaries(cfg):
         return ("qv", *hydrometeors, *AEROSOL_BOUNDARY_FIELDS)
     from gpuwm.core.chem_mp_coupling import source_number_fields
     composition = source_number_fields(cfg) if int(cfg.mp_physics) == 28 else ()
@@ -186,7 +203,7 @@ def admissible_boundary_inventory(cfg, scalars) -> bool:
             return False
         rest.discard("qke_adv")
     aerosol = rest & set(AEROSOL_BOUNDARY_FIELDS)
-    if aerosol and int(getattr(cfg, "mp_physics", 0)) not in (28, 38):
+    if aerosol and int(getattr(cfg, "mp_physics", 0)) not in (28, 38)             and not tempo_analyzed_aerosol_boundaries(cfg):
         return False
     if aerosol and aerosol != set(AEROSOL_BOUNDARY_FIELDS):
         from gpuwm.core.chem_mp_coupling import source_number_fields

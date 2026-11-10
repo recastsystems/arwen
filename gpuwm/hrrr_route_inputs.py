@@ -1435,7 +1435,7 @@ def route_input_paths(config_path: Path) -> dict[str, Path]:
 #: same edit in the importer's words with no way out.
 ROUTE_SHARED_DOMAIN_KEYS = ("bldt", "diff_6th_opt", "isfflx",
                             "mp_physics", "sf_sfclay_physics",
-                            "mynn_sfclay_variant", "ysu_version", "terrain_clock",
+                            "mynn_sfclay_variant", "ysu_version", "shinhong_version", "terrain_clock",
                             "diff_6th_form", "upper_wind_limiter_form",
                             "mp_zero_out", "mp_zero_out_thresh",
                             "mp_zero_out_all", "ruc_irrigation", "ruc_snow",

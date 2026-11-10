@@ -212,6 +212,7 @@ pub(super) fn build_render_request(
     } else {
         request.contours = build_contour_layers(recipe, extracted, contour_layer_cache);
     }
+    request.contour_fills = build_contour_fill_layers(recipe, extracted);
     timing.contour_prepare_ms += contour_prepare_start.elapsed().as_millis();
     let barb_prepare_start = Instant::now();
     request.wind_streamlines = build_streamline_layers(
@@ -834,6 +835,23 @@ fn build_contour_layers(
     )
     .into_iter()
     .collect()
+}
+
+/// The translucent fill under the recipe's contour overlay, where the
+/// overlay field has one (the UH overlays on reflectivity).
+fn build_contour_fill_layers(
+    recipe: &PlotRecipe,
+    extracted: &HashMap<FieldSelector, SelectedField2D>,
+) -> Vec<rustwx_render::ContourFillLayer> {
+    let Some(selector) = recipe.contours.as_ref().and_then(|spec| spec.selector) else {
+        return Vec::new();
+    };
+    let Some(field) = extracted.get(&selector) else {
+        return Vec::new();
+    };
+    crate::plot_design::operational_contour_fill_for_values(selector, &field.values)
+        .into_iter()
+        .collect()
 }
 
 fn cached_contour_layer(

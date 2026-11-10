@@ -66,4 +66,4 @@ reference results are CC-BY-NC-SA-4.0 and the input file's terms are
 ambiguous, so the tests that read them fetch them from upstream at test
 time, and RRTMGP runs on a 136-number table derived from the inputs.
 
-Source and issues: https://github.com/FahrenheitResearch/arwen
+Source and issues: https://github.com/recastsystems/arwen

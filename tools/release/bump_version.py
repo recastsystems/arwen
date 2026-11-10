@@ -77,7 +77,7 @@ CHANGELOG = "CHANGELOG.md"
 #: The disclaimer receipt carries a verbatim copy of one README item, link included.
 TAG_LINK_FILES = ("README.md", "docs/public/receipts/resolved-scale-disclaimer.json")
 TAG_LINK = re.compile(
-    r"(https://github\.com/FahrenheitResearch/arwen/(?:blob|tree|raw)/v)(\d+\.\d+\.\d+)(/)")
+    r"(https://github\.com/(?:recastsystems/arwen|FahrenheitResearch/arwen)/(?:blob|tree|raw)/v)(\d+\.\d+\.\d+)(/)")
 
 #: The generator of the two binary licence notices, and the notices it writes.
 NOTICE_TOOL = "tools/update_tui_license_notice.py"
@@ -147,7 +147,7 @@ def disagreements(root: Path) -> list[str]:
     wrong.extend(f"{relative}:{number} links the v{version} tree, pyproject.toml says {lead}"
                  for relative, number, version in tag_links(root) if version != lead)
     wrong.extend(f"README.md:{number} links {target} relatively, a 404 on the PyPI page; "
-                 f"link https://github.com/FahrenheitResearch/arwen/blob/v{lead}/{target}"
+                 f"link https://github.com/recastsystems/arwen/blob/v{lead}/{target}"
                  for number, target in relative_links(root))
     return wrong
 

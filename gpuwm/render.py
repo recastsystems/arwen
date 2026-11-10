@@ -1342,15 +1342,32 @@ def render_series_rust(paths, *, products: str, timeidx: int | None,
 
 
 def _joined_across_moves(subject: Path, context_paths) -> bool:
-    """Whether a context frame is the subject's nest at another recorded
-    place (:func:`history_series_groups` joined it across a move)."""
+    """Whether a context frame is the subject's nest at another place
+    (:func:`history_series_groups` joined it across a move)."""
 
     mine = _history_series_identity(subject)[1]
     for path in context_paths:
         theirs = _history_series_identity(path)[1]
-        if theirs[:3] == mine[:3] and theirs[3] != mine[3]:
+        if _another_place(mine, theirs):
             return True
     return False
+
+
+def _another_place(mine, theirs) -> bool:
+    """Whether two nest keys are one nest at two places on the ground.
+
+    Either the recorded place differs (the nest moved in its parent), or
+    the recorded place is the same and the coordinates are not: a nest
+    that rides a parent which moved (a cyclone run's 1 km d03, fixed in
+    its following 3 km d02) records its place in that parent, which never
+    changes, while its ground moves with the parent.  Keyed on the
+    recorded place alone, its frames on either side of a parent's move
+    were two unrelated series, and its 1 h rain was drawn at no hour in
+    which the parent moved (run_c12e1e07306546b4: 10 of 12 hours).
+    """
+
+    return mine[:3] == theirs[:3] and (mine[3] != theirs[3]
+                                       or mine[5][0] != theirs[5][0])
 
 
 def _wanted_slots(series, wanted_times, *, each: bool = False) -> list[str] | None:
@@ -1437,14 +1454,16 @@ def _history_series_identity(path: Path
 
     The series key is the grid's whole identity, its place included, which
     is what one store may hold.  The nest key is ``(folder, episode, the
-    identity without the place, the recorded place, (ratio, nx, ny))``, the
-    place being :data:`_PLACEMENT_ATTRIBUTES` and the coordinates: two
-    frames whose nest keys differ only in the recorded place are one moving
-    nest before and after a move, whose earlier frames a later series needs
-    to close its windows (:func:`history_series_groups`).  Frames at one
-    recorded place with other coordinates are not a move and stay apart.
-    The last member is what says whether two places share ground
-    (:func:`_places_share_ground`).
+    identity without the place, the recorded place, (ratio, nx, ny), the
+    ground)``, the place being :data:`_PLACEMENT_ATTRIBUTES` and the
+    coordinates: two frames whose nest keys differ only in the place are
+    one moving nest before and after a move, whose earlier frames a later
+    series needs to close its windows (:func:`history_series_groups`).
+    That includes frames at one RECORDED place with other coordinates: a
+    nest fixed in a parent that moves keeps its recorded place while its
+    ground moves (:func:`_another_place`).  The ground is ``(coordinates
+    digest, lat min, lat max, lon min, lon max)``; it and the extent say
+    whether two places share ground (:func:`_places_share_ground`).
     """
     import netCDF4
 
@@ -1470,6 +1489,8 @@ def _history_series_identity(path: Path
             digest = hashlib.sha256(json.dumps(metadata, sort_keys=True,
                                                allow_nan=False).encode("utf-8"))
             digest.update(repr(sorted(dimensions)).encode("utf-8"))
+            ground = hashlib.sha256()
+            coordinates = {}
             for name in ("XLAT", "XLONG"):
                 variable = dataset.variables[name]
                 values = np.asarray(variable[:])
@@ -1481,10 +1502,12 @@ def _history_series_identity(path: Path
                     first = values
                 if not np.isfinite(first).all():
                     raise ValueError(f"{name} contains nonfinite coordinates")
-                digest.update(name.encode("ascii"))
-                digest.update(str(first.dtype).encode("ascii"))
-                digest.update(np.ascontiguousarray(first).tobytes())
-            stamps = tuple(datetime.datetime.strptime(str(stamp), "%Y-%m-%d_%H:%M:%S")
+                for hashed in (digest, ground):
+                    hashed.update(name.encode("ascii"))
+                    hashed.update(str(first.dtype).encode("ascii"))
+                    hashed.update(np.ascontiguousarray(first).tobytes())
+                coordinates[name] = np.asarray(first, dtype=np.float64)
+            stamps =tuple(datetime.datetime.strptime(str(stamp), "%Y-%m-%d_%H:%M:%S")
                            for stamp in netCDF4.chartostring(dataset.variables["Times"][:]))
             if not stamps or any(left >= right for left, right in zip(stamps, stamps[1:])):
                 raise ValueError("history times are empty, duplicate, or not increasing")
@@ -1497,8 +1520,16 @@ def _history_series_identity(path: Path
     sizes = dict(dimensions)
     extent = (metadata.get("PARENT_GRID_RATIO"), sizes.get("west_east"),
               sizes.get("south_north"))
+    # The ground the frame covers: its coordinates' digest, and their
+    # latitude span and longitude span (unwrapped about the first cell, so
+    # a grid across 180 degrees keeps one span).
+    lat, lon = coordinates["XLAT"], coordinates["XLONG"]
+    anchor = float(lon.flat[0])
+    lon = (lon - anchor + 180.0) % 360.0 - 180.0 + anchor
+    span = (ground.hexdigest(), float(lat.min()), float(lat.max()),
+            float(lon.min()), float(lon.max()))
     return ((str(path.parent), episode, digest.hexdigest()),
-            (str(path.parent), episode, nest.hexdigest(), place, extent), stamps)
+            (str(path.parent), episode, nest.hexdigest(), place, extent, span), stamps)
 
 
 def _places_share_ground(mine, theirs) -> bool:
@@ -1509,8 +1540,25 @@ def _places_share_ground(mine, theirs) -> bool:
     y), and they overlap exactly when that is less than the grid's width
     in both.  A place whose numbers are not all recorded shares nothing:
     no move can be read from it.
+
+    At one recorded place with other coordinates (the parent moved, see
+    :func:`_another_place`) the recorded places say nothing about the
+    ground, so the coordinates' spans decide: grids whose latitude and
+    longitude spans do not both overlap have no cell in common.  The
+    renderer then reads the whole-cell move from the coordinates and
+    checks it on every shared cell (rw_wrfbatch ``locate_shift``).
     """
 
+    if mine[3] == theirs[3]:
+        (_, south, north, west, east) = mine[5]
+        (_, south_other, north_other, west_other, east_other) = theirs[5]
+        if east_other - west_other < 180.0 and east - west < 180.0:
+            # Both spans unwrapped about their own first cell: bring the
+            # other's longitudes to within 180 degrees of this one's.
+            offset = round(((west + east) - (west_other + east_other)) / 720.0) * 360.0
+            west_other, east_other = west_other + offset, east_other + offset
+        return (south < north_other and south_other < north
+                and west < east_other and west_other < east)
     (i, j), (ratio, nx, ny) = mine[3], mine[4]
     (i_other, j_other) = theirs[3]
     try:
@@ -1556,7 +1604,12 @@ def history_series_groups(paths, *, context_paths=()
     stage failed.  A place the nest has travelled a whole width away from
     holds no value on the series' ground: joined anyway, every such frame was
     imported (and with ``--frames all`` drawn) again for every later place,
-    and the renderer refused the whole series over it.
+    and the renderer refused the whole series over it.  A nest fixed in a
+    parent that moves is joined the same way (:func:`_another_place`); the
+    renderer reads its move from the coordinates.  Ground a nest newly
+    covers stays missing for a window that began before it arrived: its
+    accumulations there count only the nest's own rain since it arrived
+    (nest-only totals, ``physics_continuation.STRIP_ACCUMULATORS``).
     """
     groups = {}
     nests = {}
@@ -1586,11 +1639,12 @@ def history_series_groups(paths, *, context_paths=()
                 key = matches[0]
         groups.setdefault(key, []).append((path, stamps))
     def moved_from(other, key):
-        # Same folder, episode and identity, another recorded place, and
-        # ground in common with this one.
+        # Same folder, episode and identity, another place (recorded, or
+        # on the ground under a parent that moved), and ground in common
+        # with this one.
         mine, theirs = nests.get(key), nests.get(other)
         return (other != key and mine is not None and theirs is not None
-                and mine[:3] == theirs[:3] and mine[3] != theirs[3]
+                and _another_place(mine, theirs)
                 and _places_share_ground(mine, theirs))
 
     moved = {}

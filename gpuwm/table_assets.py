@@ -161,7 +161,7 @@ CAM3_TABLE_ASSETS = tuple(TableAsset(row["filename"],row["size_bytes"],row["sha2
 #: Release the pinned assets were published with.  The pins themselves
 #: live in thompson_contract; this only says where the bytes are hosted.
 RELEASE_ASSET_BASE_URL = (
-    "https://github.com/FahrenheitResearch/arwen/releases/download/v1.0.0")
+    "https://github.com/recastsystems/arwen/releases/download/v1.0.0")
 
 ASSET_URL_BASE_ENV = "GPUWM_TABLE_ASSET_URL_BASE"
 

@@ -47,7 +47,7 @@
 # Environment:
 #   GPUWM_REPO_URL     clone source when run outside a checkout
 #                      (default:
-#                      https://github.com/FahrenheitResearch/arwen).
+#                      https://github.com/recastsystems/arwen).
 #   GPUWM_PYTHON       interpreter used to create .venv, same as
 #                      --python (default: free-threaded CPython 3.14t,
 #                      see "Interpreter" below)
@@ -117,7 +117,7 @@ say()  { printf 'install: %s\n' "$*"; }
 fail() { printf 'install: ERROR: %s\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- checkout
-REPO_URL="${GPUWM_REPO_URL:-https://github.com/FahrenheitResearch/arwen}"
+REPO_URL="${GPUWM_REPO_URL:-https://github.com/recastsystems/arwen}"
 if [ -f pyproject.toml ] && [ -d gpuwm ] && [ -d tools/grib1_bridge ]; then
     say "using the existing checkout at $(pwd)"
 elif [ -f gpuwm/pyproject.toml ] && [ -d gpuwm/gpuwm ]; then

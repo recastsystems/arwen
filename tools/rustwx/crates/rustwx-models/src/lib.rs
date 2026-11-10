@@ -7505,11 +7505,17 @@ fn should_use_range_probe(source: SourceId) -> bool {
     matches!(source, SourceId::Nomads)
 }
 
+/// Probes retry a 429/5xx (a rate-limited host is not a missing run) but
+/// not a transport failure: a dead host should answer "unavailable" fast.
+fn probe_policy() -> rw_http::Policy {
+    rw_http::Policy { max_transport_attempts: 1, ..rw_http::Policy::from_env() }
+}
+
 fn head_ok(agent: &ureq::Agent, url: &str) -> bool {
     let response = if url.contains("nomads.ncep.noaa.gov") {
-        agent.get(url).header("Range", "bytes=0-0").call()
+        rw_http::send_with(agent, rw_http::Method::Get, url, &[("Range", "bytes=0-0")], &probe_policy())
     } else {
-        agent.head(url).call()
+        rw_http::send_with(agent, rw_http::Method::Head, url, &[], &probe_policy())
     };
     match response {
         Ok(_) => true,
@@ -7519,7 +7525,7 @@ fn head_ok(agent: &ureq::Agent, url: &str) -> bool {
 }
 
 fn range_probe_ok(agent: &ureq::Agent, url: &str) -> bool {
-    match agent.get(url).header("Range", "bytes=0-0").call() {
+    match rw_http::send_with(agent, rw_http::Method::Get, url, &[("Range", "bytes=0-0")], &probe_policy()) {
         Ok(_) => true,
         Err(ureq::Error::StatusCode(code)) if code == 403 || code == 404 => false,
         Err(_) => false,

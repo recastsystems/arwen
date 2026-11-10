@@ -1488,6 +1488,22 @@ def prepare_real_case(cfg: RunConfig, *, grid, geog_root,
         land_state=land_state_context(
             grid, getattr(initial_met, "valid_time", times[0])),
         route=_WATER_ROUTE)
+    # The model's SST carrier: the forcing's SST, with TSK on every water
+    # cell the source leaves without one (real.exe's no-SST rule), for
+    # every forcing source through this one seam.  Set here, before the
+    # case store, the ensemble capture and the physics initialization read
+    # soil_fields, so all three see the same carrier.  ``wrf_compat`` keeps
+    # stock real.exe's carrier (flag_sst = 1 leaves the mapped value) for
+    # byte-for-byte certification.
+    if water_temperature_policy != "wrf_compat" and "SST" in soil_fields:
+        from gpuwm.ingest.water_temperature import model_sst_with_skin_fill
+        soil_fields["SST"], sst_receipt = model_sst_with_skin_fill(
+            soil_fields["SST"], skin=soil.tsk, landmask=static["LANDMASK"])
+        if sst_receipt["filled_from_tsk"]:
+            print(f"[surface] sst: {sst_receipt['filled_from_tsk']} of "
+                  f"{sst_receipt['filled_from_tsk'] + sst_receipt['source_cells']}"
+                  " water cells have no source SST; filled from TSK "
+                  "(real.exe's no-SST rule)", flush=True)
     if store_request is not None:
         from types import SimpleNamespace
         from gpuwm.ingest.case_store import write_case_store_input
@@ -6058,6 +6074,10 @@ def _run_experiment(exp: ExperimentConfig, data: CaseDataConfig, outdir, *,
     """
     from gpuwm.experiment import _bind_physics_params
     exp = _bind_physics_params(exp, "gpuwm.runtime.run_experiment")
+    if restart is not None:
+        # A resume continues its checkpoint's TEMPO generation.
+        from gpuwm.core.tempo import adopt_checkpoint_generation
+        exp = adopt_checkpoint_generation(exp, restart)
     from gpuwm.ensemble.runtime_context import current_session
     ensemble = current_session()
     if ensemble is not None:

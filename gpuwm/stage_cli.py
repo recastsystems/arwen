@@ -687,13 +687,15 @@ def packaged_source_of(prepared_root: Path, *,
     schemas = source_schemas()
     observed_composition = _sha256(composition)
     mapping_bytes = mapping.read_bytes()
-    for source, profile_id in packaged_profile_sources().items():
-        pins = packaged_authority_sha256(profile_id)
-        if (observed_composition == pins["composition"]
-                and isinstance(manifest, Mapping)
-                and manifest.get("schema") == schemas.get(source)
-                and bound_mapping_refusal(profile_id, mapping_bytes) is None):
-            return source
+    from gpuwm.source_authorities import packaged_profile_family
+    for source, family_head in packaged_profile_sources().items():
+        for profile_id in packaged_profile_family(family_head):
+            pins = packaged_authority_sha256(profile_id)
+            if (observed_composition == pins["composition"]
+                    and isinstance(manifest, Mapping)
+                    and manifest.get("schema") == schemas.get(source)
+                    and bound_mapping_refusal(profile_id, mapping_bytes) is None):
+                return source
     return None
 
 
@@ -1327,7 +1329,35 @@ def sim_main(args) -> int:
         from gpuwm import prepared_domain_tree_forecast as runner_module
     else:
         from gpuwm import prepared_single_domain_forecast as runner_module
-    return runner_module.main(command[3:])
+    code = runner_module.main(command[3:])
+    if code == 0 and plots:
+        _finish_sim_pictures(outdir, requested, getattr(args, "render_dir", None),
+                             explain=explain_enabled(args))
+    return code
+
+
+def _finish_sim_pictures(outdir: Path, products: str, render_dir, *, explain: bool) -> None:
+    """The end of a ``gpuwm sim`` run that drew pictures: ``gpuwm go``'s render stage over the same folder.
+
+    The runner draws each frame as it lands with at most one hour of earlier frames beside it, so the maps that fold
+    the whole series (``uh_2to5km_run_max``, ``uh_2to5km_3h_max``, ``qpf_6h``, the run and daily extremes) were drawn
+    only by ``gpuwm go``'s end-of-run windowed pass, which ``gpuwm sim`` never ran.  THE BREAKAGE THIS PREVENTS (WOOF
+    canary run_6048ab38808a0625, 2026-11-10): a Hex with Regional 1 km nest, which runs through ``gpuwm sim``, drew
+    ``uh_2to5km_run_max`` at F001 and F002 only and no ``uh_2to5km_3h_max``, while a ``gpuwm go`` run of the same
+    request drew both at every hour.  The stage fills only what is missing: frames drawn while the forecast ran are
+    verified by digest and kept (measured: 1 s for a 7-frame 3 km run).  A failure here leaves the forecast's result
+    as it is and says so.
+    """
+
+    from gpuwm import go_cli
+
+    render = Path(render_dir) if render_dir is not None else Path(outdir) / "png"
+    plan = {"run": Path(outdir), "render": render, "publish_root": render.parent / "www", "publish_cmd": None,
+            "hydro": "auto", "render_products": products, "restart": None, "render_section": None}
+    try:
+        go_cli._render_stage(plan, explain=explain, door="sim")
+    except Exception as error:  # noqa: BLE001 - the forecast finished; its pictures so far stand
+        print(f"sim: the end-of-run pictures were not drawn: {type(error).__name__}: {error}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------

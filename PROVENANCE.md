@@ -193,10 +193,10 @@ bytes are outside the numerical oracle.
   `cupy.cuda.compiler` line 585 (`options += ('-ftz=true',)`), after the
   caller's options, and NVRTC honours the last occurrence.
   The inventory records 12 distinct caller-supplied option tuples across the
-  172 compile sites in the shipped package, each listed here with a site
+  181 compile sites in the shipped package, each listed here with a site
   that supplies it:
   - no caller options -- `gpuwm/backend/__init__.py:28` (self.xp.RawModule),
-    and 119 other site(s)
+    and 128 other site(s)
   - `-std=c++17` -- `gpuwm/core/acoustic_fusion.py:405` (cp.RawModule), and
     15 other site(s)
   - `--std=c++17` -- `gpuwm/ensemble/batch_perturbation.py:51`
@@ -207,7 +207,7 @@ bytes are outside the numerical oracle.
     4 other site(s)
   - `-fmad=false` -- `gpuwm/core/dycore.py:308` (cp.ElementwiseKernel), and
     2 other site(s)
-  - `-std=c++17` `--fmad=false` -- `gpuwm/core/kernels/__init__.py:1230`
+  - `-std=c++17` `--fmad=false` -- `gpuwm/core/kernels/__init__.py:1249`
     (cp.RawModule), and 1 other site(s)
   - `-std=c++17` `--fmad=false` `--ftz=false` --
     `gpuwm/core/thompson_fork.py:109` (compiler.compile_using_nvrtc), and 1
@@ -219,7 +219,7 @@ bytes are outside the numerical oracle.
   - `--std=c++17` a target flag built from the device architecture at run
     time -- `gpuwm/ocean/waves/model.py:73` (cp.RawModule)
   - `-std=c++17` `--maxrregcount=112` --
-    `gpuwm/core/kernels/__init__.py:1202` (cp.RawModule)
+    `gpuwm/core/kernels/__init__.py:1221` (cp.RawModule)
   `R5` and `R1` are kernels inside ONE compiled object -- same device, same
   flags, one compile -- and they did not measure alike, so on this device
   the outcome follows the instruction the compiler emitted rather than the

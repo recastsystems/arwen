@@ -2018,9 +2018,8 @@ def geography_for_run(config_path: Path) -> dict:
         cfg = domains[domain_id].run
         if getattr(cfg, "sf_lake_physics", 0) and "LAKE_DEPTH" not in served:
             required.add("lake_depth")
-        from gpuwm.static.orographic import required_static_fields, orographic_paths
-        drag = tuple(name for name in required_static_fields(
-            getattr(cfg, "topo_wind", 0), getattr(cfg, "gwd_opt", 0)) if name not in served)
+        from gpuwm.static.orographic import required_static_fields_for, orographic_paths
+        drag = tuple(name for name in required_static_fields_for(cfg) if name not in served)
         if drag:
             paths = orographic_paths(drag, selection.root, selection.resolution_tokens)
             required.update(path.relative_to(selection.root).as_posix() for path in paths.values())

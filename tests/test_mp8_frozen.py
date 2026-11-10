@@ -1262,9 +1262,14 @@ FROZEN_MODULE_DIGESTS = {
         # 0bf505764 in all 21,885,246 history words.
         'ef57884c3f55818b9f6cb920d2c5734f5b019967bf0deb917b944cb67df95094',
         '42ed557f113efd6423279a881c3c0db362639180f8cf2dbdcf287c0ce3845331'),
+    # fix/noahmp-small-defects (2026-11-09): correct-mode SN1, the Noah-MP
+    # snowmelt reset re-evaluating ESTG at the reset TG, compiled only under
+    # GPUWM_NOAHMP_MELT_RESET_ESAT.  Without it the arithmetic is unchanged
+    # (colo 3 km 9 h and c1 12 km 1 h, SN1 off: 0 of 338,307,610 and
+    # 0 of 24,142,130 history words differ from rel/2.9.13).
     'noahmp_bareflux': (
-        '54fb5065e95b24d4cf676e2deda29bae44b3e9305d3d98cbc1abf5ed55f444ce',
-        'fbb19fc8b5668ea2edbcc1270f8ffe367475124ffa0ce99d3bc34639f3f31e9f'),
+        '883cd6f2cbc8cbf56671469bc0ff08126bc5f7b56573869d336a5c85d7feb916',
+        '18bce629727038d680911ebb57f4e2aa37639dcbaf030d8fada6f4d64f7b9cf4'),
     'noahmp_driver': (
         'bd555be10ccade5a5bdddcaf4c56b7f4353dae1208fc48a5586fb7ce7d32d643',
         'f1913fe0054adb74188effa6499b799e989cfb1e96ecd676edcd43df0083030e'),
@@ -1334,9 +1339,14 @@ FROZEN_MODULE_DIGESTS = {
     # selector.  The default-route arithmetic is unchanged; the
     # composed-unit frame row is re-read for it in
     # kernel_frame_recordings.  Previously 295e9541/c3271c5a.
+    # fix/noahmp-small-defects (2026-11-09): correct-mode SN1, the Noah-MP
+    # snowmelt reset re-evaluating ESTG at the reset TG, compiled only under
+    # GPUWM_NOAHMP_MELT_RESET_ESAT.  Without it the arithmetic is unchanged
+    # (colo 3 km 9 h and c1 12 km 1 h, SN1 off: 0 of 338,307,610 and
+    # 0 of 24,142,130 history words differ from rel/2.9.13).
     'noahmp_vegeflux': (
-        'd55c402a21caf3f52e5aed05a0dd727df76b747906a3e0d082446e6a7bcab014',
-        '0d23b367d88497bb45a2e895e6d85abc826caf2f4467b8b47c7ba7be32d3a9b4'),
+        'b35620d804880453d8cc5b68c03cc0cd15fa6a4c432c53c555d1d4b2fd363d8b',
+        'ecfcaf8d5e8ae09d127a37ca8ecb75ebebfad942f00becdd8d63197e96cb9ce9'),
     'noahmp_vegprecip': (
         '9ce5667599d111be0efc7cb0871e5719d70259bb95b30fbe923e01964b75c26c',
         '599e85f0fe59a28ae5fd5437e47db7f41c31abd21783979f66b987b212f1f41a'),
@@ -1896,8 +1906,17 @@ FROZEN_MODULE_DIGESTS = {
         # physics-on step.  Graded against the strict-recipe oracle
         # (tools/sfclayrev_wrf461_oracle/build_strict.sh).  sfclay is not an
         # mp=8 translation unit.  Previously 09ff5be4/010efce3.
-        '2110f93e4f5ca9fcdee9c2b41844f81082b333af6081133c7078d8d02c82cbb6',
-        '1cbeb1fe01a272288a8afc2a0980182016180c8ec640be8d0fd98fa05044537d'),
+        # Re-pinned port/wrf-480 L07 (WRF v4.8.0 kim_tofd): sfclay.cu gains the
+        # KIM turbulent orographic form drag inside #ifdef GPUWM_SFCLAY_TOFD,
+        # compiled only into the new sfclay_tofd unit.  Reading: the sfclay and
+        # sfclay_dx2d images (fast and strict) are byte-identical to the
+        # previous source's; the WRF 4.6.1 fixture stays 0 ULP; the 4.8.0
+        # referee-object oracle (tools/sfclayrev_wrf480_oracle) is 0 of
+        # 267,960 words under strict numerics.  Previously 2110f93e/1cbeb1fe.
+        # 3.0.0 export hygiene: a comment-only rewrite (the lane report path in
+        # the dx_factor note became the lane name); previously f6932fd1.
+        '29be8e5edf5feac9af91b2bc6702ff09fed7be5f0f5414840b4fa5d539fdcca2',
+        'ad66c56a04b440112ebc6fdfcf1d1d972ac7b86eef48941a3a00feb406fed25b'),
     'smag2d': (
         # Re-pinned by the cat6 fix, 2026-11-02: 51bb93111ee (export hygiene)
         # rewrote comments only in glibc_flt32.cuh, flt32_expf_fma.cuh, kf.cu,

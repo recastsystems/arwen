@@ -637,6 +637,7 @@ def mynn_pblh_scale_columns_cuda(
     *,
     scratch=None,
     bl_mynn_version: str = "wrf_461",
+    mynn_fixes_v61: bool = False,
 ) -> MynnPblhScaleResult:
     """Evaluate WRF ``GET_PBLH`` and ``SCALE_AWARE`` on device columns."""
 
@@ -660,7 +661,8 @@ def mynn_pblh_scale_columns_cuda(
         psig_shcu=scaled["psig_shcu"],
     )
     blocks = (ncol + _TPB - 1) // _TPB
-    kernel = mynn_pbl_kernel("mynn_pblh_scale_columns", bl_mynn_version)
+    kernel = mynn_pbl_kernel("mynn_pblh_scale_columns", bl_mynn_version,
+                             mynn_fixes_v61=mynn_fixes_v61)
     kernel(
         (blocks,), (_TPB,),
         (theta, energy, interface, depth, sea, spacing,
@@ -1049,10 +1051,22 @@ def _mynn_version_check(bl_mynn_version: str) -> None:
             f"this solver carries ({', '.join(MYNN_VERSIONS)}).")
 
 
-def mynn_pbl_kernel(func: str, bl_mynn_version: str = "wrf_461", shape=()):
-    """The ``mynn_pbl.cu`` kernel ``func`` compiled for one MYNN generation."""
+def mynn_pbl_kernel(func: str, bl_mynn_version: str = "wrf_461", shape=(),
+                    mynn_fixes_v61: bool = False):
+    """The ``mynn_pbl.cu`` kernel ``func`` compiled for one MYNN generation.
+
+    ``mynn_fixes_v61`` (RunConfig.mynn_fixes_v61) loads the kernels the
+    upstream MYNN v6.1 fixes edit from the ``mynn_pbl_v61`` unit
+    (gpuwm/core/mynn_pbl_v61.py); it is a wrf_461 option only.
+    """
 
     _mynn_version_check(bl_mynn_version)
+    if mynn_fixes_v61:
+        if bl_mynn_version != "wrf_461":
+            raise ValueError("mynn_fixes_v61 edits the wrf_461 unit; "
+                             f"bl_mynn_version={bl_mynn_version!r} is another source")
+        from gpuwm.core.mynn_pbl_v61 import mynn_v61_kernel_name
+        return get_kernel(mynn_v61_kernel_name(func, True), func, shape)
     if bl_mynn_version == "wrf_461":
         return get_kernel("mynn_pbl", func, shape)
     return get_kernel_int_defines("mynn_pbl", func, (("MYNN_GSD41", 1),), shape)
@@ -1115,6 +1129,7 @@ def _tendency_launch(
     work,
     bl_mynn_version: str = "wrf_461",
     bl_mynn_cloud_tendency_form: str = "wrf_461",
+    mynn_fixes_v61: bool = False,
 ) -> MynnTendenciesResult:
     """Launch ``mynn_tendencies_columns`` for one already-validated batch."""
 
@@ -1131,7 +1146,8 @@ def _tendency_launch(
     blocks = (ncol + _TPB - 1) // _TPB
     gsd41_args = () if bl_mynn_version == "wrf_461" else (
         columns["qc"], columns["qi"], np.int32(bl_mynn_cloud_tendency_form == "gsd_41"))
-    kernel = mynn_pbl_kernel("mynn_tendencies_columns", bl_mynn_version, (nz, 1, ncol))
+    kernel = mynn_pbl_kernel("mynn_tendencies_columns", bl_mynn_version, (nz, 1, ncol),
+                             mynn_fixes_v61=mynn_fixes_v61)
     kernel(
         (blocks,), (_TPB,),
         (
@@ -1244,6 +1260,7 @@ def mynn_tendencies_default_cuda(
     scratch=None,
     bl_mynn_version: str = "wrf_461",
     bl_mynn_cloud_tendency_form: str = "wrf_461",
+    mynn_fixes_v61: bool = False,
 ) -> MynnTendenciesResult:
     """Evaluate WRF ``mynn_tendencies`` with the mass flux admitted on device.
 
@@ -1313,7 +1330,8 @@ def mynn_tendencies_default_cuda(
     onoff = 0.0 if bl_mynn_edmf_mom == 0 else 1.0
     _mynn_version_check(bl_mynn_version)
     result = _tendency_launch(columns, interfaces, scalars, ncol, nz, onoff,
-                              work, bl_mynn_version, bl_mynn_cloud_tendency_form)
+                              work, bl_mynn_version, bl_mynn_cloud_tendency_form,
+                              mynn_fixes_v61=mynn_fixes_v61)
     if bl_mynn_mixscalars == 1:
         # The five stock qn solves (module_bl_mynn.F:4654-4860) in WRF's
         # solve order, launched from the scalar translation unit. The
@@ -1683,7 +1701,8 @@ def _driver_prep_cuda(layers, ust, ncol: int, nz: int, work,
 
 
 def _driver_surface_cuda(layers, qv1, scalars, ncol: int, nz: int, work,
-                         bl_mynn_version: str = "wrf_461"):
+                         bl_mynn_version: str = "wrf_461",
+                         mynn_fixes_v61: bool = False):
     """The surface-flux block, z/L, and ``pmz``/``phh`` (``:1057-1097``).
 
     ``pmz``/``phh`` come out of this kernel now.  They used to be evaluated on
@@ -1724,13 +1743,18 @@ def _driver_surface_cuda(layers, qv1, scalars, ncol: int, nz: int, work,
     # gsd_41 keeps the surface layer's 1/L (GSD MYNN v4.1 :4412), so the
     # kernel reads the field it was handed.
     gsd41_args = () if bl_mynn_version == "wrf_461" else (scalars["rmol"],)
-    mynn_pbl_kernel("mynn_driver_surface_columns", bl_mynn_version)(
+    # mynn_fixes_v61 A5: theta of the ground from the ground's own Exner
+    # function, so the kernel reads the surface pressure as well.
+    v61_args = (scalars["ps"],) if mynn_fixes_v61 else ()
+    mynn_pbl_kernel("mynn_driver_surface_columns", bl_mynn_version,
+                    mynn_fixes_v61=mynn_fixes_v61)(
         (blocks,), (_TPB,),
         (
             layers["rho"], layers["exner"], layers["dz"], qv1,
             scalars["ust"], scalars["hfx"], scalars["qfx"], scalars["ts"],
             *(outputs[name] for name in names),
             np.int32(nz), np.int32(ncol),
+            *v61_args,
             *gsd41_args,
         ),
     )
@@ -1773,6 +1797,7 @@ def mynn_bl_driver_cuda(
     bl_mynn_gsd41_unsquared_qtke: bool = False,
     bl_mynn_cloud_tendency_form: str = "wrf_461",
     initialize_qke: bool | None = None,
+    mynn_fixes_v61: bool = False,
 ) -> dict[str, cp.ndarray]:
     """Device twin of :func:`gpuwm.core.mynn_pbl.mynn_bl_driver`.
 
@@ -1788,6 +1813,28 @@ def mynn_bl_driver_cuda(
     not retain the former FP64-then-round allowance.
     """
 
+    if type(mynn_fixes_v61) is not bool:
+        raise TypeError("mynn_fixes_v61 must be a bool")
+    if mynn_fixes_v61 and bl_mynn_version != "wrf_461":
+        # The fixes are marked edits of the wrf_461 unit; another generation
+        # would run without them while its run claims them.
+        raise ValueError("mynn_fixes_v61 requires bl_mynn_version='wrf_461', "
+                         f"got {bl_mynn_version!r}")
+    if bl_mynn_version == "wrf_480":
+        if mix_chem is not False:
+            raise ValueError("WRF 4.8.0 MYNN chemistry mixing is not admitted")
+        from gpuwm.core.mynn480_gpu import driver as driver480
+        return driver480(values, initflag=initflag, delt=delt, scratch=scratch,
+                         closure=closure, restart=restart, cycling=cycling,
+                         bl_mynn_cloudpdf=bl_mynn_cloudpdf, bl_mynn_mixlength=bl_mynn_mixlength,
+                         bl_mynn_edmf=bl_mynn_edmf, bl_mynn_edmf_mom=bl_mynn_edmf_mom,
+                         bl_mynn_edmf_tke=bl_mynn_edmf_tke, bl_mynn_mixscalars=bl_mynn_mixscalars,
+                         bl_mynn_cloudmix=bl_mynn_cloudmix, bl_mynn_mixqt=bl_mynn_mixqt,
+                         bl_mynn_output=bl_mynn_output, bl_mynn_tkeadvect=bl_mynn_tkeadvect,
+                         tke_budget=tke_budget, spp_pbl=spp_pbl, flag_qc=flag_qc, flag_qi=flag_qi,
+                         flag_qs=flag_qs, flag_qnc=flag_qnc, flag_qni=flag_qni,
+                         flag_qnwfa=flag_qnwfa, flag_qnifa=flag_qnifa, flag_qnbca=flag_qnbca,
+                         flag_ozone=flag_ozone)
     if bl_mynn_version == "wrf_471":
         if mix_chem is not False:
             raise ValueError("WRF 4.7.1 MYNN chemistry mixing is not admitted")
@@ -1958,6 +2005,7 @@ def mynn_bl_driver_cuda(
         seeded_pblh = mynn_pblh_scale_columns_cuda(
             pblh_thetav, qke_seed, zw, layers["dz"], scalars["xland"],
             scalars["dx"], scratch=work, bl_mynn_version=bl_mynn_version,
+            mynn_fixes_v61=mynn_fixes_v61,
         )
         scalars["pblh"] = seeded_pblh.zi
         kpbl = seeded_pblh.kzi
@@ -2008,6 +2056,7 @@ def mynn_bl_driver_cuda(
     pblh_scale = mynn_pblh_scale_columns_cuda(
         pblh_thetav, layers["qke"], zw, layers["dz"], scalars["xland"],
         scalars["dx"], scratch=work, bl_mynn_version=bl_mynn_version,
+        mynn_fixes_v61=mynn_fixes_v61,
     )
     scalars["pblh"] = pblh_scale.zi
     kpbl = pblh_scale.kzi
@@ -2019,7 +2068,8 @@ def mynn_bl_driver_cuda(
     # (module_bl_mynn.F:4425, cp*(1+0.84*qv(i,kts,j))), not from one rebuilt
     # out of the specific humidity.
     surface = _driver_surface_cuda(layers, gsd41_water.get("qv", qv1),
-                                   scalars, ncol, nz, work, bl_mynn_version)
+                                   scalars, ncol, nz, work, bl_mynn_version,
+                                   mynn_fixes_v61=mynn_fixes_v61)
     flt = surface["flt"]
     fltv = surface["fltv"]
     flq = surface["flq"]
@@ -2203,6 +2253,7 @@ def mynn_bl_driver_cuda(
         scratch=work,
         bl_mynn_version=bl_mynn_version,
         bl_mynn_cloud_tendency_form=bl_mynn_cloud_tendency_form,
+        mynn_fixes_v61=mynn_fixes_v61,
     )
 
     # module_bl_mynn.F:5358 retrieve_exchange_coeffs.

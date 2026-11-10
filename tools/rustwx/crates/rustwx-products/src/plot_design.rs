@@ -1,7 +1,8 @@
 use rustwx_core::{CanonicalField, FieldSelector, VerticalSelector};
 use rustwx_models::{PlotRecipe, RenderStyle};
 use rustwx_render::{
-    Color, ColorScale, ContourLayer, ContourLinePattern, DiscreteColorScale, DomainFrame,
+    Color, ColorScale, ContourFillLayer, ContourLayer, ContourLinePattern, DiscreteColorScale,
+    DomainFrame,
     DomainFrameSource, ExtendMode, LegendControls, LegendMode, LevelDensity, MapRenderRequest,
     ProductVisualMode, RenderDensity, WindStreamlineStyle,
     weather::{
@@ -509,6 +510,124 @@ pub fn operational_fill_scale_for_recipe_in(
         },
     };
     ColorScale::Discrete(discrete)
+}
+
+/// The environment switch for the UH overlay shading: `0`, `off`, `false` or
+/// `no` drops it and leaves the black contours alone, as every release up to
+/// 2.9.13 drew them; `bright` shades with a light magenta-to-white ladder
+/// instead of the default dark one; anything else (or unset) is the default.
+pub const UH_FILL_ENV: &str = "RUSTWX_UH_FILL";
+
+/// The translucent shading under an updraft-helicity overlay's contours
+/// draw UH tracks over reflectivity).  The ladder starts at the layer's
+/// lowest contour, so the shading sits inside the outline, and darkens in
+/// two more steps; the black outlines still draw on top.  2-5 km: 75, 150
+/// and 250 m2/s2 (outline at 75); 0-1 km: 10, 20 and 40; 0-2 and 0-3 km:
+/// 25, 50 and 75 (the outlines of [`operational_contour_layer_for_values`]).
+/// `None` for every other field, and for UH when [`UH_FILL_ENV`] is off.
+pub fn operational_contour_fill_for_values(
+    selector: FieldSelector,
+    values: &[f32],
+) -> Option<ContourFillLayer> {
+    if selector.field != CanonicalField::UpdraftHelicity {
+        return None;
+    }
+    let colors = match uh_fill_style() {
+        UhFillStyle::Off => return None,
+        UhFillStyle::Dark => uh_fill_colors(),
+        UhFillStyle::Bright => uh_fill_colors_bright(),
+    };
+    let levels = match selector.vertical {
+        VerticalSelector::HeightAboveGroundLayerMeters {
+            bottom_m: 2000,
+            top_m: 5000,
+        } => vec![75.0, 150.0, 250.0],
+        VerticalSelector::HeightAboveGroundLayerMeters {
+            bottom_m: 0,
+            top_m: 1000,
+        } => vec![10.0, 20.0, 40.0],
+        VerticalSelector::HeightAboveGroundLayerMeters {
+            bottom_m: 0,
+            top_m: 2000 | 3000,
+        } => vec![25.0, 50.0, 75.0],
+        _ => return None,
+    };
+    Some(ContourFillLayer {
+        data: values.to_vec(),
+        levels,
+        colors,
+    })
+}
+
+/// Black at 35, 42 and 50 percent opacity: a shadow over the radar colours
+/// that never reads as a reflectivity colour of its own.
+fn uh_fill_colors() -> Vec<Color> {
+    vec![
+        Color::rgba(0, 0, 0, 89),
+        Color::rgba(0, 0, 0, 107),
+        Color::rgba(0, 0, 0, 128),
+    ]
+}
+
+/// Light magenta to white at 45 percent opacity (`RUSTWX_UH_FILL=bright`):
+/// a highlight that lifts the tracks off dark radar colours.
+fn uh_fill_colors_bright() -> Vec<Color> {
+    vec![
+        Color::rgba(255, 150, 255, 115),
+        Color::rgba(255, 200, 255, 115),
+        Color::rgba(255, 255, 255, 115),
+    ]
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UhFillStyle {
+    Off,
+    Dark,
+    Bright,
+}
+
+fn uh_fill_style() -> UhFillStyle {
+    uh_fill_style_from(std::env::var(UH_FILL_ENV).ok().as_deref())
+}
+
+fn uh_fill_style_from(value: Option<&str>) -> UhFillStyle {
+    match value.map(|value| value.trim().to_ascii_lowercase()).as_deref() {
+        Some("0" | "off" | "false" | "no") => UhFillStyle::Off,
+        Some("bright") => UhFillStyle::Bright,
+        _ => UhFillStyle::Dark,
+    }
+}
+
+/// Below this a UH swath is not drawn, m2/s2: the weak-rotation haze that
+/// filled every 2.9.13 swath map with grey streaks (25 is the lowest UH
+/// threshold the operational ensembles chart).
+pub const UH_TRACK_FLOOR: f64 = 25.0;
+
+/// have gotten with the shaded uh"): a 2-5 km UH maximum over 1 h, 3 h or the
+/// whole run (`uh_2to5km_1h_max`, `uh_2to5km_3h_max`, `uh_2to5km_run_max`)
+/// keeps the UH colour ramp, drops the haze below [`UH_TRACK_FLOOR`] and is
+/// outlined in black at 75 m2/s2, the line the shaded 2-5 km overlays draw
+/// round their shading, so a track reads the same on both maps.
+///
+/// Looked at on a 3 km Arkansas run (2023-03-31 18Z, F006): the overlays'
+/// translucent ladder on the swath maps' white ground gave three near-equal
+/// greys and threw the swath's intensity away, so the ramp stays.
+///
+/// Leaves `request` alone with [`UH_FILL_ENV`] off: the 2.9.13 look, byte for
+/// byte, as for the overlays.
+pub fn apply_uh_track_style(request: &mut MapRenderRequest, values: &[f32]) {
+    if uh_fill_style() == UhFillStyle::Off {
+        return;
+    }
+    let mut scale = request.scale.resolved_discrete();
+    scale.mask_below = Some(UH_TRACK_FLOOR);
+    request.scale = ColorScale::Discrete(scale);
+    request.contours = operational_contour_layer_for_values(
+        FieldSelector::height_layer_agl(CanonicalField::UpdraftHelicity, 2000, 5000),
+        values,
+    )
+    .into_iter()
+    .collect();
 }
 
 pub fn operational_contour_layer_for_values(
@@ -1482,6 +1601,68 @@ mod tests {
         assert_eq!(layer.major_width, Some(2));
         assert!(layer.labels);
         assert!(!layer.show_extrema);
+    }
+
+    #[test]
+    fn uh_overlays_shade_inside_their_lowest_contour_and_nothing_else_is_shaded() {
+        let uh = |bottom_m, top_m| {
+            FieldSelector::height_layer_agl(CanonicalField::UpdraftHelicity, bottom_m, top_m)
+        };
+        for (selector, lowest) in [(uh(2000, 5000), 75.0), (uh(0, 1000), 10.0),
+                                   (uh(0, 2000), 25.0), (uh(0, 3000), 25.0)] {
+            let outline = operational_contour_layer_for_values(selector, &[0.0; 4])
+                .expect("UH outline");
+            let fill = operational_contour_fill_for_values(selector, &[0.0, 80.0, 160.0, 300.0])
+                .expect("UH shading");
+            // The shading starts at the outline, so it sits inside it.
+            assert_eq!(fill.levels[0], lowest);
+            assert_eq!(outline.levels[0], lowest);
+            assert_eq!(fill.levels.len(), 3);
+            assert_eq!(fill.colors.len(), 3);
+            assert_eq!(fill.data, vec![0.0, 80.0, 160.0, 300.0]);
+            assert!(fill.levels.windows(2).all(|pair| pair[0] < pair[1]));
+            // Translucent (about 35 to 50 percent), darkening up the ladder.
+            assert!(fill.colors.iter().all(|c| (80..=130).contains(&c.a)));
+            assert!(fill.colors.windows(2).all(|pair| pair[0].a < pair[1].a));
+        }
+        assert!(operational_contour_fill_for_values(
+            FieldSelector::mean_sea_level(CanonicalField::PressureReducedToMeanSeaLevel),
+            &[100000.0; 4],
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn uh_fill_switch_reads_off_bright_and_defaults_to_dark() {
+        for off in ["0", "off", " OFF ", "false", "no"] {
+            assert_eq!(uh_fill_style_from(Some(off)), UhFillStyle::Off);
+        }
+        assert_eq!(uh_fill_style_from(Some("bright")), UhFillStyle::Bright);
+        assert_eq!(uh_fill_style_from(None), UhFillStyle::Dark);
+        assert_eq!(uh_fill_style_from(Some("dark")), UhFillStyle::Dark);
+        let bright = uh_fill_colors_bright();
+        assert_eq!(bright.len(), uh_fill_colors().len());
+        assert!(bright.iter().all(|c| c.a == 115 && c.r == 255));
+    }
+
+    #[test]
+    fn uh_tracks_keep_the_ramp_drop_the_haze_and_outline_the_track_line() {
+        use rustwx_core::{Field2D, GridShape, LatLonGrid, ProductKey};
+        // The test environment leaves RUSTWX_UH_FILL unset (the default, dark).
+        let shape = GridShape::new(2, 2).expect("shape");
+        let grid = LatLonGrid::new(shape, vec![35.0, 35.0, 36.0, 36.0], vec![-91.0, -90.0, -91.0, -90.0])
+            .expect("grid");
+        let values = vec![0.0, 80.0, 300.0, 10.0];
+        let field = Field2D::new(ProductKey::named("uh"), "m^2/s^2", grid, values.clone()).expect("field");
+        let mut request = MapRenderRequest::for_core_weather_product(field, rustwx_render::WeatherProduct::Uh);
+        let ramp = request.scale.resolved_discrete();
+        apply_uh_track_style(&mut request, &values);
+        let tracks = request.scale.resolved_discrete();
+        assert_eq!(tracks.mask_below, Some(UH_TRACK_FLOOR));
+        assert_eq!((tracks.levels, tracks.colors), (ramp.levels, ramp.colors));
+        assert_eq!(request.contours.len(), 1);
+        assert_eq!(request.contours[0].levels, vec![75.0]);
+        assert_eq!(request.contours[0].color, Color::BLACK);
     }
 
     #[test]

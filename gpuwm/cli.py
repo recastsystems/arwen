@@ -864,6 +864,14 @@ def build_parser(*, render_only: bool = False, preset_only: bool = False,
                           "YSU, sun, Noah-MP snow aging and urban water "
                           "balance; a bare 4 keeps the newest). The report "
                           "names the version and what chose it")
+    from gpuwm.wrf_reference import WRF_REFERENCES
+    imp.add_argument("--wrf-reference", default=None, choices=WRF_REFERENCES,
+                     dest="wrf_reference",
+                     help="the WRF release ArWen is pinned against for this "
+                          "import: the release's Registry vocabulary and the "
+                          "scheme generations it runs (the same as "
+                          "--wrf-version with that release; omitted, the "
+                          "newest)")
     imp.add_argument("--urban-ucm-generation", choices=("wrf_471", "wrf_480"), default=None,
                      help="single-layer urban numerical generation; omitted imports retain wrf_471")
     imp.add_argument("--urban-treeoption", type=int, choices=(0,1), default=None)
@@ -1588,6 +1596,14 @@ def _dispatch_with_outputs(args) -> int:
             raise ValueError(
                 f"--output {args.output} aliases an input namelist; "
                 "refusing to overwrite the source file.")
+        if args.wrf_reference is not None:
+            if args.wrf_version not in (None, args.wrf_reference):
+                print(f"gpuwm import-namelist: error: --wrf-reference "
+                      f"{args.wrf_reference} and --wrf-version "
+                      f"{args.wrf_version} name different releases; give one",
+                      file=sys.stderr)
+                return 2
+            args.wrf_version = args.wrf_reference
         try:
             toml_text, report = import_namelists(
                 args.wps, args.input, name=args.name,
@@ -1602,7 +1618,9 @@ def _dispatch_with_outputs(args) -> int:
                 **({} if args.wrf_version is None else {
                     "wrf_version": args.wrf_version,
                     "wrf_version_source":
-                        f"--wrf-version {args.wrf_version}"}))
+                        (f"--wrf-reference {args.wrf_reference}"
+                         if args.wrf_reference is not None
+                         else f"--wrf-version {args.wrf_version}")}))
         except NotImplementedError as error:
             # validate_run_config raises its "not executable yet" refusals
             # (e.g. ra_lw_physics=1, WRF RRTM longwave) as

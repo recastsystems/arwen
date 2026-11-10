@@ -220,6 +220,14 @@ N0_GATE_METRICS = ("alloc_fits_wddm_budget", "alloc_measured_le_estimate",
                    "alloc_estimate_le_wddm_budget")
 
 
+def _snow_layers_selected(exp):
+    """clean-snicar-layers image (Toon solver) selected; spectra five-band mode
+    launches the default image twice and is priced with it."""
+    return any(dc.run.sf_surface_physics == 4 and dc.run.opt_alb == 3
+               and getattr(dc.run, "snicar_solver_opt", 1) != 1
+               for dc in exp.domains)
+
+
 def gate_display_name(metric: str, *, vram_gib: float | None = None) -> str:
     """A gate's name as THIS platform should print it.
 
@@ -1965,7 +1973,8 @@ def non_pool_basis(profile: "DeviceLocalMemoryProfile",
             _frames, selected_basis = selected_frames(
                 _noahmp_pricing_profile(exp, profile),
                 snow_papers=any(dc.run.sf_surface_physics == 4 and dc.run.opt_alb == 3
-                                for dc in exp.domains))
+                                for dc in exp.domains),
+                snow_layers=_snow_layers_selected(exp))
             sentence = f"{sentence}; {selected_basis}"
     if exp is not None:
         # A module with no reading anywhere is priced, not refused, and
@@ -2647,6 +2656,15 @@ KERNEL_MAX_LOCAL_SIZE_BYTES: dict[str, int] = {
     # Production fast/strict images, sm_120, NVRTC 13.4.92, 2026-11-02.
     # tools/sfc_irr_seaice_wrf471/measure_frames.py records every export.
     "sfclay_dx2d": 0,
+    # WRF v4.8.0 kim_tofd unit (sfclay.cu + GPUWM_SFCLAY_TOFD), port/wrf-480 L07:
+    # 0 B fast and strict, RTX 5090 sm_120, NVRTC 13.3.33, 2026-11-09.
+    "sfclay_tofd": 0,
+    # 3.0.0 fold, production loaders, test host B sm_120 / NVRTC 13.4.92
+    # (kernel_frame_recordings): WRF v4.8.0 dynamic lightning and the Fitch
+    # 4.8.0 unit (32 B fast, 0 B strict).
+    "dyn_lightning": 0,
+    "wind_fitch_480": 32,
+
     "noah_ua": 224,
     "noah_mosaic_ua": 176,
     "noah_ua_sfcdiags": 0,
@@ -2665,6 +2683,10 @@ KERNEL_MAX_LOCAL_SIZE_BYTES: dict[str, int] = {
     # priced separately by shinhong_column_workspace_bytes.
     "shinhong": 0,
     "shinhong_validation": 0,
+    # The WRF 4.8.0 generation keeps the 4.6.1 unit's global column
+    # workspace (shinhong_column_workspace_bytes prices it); its exports
+    # read 0 local bytes (kernel_frame_recordings, test host A 2026-11-09).
+    "shinhong_480": 0,
     "smag2d": 0,
     # wrf_stress_output: production loader, NVRTC 13.4, sm_120, 2026-11-02.
     # evidence/port-dyn-options/sfs-output-frame.json: local_size_bytes=0.
@@ -3233,6 +3255,13 @@ CONDITIONAL_COLUMN_TIERED_FRAMES = {
 #: :data:`CHAINED_TRANSLATION_UNIT_FRAMES`, which cover these fragments
 #: as the translation units they actually launch in.
 UNMEASURED_KERNEL_MODULES = frozenset({
+    # 3.0.0 fold: two units that compile only composed.  MYNN-SFC b66187f
+    # needs the SL_* defines and mynn_libm.cuh its loader prepends
+    # (gpuwm.core.mynnsfc_b66187f.module_source); read through that loader on
+    # test host B (NVRTC 13.4.92) at 184 B, mynnsfc_wrf_columns.  The SNICAR
+    # LAP unit is appended to snow_papers.cu (snow_papers._lap_module); read
+    # through it at 1,360 B, snow_lap_albedo.
+    "mynnsfc_b66187f", "snow_lap",
     # New Goddard (golden/ports-rad) sat here while its standalone compile
     # failed; it compiles alone now (read 2026-10-17 on test host B's RTX
     # 5090, sm_120, NVRTC 13.4.92: 43,664 B, its source default
@@ -3289,6 +3318,10 @@ UNMEASURED_KERNEL_MODULES = frozenset({
     # The drag unit borrows glibc helpers from the composed source in
     # gpuwm.core.terrain_drag.module_source(); it cannot compile alone.
     "terrain_drag",
+    # WRF v4.8.0 gwd_opt = 1 follows terrain_drag.cu in its own unit
+    # (gpuwm.core.terrain_drag.gwdo480_module_source()) and reuses its
+    # td_atan2f; priced as terrain_drag_gwdo480_composed.
+    "terrain_drag_gwdo480",
     # The GBM PBL calls gfk_exp/gfk_log/gfk_pow from glibc_flt32.cuh, which
     # gpuwm.core.gbmpbl.module_source() composes in front of it; priced as
     # gbmpbl_composed.
@@ -3506,6 +3539,16 @@ CHAINED_TRANSLATION_UNIT_FRAMES: dict[str, ChainedTranslationUnitFrame] = {
         module="terrain_drag_composed",
         max_local_size_bytes=1184,
         covers=frozenset({"terrain_drag"})),
+    # WRF v4.8.0 gwd_opt = 1 (gwdo_version = "wrf_480"): the frozen unit's
+    # text plus terrain_drag_gwdo480.cu, loaded by
+    # gpuwm.core.terrain_drag._gwdo480_module.  Its widest kernel is the
+    # GSL column it carries along (1,184 B); gwdo480_column itself reads
+    # the frame recorded in kernel_frame_recordings
+    # (CHAINED_UNITS_WITHOUT_A_PER_PLATFORM_ROW).
+    "terrain_drag_gwdo480_composed": ChainedTranslationUnitFrame(
+        module="terrain_drag_gwdo480_composed",
+        max_local_size_bytes=1184,
+        covers=frozenset({"terrain_drag_gwdo480"})),
     # The fork Thompson unit (thompson_version = "wrf_39_noaa", mp_physics
     # = 28, the HRRR and RAP doors' default): thompson_fork.cu +
     # thompson_fork_constants.cuh compiled by gpuwm/core/thompson_fork.py.
@@ -4193,6 +4236,11 @@ def domain_kernel_modules(dc: DomainConfig, *,
         from gpuwm.wrf_exact import ENABLED
         modules.discard("ysu")
         modules.add(ysu_kernel_selection(dc.run.ysu_version, strict=ENABLED)[0])
+    if (int(dc.run.bl_pbl_physics) == 11
+            and getattr(dc.run, "shinhong_version", "wrf_461") == "wrf_480"):
+        # The 4.8.0 unit carries its own output census.
+        modules.difference_update(("shinhong", "shinhong_validation"))
+        modules.add("shinhong_480")
     modules.update(_SHORTWAVE_ADDITIONAL_KERNEL_MODULES.get(
         radiation_scheme_ids(dc.run)[1], ()))
     modules.update(_urban_kernel_modules(dc.run, dc.grid_id))
@@ -4222,9 +4270,14 @@ def domain_kernel_modules(dc: DomainConfig, *,
         modules.add("noah_fractional")
         if int(dc.run.sf_sfclay_physics) == 1:
             modules.add("sfclay_dx2d")
+    if getattr(dc.run, "kim_tofd", False) and int(dc.run.sf_sfclay_physics) == 1:
+        modules.add("sfclay_tofd")   # WRF v4.8.0 KIM form drag (sfclay.py)
     if (int(getattr(dc.run, "topo_wind", 0) or 0)
             or int(getattr(dc.run, "gwd_opt", 0) or 0)):
         modules.add("terrain_drag_composed")
+    if (int(getattr(dc.run, "gwd_opt", 0) or 0) == 1
+            and getattr(dc.run, "gwdo_version", "wrf_480") == "wrf_480"):
+        modules.add("terrain_drag_gwdo480_composed")
     if dc.run.cu_physics == 1 and dc.run.kfeta_trigger != 1:
         modules.add(f"kf_trigger{dc.run.kfeta_trigger}")
     if int(getattr(dc.run, "grav_settling", 0) or 0):
@@ -4432,7 +4485,8 @@ def kernel_local_frame_bytes(
         extra, _basis = selected_frames(
             _noahmp_pricing_profile(exp, profile),
             snow_papers=any(dc.run.sf_surface_physics == 4 and dc.run.opt_alb == 3
-                            for dc in exp.domains))
+                            for dc in exp.domains),
+            snow_layers=_snow_layers_selected(exp))
         for key, frame in extra.items():
             frames[key] = max(frames.get(key, 0), frame)
     if "noahmp_gecros" in modules:
@@ -5151,9 +5205,17 @@ def gf_column_workspace_bytes(
     -- a domain smaller than one tile never allocates a whole tile.
 
     Zero for every configuration that does not select ``cu_physics = 3``.
+
+    ``cu_physics = 3`` with ``cu_gf_version = 'gfl_873b414'`` (the default,
+    WRF v4.8.0's Grell-Freitas-Li) holds a different workspace: the lane
+    scratch of its persistent column launch, kept for the run and shared by
+    every domain on the card (gpuwm.core.gfl_lanes.scratch_bytes, the formula
+    the launcher allocates from). Before 2026-11-09 a GFL run was priced as
+    GFDRV's tile workspace while it held up to 4 GiB.
     """
     from gpuwm.core.gf import (
         GF_BLOCK, GF_TILE_BLOCKS_PER_SM, gf_workspace_floats)
+    from gpuwm.core.gfl_lanes import scratch_bytes as gfl_scratch_bytes
 
     profile = MEASURED_LOCAL_MEMORY_PROFILE if profile is None else profile
     tile_cap = (profile.multiprocessor_count * GF_TILE_BLOCKS_PER_SM
@@ -5161,6 +5223,11 @@ def gf_column_workspace_bytes(
     worst = 0
     for dc in exp.domains:
         if int(dc.run.cu_physics) != 3:
+            continue
+        if getattr(dc.run, "cu_gf_version", "wrf_461") == "gfl_873b414":
+            worst = max(worst, gfl_scratch_bytes(
+                int(dc.run.nz), int(dc.run.nx) * int(dc.run.ny),
+                profile.multiprocessor_count))
             continue
         columns = min(int(dc.run.nx) * int(dc.run.ny), tile_cap)
         worst = max(worst, gf_workspace_floats(int(dc.run.nz), columns) * 4)
@@ -5910,7 +5977,8 @@ def physics_field_names_2d(cfg: RunConfig | None = None) -> tuple[str, ...]:
             NOAHMP_DIAGNOSTICS_2D, NOAHMP_STATE_2D, NOAHMP_STATE_INT_2D,
         )
         from gpuwm.core.noahmp_runtime import state_fields_2d,diagnostic_fields_2d,state_int_fields_2d
-        union.update(dict.fromkeys(state_fields_2d(cfg.opt_run,cfg.dveg,cfg.opt_tdrn,cfg.opt_irr,cfg.opt_crop)))
+        from gpuwm.core.noahmp_runoff_split import carrier_of as _runoff_carrier_of
+        union.update(dict.fromkeys(state_fields_2d(_runoff_carrier_of(cfg),cfg.dveg,cfg.opt_tdrn,cfg.opt_irr,cfg.opt_crop)))
         from gpuwm.core.noahmp_soil_cadence import shapes as cadence_shapes
         union.update(cadence_shapes(cfg.soiltstep,(cfg.ny,cfg.nx)))
         from gpuwm.core.noahmp_output import shapes as output_shapes
@@ -5919,6 +5987,11 @@ def physics_field_names_2d(cfg: RunConfig | None = None) -> tuple[str, ...]:
         union.update(soil_input_shapes(cfg.opt_soil,(cfg.ny,cfg.nx)))
         union.update(dict.fromkeys(state_int_fields_2d(cfg.opt_irr,cfg.opt_crop)))
         union.update(dict.fromkeys(diagnostic_fields_2d(cfg.dveg,cfg.opt_crop)))
+        if cfg.noahmp_wetland:
+            # Match initialize_physics: one carried store, two static maps
+            # and two diagnostics, each a resident float32 surface plane.
+            from gpuwm.core.noahmp_wetland import STATE, STATIC, DIAGNOSTICS
+            union.update(dict.fromkeys((*STATE, *STATIC, *DIAGNOSTICS)))
         from gpuwm.core.surface_forcing import SURFACE_PRECIPITATION_FIELDS
         union.update(dict.fromkeys(SURFACE_PRECIPITATION_FIELDS))
         union["coszen"] = None
@@ -6105,6 +6178,10 @@ def physics_array_shapes(cfg: RunConfig, *, cam_ozone: bool = False,
             from gpuwm.core.mynn471_gpu import diagnostic_shapes
             for name, dims in diagnostic_shapes(cfg).items():
                 shapes[f"fields/{name}"] = dims
+        if cfg.bl_mynn_version == "wrf_480":
+            from gpuwm.core.mynn480_gpu import diagnostic_shapes as diagnostic_shapes_480
+            for name, dims in diagnostic_shapes_480(cfg).items():
+                shapes[f"fields/{name}"] = dims
     if int(cfg.bl_pbl_physics) == 11:
         # Shin-Hong's Registry carriers TKE_PBL and EL_PBL (initialize_physics).
         shapes["fields/tke_pbl"] = (nz + 1, ny, nx)
@@ -6198,7 +6275,8 @@ def physics_array_shapes(cfg: RunConfig, *, cam_ozone: bool = False,
         shapes.update({"fields/"+name:shape for name,shape in cadence_shapes(cfg.soiltstep,(ny,nx)).items()})
         from gpuwm.core.noahmp_output import shapes as output_shapes
         shapes.update({"fields/"+name:shape for name,shape in output_shapes(cfg.noahmp_output,(ny,nx)).items()})
-        if int(cfg.opt_run)==5:
+        from gpuwm.core.noahmp_runoff_split import carrier_of as _runoff_carrier_of
+        if _runoff_carrier_of(cfg)==5:
             from gpuwm.core.noahmp_groundwater_slab import shapes as groundwater_shapes
             shapes.update({"fields/"+name:shape for name,shape in groundwater_shapes((ny,nx)).items()})
         from gpuwm.core.noahmp_soil_options import soil_input_shapes
@@ -6208,6 +6286,11 @@ def physics_array_shapes(cfg: RunConfig, *, cam_ozone: bool = False,
         if cfg.opt_alb == 3:
             from gpuwm.core.snow_papers import STATE_FIELD, STATE_WORDS
             shapes[f"fields/{STATE_FIELD}"] = (STATE_WORDS, ny, nx)
+            if int(getattr(cfg, "snicar_lap_opt", 0) or 0):
+                from gpuwm.core.snow_papers import (LAP_FIELD, LAP_WORDS,
+                    LAP_DEPOSITION_FIELD, LAP_DEPOSITION_WORDS)
+                shapes[f"fields/{LAP_FIELD}"] = (LAP_WORDS, ny, nx)
+                shapes[f"fields/{LAP_DEPOSITION_FIELD}"] = (LAP_DEPOSITION_WORDS, ny, nx)
         for name in NOAHMP_STATE_SNOWSOIL_3D:
             shapes[f"fields/{name}"] = (NSNOW + n_soil, ny, nx)
     if int(getattr(cfg, "sf_urban_physics", 0)) > 0:
@@ -8691,6 +8774,16 @@ SCRATCH_SLOT_LIFETIME_AUDIT = (
                "qdcn", "qtcn", "qccn", "qrcn", "qnin", "fi", "fs", "vi", "vs", "vg", "ai", "as_", "ag", "ah", "i3m",
                "qndrop", "qnr", "qni", "qns", "qng", "qnh", "qnn",
                "qvolg", "qvolh", "nc", "nn", "nwfa", "nifa",
+               # TEMPO's graupel volume (mp 900), Ferrier hi-res rime
+               # (mp 15), three-moment P3's sixth moment (mp 53) and the old
+               # Eta total condensate (mp 95).  MEASURED without "volg", on
+               # the 3.0.0 candidate: `gpuwm domain --ladder 12-3` with
+               # microphysics tempo died with `KeyError: scratch slot
+               # 'nest_volg_bxs' has no lifetime audit row`, so no nested
+               # TEMPO run could be written by the front door.  The other
+               # three were found by walking every selector
+               # (tests/test_mynn_tke_advection.py).
+               "volg", "qrimef", "qzi", "qt",
                # MYNN TKE advection's scalar (nest_field_kinds appends it
                # when bl_pbl_physics=5 and bl_mynn_tkeadvect).  MEASURED
                # without it: every nested run with TKE advection on (the
@@ -9521,6 +9614,10 @@ _SHINHONG_OUTPUT_BUNDLE_SCHEMES = (11,)
 _SHINHONG_3D = ("du", "dv", "dtheta", "dqv", "dqc", "dqi",
                 "exch_h", "tke", "el")
 _SHINHONG_2D = ("hpbl", "kpbl", "wstar", "delta")
+#: launch_shinhong_480's roster (exch_m and the scheme's u10/v10 added).
+_SHINHONG480_3D = ("du", "dv", "dtheta", "dqv", "dqc", "dqi",
+                   "exch_h", "exch_m", "tke", "el")
+_SHINHONG480_2D = ("hpbl", "wstar", "delta", "u10", "v10", "kpbl")
 
 
 def shinhong_output_transient_shapes(
@@ -9538,8 +9635,12 @@ def shinhong_output_transient_shapes(
         return {}
     m = (cfg.nz, cfg.ny, cfg.nx)
     s2 = (cfg.ny, cfg.nx)
-    shapes = {f"shinhong_output/{name}": m for name in _SHINHONG_3D}
-    shapes.update({f"shinhong_output/{name}": s2 for name in _SHINHONG_2D})
+    if getattr(cfg, "shinhong_version", "wrf_461") == "wrf_480":
+        names3, names2 = _SHINHONG480_3D, _SHINHONG480_2D
+    else:
+        names3, names2 = _SHINHONG_3D, _SHINHONG_2D
+    shapes = {f"shinhong_output/{name}": m for name in names3}
+    shapes.update({f"shinhong_output/{name}": s2 for name in names2})
     return shapes
 
 
@@ -9761,7 +9862,7 @@ def noahmp_lsm_transient_shapes(cfg: RunConfig) -> dict[str, tuple[int, ...]]:
         SLAB_TRANSIENT_BYTES_PER_COLUMN)
 
     columns = int(cfg.ny) * int(cfg.nx)
-    from gpuwm.core.noahmp_surface_device import selected_options, parameter_bytes_per_row
+    from gpuwm.core.noahmp_surface_device import device_route, parameter_bytes_per_row
     selected = ({
         # Fixed-capacity deferred glacier error codes; column rows are local.
         "noahmp_lsm/device_glacier_driver": (columns, 4),
@@ -9776,10 +9877,10 @@ def noahmp_lsm_transient_shapes(cfg: RunConfig) -> dict[str, tuple[int, ...]]:
             (min(SLAB_COLUMN_CHUNK,columns), 2048)} if int(cfg.opt_crop) else {}),
         **({"noahmp_lsm/gecros_operands":
             (min(SLAB_COLUMN_CHUNK,columns), (60*3+15+30)*4)} if int(cfg.opt_crop)==2 else {}),
-        **({"noahmp_lsm/groundwater_operands":(columns,256)} if int(cfg.opt_run)==5 else {}),
+        **({"noahmp_lsm/groundwater_operands":(columns,256)} if __import__("gpuwm.core.noahmp_runoff_split",fromlist=["carrier_of"]).carrier_of(cfg)==5 else {}),
         **({"noahmp_lsm/soil_option_operands":
             (min(SLAB_COLUMN_CHUNK,columns),256)} if int(cfg.opt_soil)!=1 else {}),
-    } if selected_options(cfg) else {})
+    } if device_route(cfg) else {})
     if cfg.opt_alb == 3:
         # Glacier's full-grid f32[n,56] pack, i32 IST, zero impurity,
         # f32[n,6] result and temporary operands. Land uses chunk rows.
@@ -9811,9 +9912,9 @@ def noahmp_lsm_cache_shapes(cfg: RunConfig) -> dict[str, tuple[int, ...]]:
     from gpuwm.core.noahmp_runtime import slab_cache_bytes_per_column
     from gpuwm.core.noahmp_surface_device import (
         MAX_VEGETATION_CLASSES, MAX_SOIL_CLASSES,
-        selected_options, parameter_bytes_per_row)
+        device_route, parameter_bytes_per_row)
 
-    if selected_options(cfg):
+    if device_route(cfg):
         return {
             **({"noahmp_lsm/snow_papers_optics": (283703, 4)}
                if cfg.opt_alb == 3 else {}),

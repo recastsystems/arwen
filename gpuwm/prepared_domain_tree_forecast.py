@@ -3268,6 +3268,12 @@ def run_prepared_tree(
     The receipt records both the configured horizon and the cycle endpoint.
 
     """
+    if restart is not None:
+        # A resume continues its checkpoint's TEMPO generation.
+        from dataclasses import replace as _replace_inputs
+        from gpuwm.core.tempo import adopt_checkpoint_generation
+        inputs = _replace_inputs(inputs, experiment=adopt_checkpoint_generation(
+            inputs.experiment, restart))
 
     from gpuwm.ensemble.runtime_context import current_session
     ensemble_session = current_session()

@@ -218,7 +218,7 @@ def test_check_names_a_relative_readme_link_the_pypi_page_cannot_resolve(tmp_pat
     lead = module.declared(root)[0][1]
     readme = root / "README.md"
     readme.write_text("See the [source table](docs/public/SOURCES.md) and "
-                      "[setup](https://github.com/FahrenheitResearch/arwen/blob/v%s/docs/public/SETUP.md).\n"
+                      "[setup](https://github.com/recastsystems/arwen/blob/v%s/docs/public/SETUP.md).\n"
                       '<img src="docs/img/a.png"> [top](#install)\n' % lead, encoding="utf-8")
     wrong = [line for line in module.disagreements(root) if line.startswith("README.md:")]
     assert len(wrong) == 2, wrong
@@ -232,6 +232,6 @@ def test_wheel_doc_links_name_the_installed_release():
     from gpuwm.docs_links import release_ref, tree_url
 
     assert release_ref("2.9.1") == "v2.9.1"
-    assert tree_url("blob", "2.9.1") == "https://github.com/FahrenheitResearch/arwen/blob/v2.9.1/"
+    assert tree_url("blob", "2.9.1") == "https://github.com/recastsystems/arwen/blob/v2.9.1/"
     for untagged in ("0+unknown", "2.9.1.dev0", "2.9.1rc1"):
         assert release_ref(untagged) == "main"

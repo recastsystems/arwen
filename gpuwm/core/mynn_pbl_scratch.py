@@ -522,6 +522,11 @@ def mynn_pbl_scratch_shapes(chunk: int, nz: int, *,
         shapes[slot] = (count * chunk * (nz + 1),)
     for slot, (count, _names) in _COLUMN_GROUPS.items():
         shapes[slot] = (count * chunk,)
+    if bl_mynn_version == "wrf_480":
+        from gpuwm.core.mynn480_gpu import scratch_shapes as scratch_shapes_480
+        shapes = {slot: shapes[slot] for slot in
+                  (SLOT_STAGE_LAYER, SLOT_STAGE_DX, SLOT_ZERO_COLUMN)}
+        shapes.update(scratch_shapes_480(chunk, nz))
     if bl_mynn_version == "wrf_471":
         from gpuwm.core.mynn471_gpu import scratch_shapes
         # The 4.7.1 monolithic column owns its internal workspace. Keep

@@ -750,8 +750,8 @@ _SWITCHES_OUTSIDE_THE_SINGLE_DOMAIN_PRODUCT = frozenset({
     "dveg", "noahmp_acc_dt", "noahmp_output", "soiltstep",
     "opt_alb", "opt_btr", "opt_crop", "opt_crs", "opt_frz", "opt_gla",
     "opt_inf", "opt_infdv", "opt_irr", "opt_irrm", "opt_pedo", "opt_rad",
-    "opt_rsf", "opt_run", "opt_sfc", "opt_snf", "opt_soil", "opt_stc",
-    "opt_tbot", "opt_tdrn",
+    "opt_rsf", "opt_run", "opt_runsrf", "opt_runsub", "opt_sfc", "opt_snf", "opt_soil", "opt_stc",
+    "opt_tbot", "opt_tdrn", "opt_tksno",
     "nest_microphysics_transition",
 })
 

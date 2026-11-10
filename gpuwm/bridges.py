@@ -112,7 +112,8 @@ CRATE_RELATIVE = "tools/grib1_bridge"
 # library with a working base contract unusable for its existing entry points.
 BRIDGE_OPTIONAL_ABI_MARKERS = {
     "static_fields": {"extra_continuous": b"gpuwm_static_extra_continuous_v1",
-                      "snow_papers": b"gpuwm_snow_optics_load_v1"},
+                      "snow_papers": b"gpuwm_snow_optics_load_v1",
+                      "snow_lap": b"gpuwm_snow_lap_optics_load_v1"},
 }
 
 BRIDGE_ABI_MARKERS = {
@@ -570,7 +571,7 @@ __getattr__ = lazy_build_hints(__name__, CARGO_BUILD_HINT=CRATE_RELATIVE)
 #: Where a pip user gets the sources the wheel does not carry.  Same URL
 #: and same clone directory as README's install section, so the two
 #: cannot drift into telling different stories.
-REPOSITORY_URL = "https://github.com/FahrenheitResearch/arwen"
+REPOSITORY_URL = "https://github.com/recastsystems/arwen"
 CLONE_DIR = "gpuwm"
 
 

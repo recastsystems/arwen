@@ -426,7 +426,11 @@ def test_noah_and_noahmp_soil_is_bitwise_what_it_was(scheme, source) -> None:
         fields, sf_surface_physics=scheme, soil_type=soil_type)
 
     assert type(through_seam) is type(reference) is NoahSoilState
-    assert through_seam.land_state == receipt
+    # The seam also records the snow-analysis step (gpuwm/ingest/snow_analysis.py,
+    # SNODAS over CONUS); this route passes no domain, so it says none applied.
+    seam_state = dict(through_seam.land_state)
+    assert seam_state.pop("snow") == {"analysis": "none: this route passed no domain context"}
+    assert seam_state == receipt
     for name in NoahSoilState.__dataclass_fields__:
         if name == "land_state":
             continue

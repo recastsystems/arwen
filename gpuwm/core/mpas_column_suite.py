@@ -188,6 +188,14 @@ GENERATION_SELECTORS = MappingProxyType({
     "tempo_surface_emission_before": {
         "values": (False, True),
         "requires": ("microphysics_scheme", ("tempo",))},
+    # The TEMPO generation: v3.2.5 (the RunConfig default) or the RRFS v2
+    # pin v3.0.3, which a proof against native NOAA MPAS names here.
+    "tempo_version": {
+        "values": ("v3.2.5", "v3.0.3"),
+        "requires": ("microphysics_scheme", ("tempo",))},
+    "tempo_hailhyperaware": {
+        "values": (True, False),
+        "requires": ("microphysics_scheme", ("tempo",))},
     "thompson_version": {
         "values": ("wrf_461", "wrf_39_noaa"),
         "requires": ("microphysics_scheme", ("thompson_aero",))},

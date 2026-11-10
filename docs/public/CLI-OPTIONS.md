@@ -1467,6 +1467,7 @@ Takes no options of its own.
 | `--urban-treeoption {0,1}` | _(the parser declares no help text for this option)_ |
 | `--urban-ttscheme {0,1}` | _(the parser declares no help text for this option)_ |
 | `--urban-ucm-generation {wrf_471,wrf_480}` | single-layer urban numerical generation; omitted imports retain wrf_471 |
+| `--wrf-reference {4.8.0,4.7.1}` | the WRF release ArWen is pinned against for this import: the release's Registry vocabulary and the scheme generations it runs (the same as --wrf-version with that release; omitted, the newest) |
 | `--wrf-version` | the WRF line or release the namelist was written for (3, 4, or a release such as 4.6.1). The line selects the Registry default an omitted &dynamics/use_theta_m takes (3: 0, dry theta, the line operational HRRR v4 runs; 4, the default: 1, moist theta). A V4 release also pins the scheme generations that release runs (4.6.1: WRF 4.6's YSU, sun, Noah-MP snow aging and urban water balance; a bare 4 keeps the newest). The report names the version and what chose it |
 
 ## `gpuwm ingest`

@@ -2095,6 +2095,12 @@ tests/test_simulated_radar_resources.py
 # and NOTICE files required for redistribution.
 tests/test_licence_notices_ship.py
 
+# No public distribution carries a CC-BY-NC/ND, GPL/LGPL/AGPL or UCAR
+# no-sale file. Prevents a restricted data file (the four CC-BY-NC-SA-4.0
+# RFMIP reference results sat beside the shipped RRTMGP tables through
+# 2.7.x) reaching an Apache-2.0 wheel through a data/**/* glob.
+tests/test_shipped_licence_scan.py
+
 # MYNN option 2 and post-PBL scalar diffusion: prevent selecting option 1
 # at initialization, treating local diffusion as plume transport, or dropping
 # the nc/ni/nwfa/nifa tendency between the wrapper and RK3. WRF column

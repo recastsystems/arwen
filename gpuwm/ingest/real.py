@@ -6194,6 +6194,16 @@ def initialize_real(snapshot: HorizontalSnapshot, cfg: RunConfig,
             if effective_mode(cfg) != "diagnose":
                 _warn_synthetic_aerosol_fallback(
                     _source_choice, wif_resolution)
+    from gpuwm.boundary_fields import tempo_analyzed_aerosol_boundaries
+    if tempo_analyzed_aerosol_boundaries(cfg) and not (
+            decoded_numbers and {"nwfa", "nifa"} <= set(number_moments)):
+        # The mp=28 route's rule, for TEMPO: use_rap_aero_icbc promises the
+        # analysis's aerosol numbers on every initial and boundary frame.
+        raise ValueError(
+            "use_rap_aero_icbc under TEMPO requires QNWFA and QNIFA on every "
+            "initial and boundary frame; this frame carries "
+            + (", ".join(sorted(n.upper() for n in number_moments)) or "no number fields")
+            + "; TEMPO's own aerosol initialization would change the requested forcing")
     # Install supplied moments after the explicit source-absent MP8/28
     # branches. The analysis must never be overwritten by their zero policy.
     if decoded_numbers:

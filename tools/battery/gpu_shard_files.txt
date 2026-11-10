@@ -1104,6 +1104,9 @@ tests/test_mynn_gsd41.py
 tests/test_mynn_massflux_gsd41.py
 tests/test_mynn_predict_gsd41.py
 tests/test_mynn_water_gsd41.py
+# mynn_fixes_v61: each upstream MYNN v6.1 fix against the frozen unit, and
+# option-off loads only the frozen kernels.
+tests/test_mynn_fixes_v61.py
 tests/test_solar_albedo_cuda.py
 tests/test_solar_albedo_integration.py
 

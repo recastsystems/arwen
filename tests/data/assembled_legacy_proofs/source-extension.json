@@ -1,7 +1,7 @@
 {
   "schema": "measured-legacy-source-extension-v1",
   "baseline": "cd336e62d6e6b6312c9636e0fdfff84801909b6a",
-  "measured_tip": "d67185fb551b20583d3eb2a586a532cbb8e11bbe",
+  "measured_tip": "5f81efef03ffe754ea0878035df4515e45031c63",
   "sources": {
     "gpuwm/core/acoustic.py": {
       "before": {
@@ -39,8 +39,8 @@
         "sha256": "e44a76e72880e6cbacee4a3cf299ab7e1a0b418e737355b3b64bfd60358b67cc"
       },
       "after": {
-        "bytes": 94037,
-        "sha256": "172c1e61edce2fd7f9cc948636fed13aaa9e870452a1d98a060573554c7d19ff"
+        "bytes": 95510,
+        "sha256": "91b780a317d9f9e8b95922cde7dc90d902a0539b09e4eb25e323d20d3de5062c"
       }
     },
     "gpuwm/wrf_exact.py": {
@@ -142,7 +142,7 @@
       178128
     ],
     "strict_differing_words": 0,
-    "source": "replays on an RTX 5090 by lane/opus-tests 3f3246aaa41 (fast and strict, base 2.8.9 vs tip)"
+    "source": "replays on an RTX 5090 at 3f3246aaa41 (fast and strict, base 2.8.9 vs tip)"
   },
   "loader_fold_replay": {
     "receipt": "loader-fold-source-replay.json",
@@ -152,7 +152,7 @@
   },
   "loader_slimming_replay": {
     "receipt": "slimming-loader-source-replay.json",
-    "sha256": "1701e4b6d8068622f53189dae96e63a5414bb783e8eccc114b4eb076caca04c6"
+    "sha256": "76f49fc6bc4ea2c601cbcfb7a1d9e8bb2d7d5b42e7a2af43cb7c294b5eb13952"
   },
   "module_sources": {
     "acoustic": {

@@ -723,6 +723,13 @@ SUPPORTED_MICROPHYSICS: Mapping[int, str] = MappingProxyType({
     52: "P3 two-category",
     53: "P3 one-category, three-moment ice",
     55: "ISHMAEL adaptive-habit ice",
+    # gpuwm's TEMPO id (WOOF id 900, not a WRF selector; WRF v4.7+ numbers
+    # TEMPO 88).  Its inventory is its capability row in
+    # gpuwm.microphysics_schemes (active_moisture_inventory).  Named
+    # breakage: without the row an HRRR analysis carrying number fields
+    # (QNCLOUD/QNRAIN/QNICE/QNWFA/QNIFA) was refused at the start state
+    # under mp_physics = "tempo", so TEMPO could not start from HRRR/RAP.
+    900: "TEMPO (gpuwm id; aerosol- and hail-aware)",
 })
 
 #: ``mp_physics`` values that are real WRF v4.6.1 packages this port does
@@ -1127,6 +1134,20 @@ def active_moisture_inventory(cfg) -> tuple[frozenset[str], frozenset[str]]:
         # disabled. Cloud and precipitation species remain inactive.
         vapor = frozenset(("QVAPOR",))
         return vapor, vapor
+    from gpuwm.microphysics_schemes import NAMED_MP_IDS, scheme as _named_scheme
+    named = _named_scheme(mp_physics) if mp_physics >= min(NAMED_MP_IDS) else None
+    if named is not None and mp_physics >= 900:
+        # A WOOF-side named scheme (TEMPO): its capability row is the
+        # inventory -- the three base masses, its ice masses, and every
+        # number moment and aerosol tracer that has a WRF input name.  Its
+        # graupel volume (``volg``) has none: WRF writes no such field for
+        # this scheme and the adapter seeds it from graupel mass.
+        by_state = {state: wrf for wrf, state in MOISTURE_MAP.items()}
+        species = (named.ice_mass_species + named.moment_species
+                   + named.aerosol_species)
+        required = frozenset(BASE_MOISTURE_WRFINPUT + tuple(
+            by_state[name] for name in species if name in by_state))
+        return required, required
     from gpuwm.physics_registry import consumer_row_for_selector
     column = consumer_row_for_selector("microphysics", "column_kernel", mp_physics)
     if column is not None:
@@ -1441,7 +1462,8 @@ def read_wrfinput(path: str | Path, *, require_complete: bool = True,
 
         if int(getattr(cfg,"sf_surface_physics",0))==4 and getattr(cfg,"opt_crop",0):
             soil_inputs=(*soil_inputs,"CROPTYPE","PLANTING","HARVEST","SEASON_GDD")
-        if int(getattr(cfg,"sf_surface_physics",0))==4 and getattr(cfg,"opt_run",3)==5:
+        from gpuwm.core.noahmp_runoff_split import carrier_of as _runoff_carrier_of
+        if int(getattr(cfg,"sf_surface_physics",0))==4 and _runoff_carrier_of(cfg)==5:
             soil_inputs=(*soil_inputs,"FDEPTH","EQZWT","RIVERBED","RECHCLIM")
         missing_soil=set(soil_inputs)-dataset.variables.keys()
         if missing_soil:
@@ -2075,8 +2097,8 @@ def restore_domain_state(restored: RestoredDomain, cfg, *, scratch_arena=None,
 
 def wrfinput_terrain_drag_inputs(restored, cfg):
     """Use the native file's active orography, without rebuilding its values."""
-    names = required_static_fields(getattr(cfg, "topo_wind", 0),
-                                   getattr(cfg, "gwd_opt", 0))
+    from gpuwm.static.orographic import required_static_fields_for
+    names = required_static_fields_for(cfg)
     if not names:
         return {}
     missing = sorted(set((*names, "HGT")) - restored.raw.keys())
@@ -2187,7 +2209,7 @@ def initialize_wrfinput_physics(state, restored, cfg, *, radiation=None,
            if int(cfg.sf_surface_physics)==4 and cfg.opt_crop else {}),
         **({"noahmp_groundwater_inputs":{**{name:raw[name] for name in ("FDEPTH","EQZWT","RIVERBED","RECHCLIM","HGT")},
             "MAPFAC_MX":raw.get("MAPFAC_MX",raw["MAPFAC_M"]),"MAPFAC_MY":raw.get("MAPFAC_MY",raw["MAPFAC_M"])}}
-           if int(cfg.sf_surface_physics)==4 and cfg.opt_run==5 else {}))
+           if int(cfg.sf_surface_physics)==4 and __import__("gpuwm.core.noahmp_runoff_split",fromlist=["carrier_of"]).carrier_of(cfg)==5 else {}))
     if (int(getattr(cfg, "sf_urban_physics", 0)) > 0
             and "utype_urb2d" in driver.fields):
         from gpuwm.ingest.wrfinput_surface_statics import (
@@ -2222,7 +2244,8 @@ def initialize_wrfinput_physics(state, restored, cfg, *, radiation=None,
         if (int(cfg.sf_surface_physics) == 4
                 and field in NOAHMP_INITIALIZED_SURFACE_FIELDS):
             continue
-        if int(cfg.sf_surface_physics)==4 and cfg.opt_run==5:
+        from gpuwm.core.noahmp_runoff_split import carrier_of as _runoff_carrier_of
+        if int(cfg.sf_surface_physics)==4 and _runoff_carrier_of(cfg)==5:
             from gpuwm.core.noahmp_groundwater_slab import CARRIERS
             if field in (*CARRIERS,"smoiseq"):continue
         if field == "glw" and constant_glw_wm2 is not None:

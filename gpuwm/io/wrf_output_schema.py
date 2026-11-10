@@ -205,6 +205,25 @@ MYNN_PBL_OUTPUT_FIELDS: dict[str, WrfOutputField] = {
     "ztop_plume": _output_field(
                       'ZTOP_PLUME', 'Height of tallest plume',
                       'm', 'Registry.EM_COMMON:1148'),
+    # WRF 4.8.0 Registry.EM_COMMON, package mynn_dmp_edmf1 (bl_mynn_version
+    # = "wrf_480" only; no other route allocates them).
+    # File names are upper case, as native wrf.exe 4.8.0 writes them
+    # (CLDTOP_COOLING, MAXMF_DD): the lower-case Registry spellings left all
+    # seven out of the A195 whole-hour compare (lane GATE-a195, 2026-11-09).
+    "excess_h": _output_field('EXCESS_H', 'Max heat excess of plume initialization',
+                              'K', 'WRF 4.8.0 Registry.EM_COMMON excess_h'),
+    "excess_q": _output_field('EXCESS_Q', 'Max moisture excess of plume initialization',
+                              'kg/kg', 'WRF 4.8.0 Registry.EM_COMMON excess_q'),
+    "maxmf_dd": _output_field('MAXMF_DD', 'Maximum mass-flux of downdrafts',
+                              'm/s * area', 'WRF 4.8.0 Registry.EM_COMMON maxMF_dd'),
+    "maxwidth_dd": _output_field('MAXWIDTH_DD', 'Maximum downdraft width',
+                                 'm', 'WRF 4.8.0 Registry.EM_COMMON maxwidth_dd'),
+    "maxtkeprod": _output_field('MAXTKEPROD', 'Maximum tke production by cloud top cooling',
+                                'm2/s2/hr', 'WRF 4.8.0 Registry.EM_COMMON maxtkeprod'),
+    "cldtop_cooling": _output_field('CLDTOP_COOLING', 'Radiative cooling at cloud top',
+                                    'K/hr', 'WRF 4.8.0 Registry.EM_COMMON cldtop_cooling'),
+    "ent_eff": _output_field('ENT_EFF', 'Entrainment efficiency for cloud tops',
+                             'unitless', 'WRF 4.8.0 Registry.EM_COMMON ent_eff'),
     "ktop_plume": WrfOutputField(
         "KTOP_PLUME", "i4", "",
         'k-level of highest pentrating plume',

@@ -267,6 +267,9 @@ class GeogSelection:
     orographic: tuple[str, ...] = ()
     #: The optional WPS depth dataset selected by the lake physics settings.
     lake_depth: bool = False
+    #: WRF v4.8.0's gwd_opt = 1 (gwdo_version "wrf_480"): ELVMAX and the VAR/CON/OA/OL statistics as WPS v4.8's
+    #: util/compute_gwdo.py writes them (WPS PR #281; :func:`gpuwm.static.orographic.build_gwdo_480_fields`).
+    gwdo_480: bool = False
     #: A published static file the configuration takes its geography from
     #: (:mod:`gpuwm.static.external_source`), or ``None`` -- every
     #: configuration that names no ``[static] source`` -- which builds
@@ -1697,6 +1700,11 @@ def build_static(
                 landuse_path=selection.path("landuse"),
                 tokens=selection.resolution_tokens, halo=halo,
                 coverage_report=source_coverage_report))
+        if selection is not None and selection.gwdo_480 and "ELVMAX" not in served:
+            # After the GEOGRID-table statistics: WPS v4.8 runs compute_gwdo.py on the finished geo_em, which
+            # writes ELVMAX and rewrites VAR, CON, OA1-4 and OL1-4 from the 30" terrain.
+            from .orographic import build_gwdo_480_fields
+            fields.update(build_gwdo_480_fields(grid, geog_root))
         lake = selection is not None and selection.lake_depth
         if lake and "LAKE_DEPTH" not in served:
             from .lake import build_lake_fields

@@ -1974,7 +1974,8 @@ def _wrfinput_fields(cache: PreparedCache, static: Mapping[str, np.ndarray],
         "QVAPOR": cache.array("state/qv"),
         "QCLOUD": cache.array("state/qc"),
         "QRAIN": cache.array("state/qr"),
-        **({"QICE": cache.array("state/qi")} if mp_physics != 95 else {}),
+        **({"QICE": cache.array("state/qi")}
+           if mp_physics not in (1, 95) else {}),  # Kessler and Ferrier carry no qi
         "SHDMAX": surface["SHDMAX"],
         "SHDMIN": surface["SHDMIN"],
         "SHDAVG": surface["SHDAVG"],

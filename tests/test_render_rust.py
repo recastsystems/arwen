@@ -1833,6 +1833,60 @@ def test_the_first_hour_after_a_move_draws_its_1h_rain(tmp_path, capsys):
     assert "different ground" in captured.out + captured.err, captured.out + captured.err
 
 
+def _write_ridden_wrfout(path, stamps, *, cells, seed_offset=0):
+    """A frame of the nest of :func:`_write_wrfout` at the SAME recorded
+    place, on ground ``cells`` nest cells east: a nest fixed in a parent
+    that moved (a cyclone run's d03 in its following d02)."""
+    import netCDF4
+
+    _write_wrfout(path, stamps, seed_offset=seed_offset)
+    step = np.float32(3.0 / (_NX - 1))
+    with netCDF4.Dataset(path, "a") as dataset:
+        dataset.CEN_LON = np.float32(dataset.CEN_LON + cells * step)
+        dataset.variables["XLONG"][:] = (
+            dataset.variables["XLONG"][:] + np.float32(cells) * step)
+    return path
+
+
+@needs_renderer
+def test_a_nest_fixed_in_a_moving_parent_draws_its_1h_rain_after_the_parent_moves(
+        tmp_path, capsys):
+    """THE DEFECT (run_c12e1e07306546b4, run_57345a967992018e): a cyclone
+    run's 1 km d03 sits fixed in its following 3 km d02, so every frame
+    records one place while its ground moves with d02.  Keyed on the
+    recorded place, the frames on either side of a d02 move were unrelated
+    series, and 1 h rain was drawn at no hour in which d02 moved (10 of
+    12), neither by the run's render stage nor by the worker's per-hour
+    recovery (``--context-wrfout`` the hour before)."""
+
+    from gpuwm.render import history_series_groups
+
+    stamps = ("1974-04-03_18:00:00", "1974-04-03_19:00:00")
+    first = _write_wrfout(tmp_path / "wrfout_d02_1974-04-03_18:00:00", stamps[:1])
+    ridden = _write_ridden_wrfout(tmp_path / "wrfout_d02_1974-04-03_19:00:00",
+                                  stamps[1:], cells=6, seed_offset=1)
+    assert ([first, ridden], [first]) in history_series_groups([ridden, first])
+
+    out = tmp_path / "png"
+    rc = cli.main(["render", str(ridden), "--engine", "rust", "--series",
+                   "--products", "qpf_1h", "--size", "400x300", "--run-stamp", "off",
+                   "--context-wrfout", str(first), "--out", str(out)])
+    captured = capsys.readouterr()
+    assert rc == 0, captured.out + captured.err
+    drawn = sorted(path.name for path in out.rglob("*.png") if "qpf_1h" in path.parts)
+    assert len(drawn) == 1 and "_f001" in drawn[0], (drawn, captured.out, captured.err)
+
+    # Ground a whole width away shares nothing with the later frame: it is
+    # not joined, and the series stays on its own.
+    far = tmp_path / "far"
+    far.mkdir()
+    early = _write_wrfout(far / "wrfout_d02_1974-04-03_18:00:00", stamps[:1])
+    gone = _write_ridden_wrfout(far / "wrfout_d02_1974-04-03_19:00:00", stamps[1:],
+                                cells=_NX + 2, seed_offset=1)
+    assert sorted(history_series_groups([gone, early])) == sorted(
+        [([early], []), ([gone], [])])
+
+
 def _far_travelled_nest(root):
     """Four hourly frames of one nest at parent starts 5, 5, 8 and 11.
 

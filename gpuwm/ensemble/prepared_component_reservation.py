@@ -321,6 +321,8 @@ def plan_prepared_component_reservation(member_inputs, *, domain_metadata=None,
             return decline(f"domain {gid}: packed production binds RUC/MYNN surface and PBL leaves; selected land or turbulence scheme retains its original driver")
         if cfg.bl_mynn_version != "wrf_461":
             return decline(f"domain {gid}: GSD cloud output needs legacy RRTMG coupling, and the original numerical MYNN driver requires icloud_bl=1")
+        if getattr(cfg, "mynn_fixes_v61", False):
+            return decline(f"domain {gid}: mynn_fixes_v61 runs the upstream MYNN v6.1 fixes; the packed MYNN leaf binds only the frozen wrf_461 unit")
         if radiation_scheme_ids(cfg) != (4, 4) or rrtmg_variant(cfg) != RRTMG_VARIANT_RTE_RRTMGP:
             return decline(f"domain {gid}: packed production has no original radiation leaf binding for this selected pair")
         policy_names = ("alb_sol", "swint_opt", "aer_opt")

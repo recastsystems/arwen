@@ -37,7 +37,7 @@ The GPU extra installs CuPy and the required user-space NVIDIA CUDA components
 through their dependency packages. It does not install Python or the NVIDIA
 device driver. Install one CuPy/CUDA major per environment. See the
 [CuPy installation guide](https://docs.cupy.dev/en/stable/install.html) and
-[ArWen hardware guidance](https://github.com/FahrenheitResearch/arwen/blob/v2.9.2/docs/public/HARDWARE.md).
+[ArWen hardware guidance](https://github.com/recastsystems/arwen/blob/v2.9.2/docs/public/HARDWARE.md).
 
 Most scientific lookup data and the renderer's map assets (coastlines,
 borders, state lines and counties) arrive with the automatically installed
@@ -96,7 +96,7 @@ when a newer version has only a source distribution.
 ## Desktop application
 
 The desktop GUI is separate from the `gpuwm` package. Choose its archive
-from the [release assets](https://github.com/FahrenheitResearch/arwen/releases)
+from the [release assets](https://github.com/recastsystems/arwen/releases)
 and retain the application resources and license notices beside it.
 Windows starts with `ArWen.exe`; Linux uses `Start ArWen.sh --python PATH`
 with the forecast environment's Python. The

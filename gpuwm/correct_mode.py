@@ -169,6 +169,18 @@ CORRECTIONS: tuple[Correction, ...] = (
         # Morrison (10): the prep, downscale and ring closure.
         carriers=(("mp_physics", (8, 10, 28)),),
     ),
+    Correction(
+        finding="SN1",
+        keys=("noahmp_melt_reset_esat",),
+        summary=(
+            "Noah-MP land snowmelt reset (snow deeper than 5 cm, ground "
+            "solved above freezing, TG set to 273.16 K) evaluates the ground "
+            "evaporation, and bare-ground QSFC, at the reset temperature, as "
+            "WRF's own glacier reset does, instead of at the discarded warmer "
+            "TG; that stale value overstated evaporation from sunlit melting "
+            "snow and drove the vegetated 2 m mixing ratio to zero or below"),
+        carriers=(("sf_surface_physics", (4,)),),
+    ),
 )
 
 #: Key -> ``(selector, values)``: the scheme selection under which the key is
@@ -188,6 +200,8 @@ KEY_SCOPE: Mapping[str, tuple[str, tuple[int, ...]]] = {
     "thompson_cloud_surface_booking": ("mp_physics", (8, 28, 38)),
     # HN1: the schemes whose number moments the handover closure writes.
     "hydrometeor_handover_numbers": ("mp_physics", (8, 10, 28)),
+    # SN1: VEGE_FLUX/BARE_FLUX (and GECROS's VEGE_FLUX) of Noah-MP.
+    "noahmp_melt_reset_esat": ("sf_surface_physics", (4,)),
 }
 
 

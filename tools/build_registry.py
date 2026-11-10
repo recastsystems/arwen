@@ -102,6 +102,16 @@ IMPLEMENTED: dict[str, dict] = {
         "component_id": "land_surface", "read_when": {"sf_surface_physics": 4, "opt_alb": 3},
         "consuming_read": "gpuwm/core/snow_papers.py",
         "description": "Paper snow optics internal dust mixing; written from papers, not bitwise to WRF."},
+    "opt_scf": {
+        "type": "integer", "enum": [1, 2], "default": 1,
+        "component_id": "land_surface", "read_when": {"sf_surface_physics": 4},
+        "consuming_read": "gpuwm/core/noahmp_energy_slab.py",
+        "description": "Noah-MP ground snow cover fraction: 1 Niu-Yang 2007 with land-type table parameters; 2 scale-aware from grid spacing (Abolafia-Rosenzweig et al. 2025), re-implemented from published descriptions, not bitwise to upstream."},
+    "snicar_fresh_grain_opt": {
+        "type": "integer", "enum": [1, 2], "default": 1,
+        "component_id": "land_surface", "read_when": {"sf_surface_physics": 4, "opt_alb": 3},
+        "consuming_read": "gpuwm/core/snow_papers.py",
+        "description": "Paper snow optics fresh-snow grain radius: 1 = 54.526-204.526 um, 2 = Lin 2025 MODSCAG 33-91 um; re-implemented from published descriptions, not bitwise to upstream."},
     "use_theta_m": {
         "type": "integer", "enum": [0, 1], "default": 0,
         "consuming_read": "gpuwm/core/state.py",
@@ -129,9 +139,9 @@ IMPLEMENTED: dict[str, dict] = {
     "windfarm_opt": {"type":"integer", "enum":[0,1,2], "default":0,
         "per_domain":True,"component_id":"pbl","consuming_read":"gpuwm/namelist_import.py",
         "description":"Native WRF wind farm: off, Fitch or MAV. MAV is a named opt-in: measured forecast hook cost 2.044114x Fitch on the retained eight-turbine case; added native wake quadratures are profiled. See docs/wind-farms.md."},
-    "windfarm_induction": {"type":"integer", "enum":[0,1], "default":0,
+    "windfarm_induction": {"type":"integer", "enum":[-1,0,1], "default":-1,
         "per_domain":False,"component_id":"pbl","consuming_read":"gpuwm/core/wind_farm.py",
-        "description":"WRF Fitch two-pass axial induction correction; explicit opt-in, measured 1.28x Fitch cost; zero is the default."},
+        "description":"WRF Fitch two-pass axial induction correction; -1 (default) takes the selected Fitch pin's Registry default (windfarm_fitch_version wrf_471 resolves 0, wrf_480 resolves 1, as WRF v4.8.0 runs it); 0 and 1 choose explicitly. Measured 1.28x Fitch cost with it on."},
     "windfarm_wake_model": {"type":"integer", "enum":list(range(1,8)), "default":2,
         "per_domain":True,"component_id":"pbl","consuming_read":"gpuwm/core/wind_mav.py",
         "description":"WRF MAV JS, XA, GM and the four native wake-model ensembles."},
@@ -161,6 +171,24 @@ IMPLEMENTED: dict[str, dict] = {
                      "WRF 4.6.1 bl_ysu_run word for word, under its own restart "
                      "identity. Changing generation changes tendencies and is "
                      "refused on restart."]},
+    "ntu_version": {
+        "type": "string", "enum": ["wrf_480", "wrf_471"], "default": "wrf_480",
+        "component_id": "microphysics", "read_when": {"mp_physics": 56},
+        "consuming_read": "gpuwm/core/ntu.py",
+        "warnings": ["wrf_480 is WRF 4.8.0's NTU: the rain-graupel collection "
+                     "RATIO is taken after its riming density is set "
+                     "(module_mp_ntu.F 4.8.0:5694-5707). wrf_471 reproduces the "
+                     "4.7.1 transcription, which reads that density before it is "
+                     "set. A generation change is refused on restart."]},
+    "udm_version": {
+        "type": "string", "enum": ["wrf_480", "wrf_471"], "default": "wrf_480",
+        "component_id": "microphysics", "read_when": {"mp_physics": 27},
+        "consuming_read": "gpuwm/core/udm.py",
+        "warnings": ["wrf_480 is WRF 4.8.0's UDM: hail deposition joins the "
+                     "ice-nucleation supersaturation budget and the graupel "
+                     "and hail fall densities are zeroed each substep "
+                     "(module_mp_udm.F 4.8.0:947, :1959). wrf_471 reproduces the "
+                     "4.7.1 generation. A generation change is refused on restart."]},
     "noahmp_snow_age": {
         "type": "string", "enum": ["wrf_470", "wrf_461"],
         "default": "wrf_470", "component_id": "land_surface",
@@ -10067,10 +10095,12 @@ def build(registry: dict) -> dict:
             "checkpoint, actual two-member ensembles and both nest feedback "
             "modes are covered. See tools/noahmp_options_wrf461_oracle/README.md "
             "for evidence scope; this does not qualify other option values.")
-        if _name.startswith("snicar_"):
+        if _name.startswith("snicar_") or _name not in registry["parameters"]:
             # These kw-only RunConfig controls are absent from the old knob
             # survey. An admitted setting without its parameter default
-            # resolves to None and makes every Noah-MP plan unlaunchable.
+            # resolves to None and makes every Noah-MP plan unlaunchable
+            # (3.0.0 fold: opt_snow_compact, opt_runsub and opt_tksno did,
+            # tests/test_physics_registry.py expert-only Noah-MP templates).
             from gpuwm.config import RunConfig
             _default = RunConfig.__dataclass_fields__[_name].default
             registry["parameters"].setdefault(_name, {
@@ -10078,7 +10108,8 @@ def build(registry: dict) -> dict:
                 "default": _default,
                 "enum": list(_values),
                 "per_domain": False,
-                "consuming_read": "gpuwm/core/snow_papers.py:settings",
+                "consuming_read": ("gpuwm/core/snow_papers.py:settings" if _name.startswith("snicar_")
+                                   else "gpuwm/core/noahmp_runtime.py"),
             })
             _noahmp_constraints["admitted_setting_values_reasons"][_name] = (
                 "These settings select the paper-based snow rewrite at opt_alb=3: "
@@ -10086,6 +10117,29 @@ def build(registry: dict) -> dict:
                 "lifecycle checks cover snow habits and impurity mixing; the "
                 "native v4.6.1 replay claim does not cover these settings. "
                 "See docs/SNOW-PAPERS.md and tests/test_snow_papers.py.")
+    # opt_scf=2 is not a WRF v4.6.1 option, so the replay claim above does
+    # not describe it; state what it is instead (lane noahmp-clean-scf).
+    _noahmp_constraints["admitted_setting_values_reasons"]["opt_scf"] = (
+        "The canonical default (1, Niu-Yang 2007 with the land-type SCFFAC and "
+        "MFSNO table values) is the unchanged WRF-lineage statement sequence. "
+        "Value 2 is the scale-aware ground snow cover fraction of "
+        "Abolafia-Rosenzweig et al. 2025 (JAMES, Eq. 4-5): re-implemented from "
+        "published descriptions, not bitwise to upstream. The native v4.6.1 "
+        "replay claim does not cover it. See gpuwm/core/noahmp_scf.py and "
+        "tests/test_noahmp_scf.py.")
+    for _name, _what in (
+            ("opt_snow_compact", "Value 2 is the snow compaction C_bd(T_air, p_sfc) of "
+             "Abolafia-Rosenzweig et al. 2024 (gpuwm/core/kernels/noahmp_water_options.cuh, "
+             "tests/test_noahmp_snow_compaction.py)"),
+            ("opt_runsub", "Nonzero values split subsurface runoff from opt_run under "
+             "WRF v4.8.0's opt_runsrf/opt_runsub names (gpuwm/core/noahmp_runoff_split.py, "
+             "tests/test_noahmp_runoff_split.py)"),
+            ("opt_tksno", "Values 2-5 are Anderson, constant 0.35, Verseghy and Yen 1981 "
+             "snow thermal conductivity (gpuwm/core/noahmp_tksno.py, tests/test_noahmp_tksno.py)")):
+        _noahmp_constraints["admitted_setting_values_reasons"][_name] = (
+            "The canonical default is the unchanged WRF-lineage statement sequence. "
+            + _what + ": re-implemented from published descriptions, not bitwise to "
+            "upstream. The native v4.6.1 replay claim does not cover it.")
     _noahmp_constraints["admitted_setting_values_reasons"]["noahmp_output"] = (
         "Level 3 runs all 58 native WRF output accumulators on resident GPU arrays. "
         "The pinned diagnostics driver treats levels 0/1/2 as standard output. "

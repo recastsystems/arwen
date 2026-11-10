@@ -902,6 +902,21 @@ def draw_door_products(plan: dict, *, first_products=None, door: str) -> bool:
     return drawn
 
 
+def parse_scheme_selectors(items):
+    """``--scheme KEY=VALUE`` items as a dict (None when absent)."""
+    if not items:
+        return None
+    from gpuwm.wrfinput_door import check_scheme_selectors
+    selectors = {}
+    for item in items:
+        key, sep, value = str(item).partition("=")
+        if not sep or not key.strip() or not value.strip():
+            raise SystemExit(f"--scheme {item!r}: write KEY=VALUE, e.g. bl_mynn_version=wrf_480")
+        selectors[key.strip()] = value.strip()
+    check_scheme_selectors(selectors)
+    return selectors
+
+
 def build_parser(*, prog=None):
     parser = argparse.ArgumentParser(prog=prog, description=__doc__)
     parser.add_argument('--wrfinput', type=Path, required=True, help='real.exe directory with wrfinput, wrfbdy and namelist.input')
@@ -909,6 +924,13 @@ def build_parser(*, prog=None):
                         help='original met_em and producing Vtable directory for automatic soil recovery; defaults to the WRF input directory')
     parser.add_argument('--rrtmg-variant', choices=('rrtmg_legacy','rte-rrtmgp'), default=None, help='preserve WRF RRTMG by default; choose rte-rrtmgp explicitly to change radiation')
     parser.add_argument('--thompson-version', choices=('wrf_461','wrf_44'), default=None)
+    parser.add_argument('--cu-gf-version', choices=('gfl_873b414','wrf_461'), default=None,
+                        help="cu_physics=3: the previous pin GFDRV (default) or WRF v4.8.0 Grell-Freitas-Li")
+    parser.add_argument('--scheme', action='append', default=None, metavar='KEY=VALUE',
+                        help="name one scheme generation selector the run uses (repeatable), e.g. "
+                             "bl_mynn_version=wrf_480; it wins over the release the files' TITLE "
+                             "names. Only the generation selectors in "
+                             "gpuwm.wrfinput_door.SCHEME_SELECTORS are accepted")
     parser.add_argument('--urban-ucm-generation', choices=('wrf_471','wrf_480'), default=None)
     parser.add_argument('--urban-treeoption', type=int, choices=(0,1), default=None)
     parser.add_argument('--urban-ttscheme', type=int, choices=(0,1), default=None)
@@ -963,8 +985,8 @@ def _door_initialization(initialization, plan_path, outdir):
 def run_wrf_forecast(directory, outdir, *, run_seconds=None, restart=None,
                      io_mode="history", health_debug=False, gpu_uuid=None,
                      exclusive_gpu=True, rrtmg_variant=None,
-                     thompson_version=None, urban_ucm_generation=None,
-                     urban_controls=None,
+                     thompson_version=None, urban_ucm_generation=None, cu_gf_version=None,
+                     urban_controls=None, scheme_selectors=None,
                      render_products=None, render_dir=None,
                      progress_options=None, relaunched=False, allow_shared_gpu=False,
                      output_owner=None, soil_source=None, ensemble_request=None,
@@ -1040,6 +1062,8 @@ def run_wrf_forecast(directory, outdir, *, run_seconds=None, restart=None,
     run = resolve_wrfinput_run(directory, rrtmg_variant=rrtmg_variant,
                                restart_from=restart_from,
                                urban_ucm_generation=urban_ucm_generation, urban_controls=urban_controls,
+                               cu_gf_version=cu_gf_version,
+                               scheme_selectors=scheme_selectors,
                                **({} if thompson_version is None else {"thompson_version":thompson_version}))
     if run_seconds is not None:
         wrfinput_window_seconds(run, run_seconds)
@@ -1080,6 +1104,10 @@ def run_wrf_forecast(directory, outdir, *, run_seconds=None, restart=None,
                 command += ['--rrtmg-variant', rrtmg_variant]
             if thompson_version is not None:
                 command += ['--thompson-version', thompson_version]
+            if cu_gf_version is not None:
+                command += ['--cu-gf-version', cu_gf_version]
+            for key, value in (scheme_selectors or {}).items():
+                command += ['--scheme', f'{key}={value}']
             if urban_ucm_generation is not None:
                 command += ['--urban-ucm-generation', urban_ucm_generation]
             for key,value in (urban_controls or {}).items():
@@ -1246,6 +1274,8 @@ def main(argv=None, *, in_process=False, prog=None):
                                exclusive_gpu=not (args._worker or in_process or args.no_supervise),
                                rrtmg_variant=args.rrtmg_variant,
                                thompson_version=args.thompson_version,
+                               cu_gf_version=args.cu_gf_version,
+                               scheme_selectors=parse_scheme_selectors(args.scheme),
                                urban_ucm_generation=args.urban_ucm_generation,
                                urban_controls={key:getattr(args,key) for key in ("urban_treeoption","urban_ttscheme","urban_fvg","urban_table_dir") if getattr(args,key) is not None},
                                render_products=args.render_products,

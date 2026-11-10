@@ -507,7 +507,12 @@ def validate_native_static_fields(
     missing = sorted(NATIVE_STATIC_REQUIRED - set(fields))
     if missing:
         raise KeyError(f"native static fields are missing {missing}")
-    from gpuwm.static.orographic import OROGRAPHIC_ROWS
+    from gpuwm.static.orographic import GWDO_480_EXTRA_FIELDS, OROGRAPHIC_ROWS
+    # ELVMAX (WRF v4.8.0's gwd_opt = 1) is not a GEOGRID-table row, so it is
+    # retained beside OROGRAPHIC_ROWS: without it the cache dropped the field
+    # the static build had just made, and the forecast refused the prepared
+    # tree (prepared_terrain_drag_missing) on every gwd_opt = 1 run.
+    orographic = tuple(OROGRAPHIC_ROWS) + tuple(GWDO_480_EXTRA_FIELDS)
     chem_fields = set(NATIVE_CHEM_STATIC_PLANES) & set(fields)
     if chem_fields and chem_fields != set(NATIVE_CHEM_STATIC_PLANES):
         raise ValueError(
@@ -521,7 +526,7 @@ def validate_native_static_fields(
                 | ({"LAKE_DEPTH", "LAKEMASK", "SLOPECAT"} & set(fields))
                 | chem_fields
                 | ({"FRC_URB2D"} & set(fields))
-                | (set(OROGRAPHIC_ROWS) & set(fields)))
+                | (set(orographic) & set(fields)))
     result = _decode_native_static_fields(fields, retained)
     landuse_categories = _landuse_category_count(result["LANDUSEF"])
     expected_shapes = {
@@ -539,7 +544,7 @@ def validate_native_static_fields(
         "E": (ny, nx),
         "SINALPHA": (ny, nx),
         "COSALPHA": (ny, nx),
-        **{name: (ny, nx) for name in OROGRAPHIC_ROWS},
+        **{name: (ny, nx) for name in orographic},
         "LAKE_DEPTH": (ny, nx),
         "LAKEMASK": (ny, nx),
         "SLOPECAT": (ny, nx),

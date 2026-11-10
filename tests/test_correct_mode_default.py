@@ -39,7 +39,8 @@ def test_exact_mode_authors_every_key_off():
                             "wsm3_conservative_surface": False,
                             "wsm5_conservative_surface": False,
                             "wsm7_conservative_surface": False,
-                            "hydrometeor_handover_numbers": False}
+                            "hydrometeor_handover_numbers": False,
+                            "noahmp_melt_reset_esat": False}
     assert res.applied == ()
     assert "forced_by" not in res.receipt()
 
@@ -53,8 +54,9 @@ def test_correct_mode_sets_every_registered_key():
                             "wsm3_conservative_surface": True,
                             "wsm5_conservative_surface": True,
                             "wsm7_conservative_surface": True,
-                            "hydrometeor_handover_numbers": True}
-    assert res.receipt()["applied_findings"] == ["WB1", "WB4", "WB5", "HN1"]
+                            "hydrometeor_handover_numbers": True,
+                            "noahmp_melt_reset_esat": True}
+    assert res.receipt()["applied_findings"] == ["WB1", "WB4", "WB5", "HN1", "SN1"]
 
 
 def test_correct_skip_drops_one_correction():
@@ -66,7 +68,8 @@ def test_correct_skip_drops_one_correction():
                             "wsm3_conservative_surface": False,
                             "wsm5_conservative_surface": False,
                             "wsm7_conservative_surface": False,
-                            "hydrometeor_handover_numbers": True}
+                            "hydrometeor_handover_numbers": True,
+                            "noahmp_melt_reset_esat": True}
     assert res.receipt()["physics.correct_skip"] == ["WB5"]
 
 
@@ -77,7 +80,7 @@ def test_the_default_is_correct_in_a_default_process():
         pytest.skip("strict process; see the strict subprocess test")
     assert correct_mode.PHYSICS_MODE_DEFAULT == "correct"
     assert correct_mode.resolve() == correct_mode.resolve("correct")
-    assert correct_mode.resolve(None, ["WB4"]).applied == ("WB1", "WB5", "HN1")
+    assert correct_mode.resolve(None, ["WB4"]).applied == ("WB1", "WB5", "HN1", "SN1")
 
 
 def test_strict_wrf_mode_forces_exact_and_records_it():
@@ -189,14 +192,15 @@ def test_wb5_spans_wsm6_and_wdm6_and_a_one_key_arm_reads_as_itself():
                     **{**correct_mode.resolve("correct").settings,
                        "wsm6_conservative_surface": False})
     receipt = correct_mode.resolution_of(arm).receipt()
-    assert receipt["applied_findings"] == ["WB1", "WB4", "WB5", "HN1"]
+    assert receipt["applied_findings"] == ["WB1", "WB4", "WB5", "HN1", "SN1"]
     assert receipt["keys"] == {"thompson_cloud_surface_booking": True,
                                "ntiedtke_dry_mass_coupling": True,
                                "wdm6_conservative_surface": True,
                                "wsm3_conservative_surface": True,
                                "wsm5_conservative_surface": True,
                                "wsm7_conservative_surface": True,
-                               "hydrometeor_handover_numbers": True}
+                               "hydrometeor_handover_numbers": True,
+                            "noahmp_melt_reset_esat": True}
 
 
 def test_run_receipt_names_each_domains_mode():
@@ -400,7 +404,8 @@ def test_every_carrier_scheme_is_a_shipped_scheme():
     """The carrier registry names only schemes the engine ships, so a typo
     cannot hide a carrier from the gate below."""
     shipped = {"mp_physics": set(_shipped("microphysics")),
-               "cu_physics": set(_shipped("cumulus"))}
+               "cu_physics": set(_shipped("cumulus")),
+               "sf_surface_physics": set(_shipped("land_surface"))}
     for c in correct_mode.CORRECTIONS:
         assert c.carriers, c.finding
         for selector, schemes in c.carriers:
@@ -483,3 +488,22 @@ def test_wsm3_5_7_keys_bind_only_their_scheme_and_a_290_checkpoint_resumes_exact
         _require_config_match(stored, cfg, "ckpt.nc")
     assert key in str(refused.value)
     _require_config_match(stored, exact, "ckpt.nc")
+
+
+# ------------------------------------------------ 2.9.14: SN1, Noah-MP reset --
+def test_sn1_is_a_noahmp_correction_on_by_default_and_off_in_exact():
+    """SN1 (the Noah-MP land snowmelt reset's stale ESTG) is a correct-mode
+    key scoped to sf_surface_physics = 4.  Breakage prevented: a default run
+    keeping WRF's stale-ESTG reset (Q2 near zero, about -60 C dewpoint, at
+    sunlit melting snow edges), or an exact/strict proof running the fix."""
+    from gpuwm.core.noahmp_runtime import NoahmpRuntimeParameters
+    assert correct_mode.FINDING_BY_KEY["noahmp_melt_reset_esat"] == "SN1"
+    assert correct_mode.key_in_scope("noahmp_melt_reset_esat",
+                                     {"sf_surface_physics": 4})
+    assert not correct_mode.key_in_scope("noahmp_melt_reset_esat",
+                                         {"sf_surface_physics": 2})
+    assert RunConfig.noahmp_melt_reset_esat is correct_mode.CORRECT_KEYS_DEFAULT
+    assert correct_mode.resolve("exact").settings["noahmp_melt_reset_esat"] is False
+    on = NoahmpRuntimeParameters(melt_reset_esat=True)
+    assert on.land_options["melt_reset_esat"] is True
+    assert "melt_reset_esat" not in NoahmpRuntimeParameters().land_options

@@ -2762,7 +2762,12 @@ mod tests {
 
     fn bitmap_crop(record: &Grib2Message, variable: &str, window: Window)
         -> Result<(Vec<u8>, Stats), String> {
-        let path = std::env::temp_dir().join(format!("bitmap-check-{}-{}.f32le",
+        // The clock alone is not a unique name: the bitmap tests run on parallel threads of one
+        // process, and on Windows two calls can read the same tick, so one test removed the file
+        // the other was about to read (3.0.0 pass 7, R8: NotFound here). A counter makes it unique.
+        static NEXT_BITMAP_SCRATCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let serial = NEXT_BITMAP_SCRATCH.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!("bitmap-check-{}-{}-{serial}.f32le",
             std::process::id(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
         let mut writer = BufWriter::new(File::create(&path).unwrap());
         let result = decode_crop_write(record, 17, &mut writer, window, variable, true, false);

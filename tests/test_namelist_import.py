@@ -27,6 +27,7 @@ from gpuwm.physics_compat import CONSTANT_DOWNWARD_LONGWAVE_ACK
 from gpuwm.experiment import DEFAULT_COLUMN_CHUNK, load_experiment
 from gpuwm.namelist_import import (GF_SCHEME_GENERATION_NOTICE,
                                    MYNN_MIXSCALARS_DEFAULT_NOTICE,
+                                   MYNN_MIXSCALARS_DEFAULT_NOTICE_480,
                                    SubstitutionReport, import_namelists,
                                    parse_namelist)
 from gpuwm.native_wrf_contract import validate_native_lambert_contracts
@@ -1867,8 +1868,13 @@ def test_mynn_mixing_length_and_scalar_diffusion_import_without_substitution(tmp
         assert domain.run.bl_mynn_mixscalars == 0
     assert "bl_mynn_mixlength = 2" in text
     assert "scalar_pblmix = 1" in text
-    # The omitted key took the v4.6.1 Registry default, and the import
-    # says so: v4.7.x defaults it to 1 and is indistinguishable here.
+    # The omitted key took 0, and the import says which Registry that is:
+    # a bare line reads WRF 4.8.0's (default 0 again); a 4.7.1 import
+    # says v4.7.x defaults it to 1 and is indistinguishable here.
+    assert MYNN_MIXSCALARS_DEFAULT_NOTICE_480 in report.notices
+    assert "Registry.EM_COMMON:2503" in report.format()
+    _, report = import_namelists(*_pair(tmp_path, inp=inp), name="mynn-options",
+                                 wrf_version="4.7.1")
     assert MYNN_MIXSCALARS_DEFAULT_NOTICE in report.notices
     assert "Registry.EM_COMMON:2479" in report.format()
 
@@ -1884,11 +1890,13 @@ def test_mynn_mixscalars_default_notice_names_the_omission_only(tmp_path):
         text, report = import_namelists(
             *_pair(tmp_path, inp=inp), name=f"mynn-mixscalars-{value}")
         assert MYNN_MIXSCALARS_DEFAULT_NOTICE not in report.notices
+        assert MYNN_MIXSCALARS_DEFAULT_NOTICE_480 not in report.notices
         exp = _load(tmp_path, text, f"mynn-mixscalars-{value}.toml")
         assert {d.run.bl_mynn_mixscalars for d in exp.domains} == {value}
     # A non-MYNN namelist that omits the key gets no MYNN notice.
     _, report = import_namelists(*_pair(tmp_path, inp=INPUT_TEXT), name="ysu-plain")
     assert MYNN_MIXSCALARS_DEFAULT_NOTICE not in report.notices
+    assert MYNN_MIXSCALARS_DEFAULT_NOTICE_480 not in report.notices
 
 
 def test_hrrr_fork_namelist_omits_mixscalars_and_imports_hrrr_mixing(tmp_path):
@@ -1911,7 +1919,7 @@ def test_hrrr_fork_namelist_omits_mixscalars_and_imports_hrrr_mixing(tmp_path):
     for domain in exp.domains:
         assert domain.run.scalar_pblmix == 1
         assert domain.run.bl_mynn_mixscalars == 0
-    assert MYNN_MIXSCALARS_DEFAULT_NOTICE in report.notices
+    assert MYNN_MIXSCALARS_DEFAULT_NOTICE_480 in report.notices
 
 
 def test_wrf3x_mynn_tkebudget_spelling_imports_the_gsd41_generation(tmp_path):

@@ -280,6 +280,13 @@ _INVENTORIES = {
         wrfinput_fields=(_moist("qv", "QVAPOR"), _moist("qc", "QCLOUD"),
                          _moist("qi", "QICE"), _moist("qs", "QSNOW")),
         runtime_state_not_wrfinput=()),
+    # WRF v4.6.1 Registry.EM_COMMON:3015 (v4.8.0 :3070, unchanged),
+    # kesslerscheme: moist:qv,qc,qr; no scalar or radius fields.
+    1: StockWrfPhysicsInventory(mp_physics=1, scheme="Kessler",
+        registry_package="kesslerscheme",
+        wrfinput_fields=tuple(f for f in _ICE_MASS
+                              if f.registry_name in ("qv", "qc", "qr")),
+        runtime_state_not_wrfinput=()),
     # WRF v4.6.1 Registry.EM_COMMON:3016, no scalar or radius fields.
     2: StockWrfPhysicsInventory(mp_physics=2,scheme="Purdue Lin",
         registry_package="linscheme",wrfinput_fields=_ICE_MASS,
@@ -826,7 +833,6 @@ def _require_agreement_with_the_registry() -> None:
             if row.get("inventoried") is True else None),
         cited_absences={
             0: "export-only scope: no evidenced Registry.EM_COMMON package contract packaged (audit R-014)",
-            1: "export-only scope: no evidenced Registry.EM_COMMON package contract packaged (audit R-014)",
             3: "export-only scope: no evidenced Registry.EM_COMMON package contract packaged (audit R-014); WSM3 joined the runtime with its port, the stock-WRF export contract did not",
             9: "export-only scope: no evidenced Registry.EM_COMMON package contract packaged (audit R-014)",
             16: "export-only scope: no evidenced Registry.EM_COMMON package contract packaged (audit R-014)",

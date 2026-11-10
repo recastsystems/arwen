@@ -52,8 +52,8 @@ keywords = ["WRF", "RRTMGP", "Thompson", "weather", "gpuwm"]
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/FahrenheitResearch/arwen"
-Repository = "https://github.com/FahrenheitResearch/arwen"
+Homepage = "https://github.com/recastsystems/arwen"
+Repository = "https://github.com/recastsystems/arwen"
 
 [tool.setuptools.dynamic]
 version = { file = ["gpuwm_data/VERSION"] }

@@ -3000,7 +3000,7 @@ def test_the_manual_chain_pointer_is_reachable_without_a_checkout():
 
     assert "docs/public/FIRST-LIGHT.md" in MANUAL_CHAIN
     assert MANUAL_CHAIN.count("https://") == 1
-    assert "FahrenheitResearch/arwen" in MANUAL_CHAIN
+    assert "recastsystems/arwen" in MANUAL_CHAIN
 
 
 def test_a_profileless_gfs_emission_points_at_gpuwm_go(tmp_path, capsys):

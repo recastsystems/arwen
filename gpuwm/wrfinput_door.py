@@ -481,10 +481,37 @@ def require_preserved_wrf_selectors(report):
                 "Select a supported physics package explicitly in the producing namelist")
 
 
+#: The scheme generation selectors ``--scheme KEY=VALUE`` may name on the
+#: WRF-file door: each picks which pinned source generation of one scheme
+#: runs (WRF-480 port).  Named breakage the list prevents: the door's TOML
+#: is validated by the importer, and an arbitrary key written after that
+#: would bypass every import check; a selector only chooses among kernels
+#: the config validator already knows.  ``ruc_soilprop`` picks the RUC
+#: SOILPROP lineage: the engine default is the operational form, stock WRF
+#: 4.6.1-4.8.0 runs ``wrf_461`` (gpuwm.wrf_reference.REFERENCE_STOCK_SELECTORS),
+#: so a bitwise proof of a RUC recipe against stock WRF has to name it.
+SCHEME_SELECTORS = frozenset({
+    "solar_generation", "ysu_version", "shinhong_version", "cu_gf_version",
+    "bl_mynn_version", "mynn_sfclay_variant", "gwdo_version",
+    "windfarm_fitch_version", "ntu_version", "udm_version",
+    "urban_water_balance", "noahmp_snow_age", "ruc_soilprop"})
+
+
+def check_scheme_selectors(selectors) -> None:
+    """Refuse a ``--scheme`` key that is not a generation selector."""
+    unknown = sorted(set(selectors or {}) - SCHEME_SELECTORS)
+    if unknown:
+        raise ConfigurationRefused(
+            f"--scheme {', '.join(unknown)}: not a scheme generation selector; "
+            f"the door accepts {sorted(SCHEME_SELECTORS)}")
+
+
 def resolve_wrfinput_run(directory: str | Path, *, name: str | None = None,
                          acknowledgements: Sequence[str] = (),
                          rrtmg_variant: str | None = None,
                          thompson_version: str | None = None,
+                         cu_gf_version: str | None = None,
+                         scheme_selectors=None,
                          urban_ucm_generation: str | None = None,
                          urban_controls: dict | None = None,
                          check_projection: bool = True,
@@ -612,6 +639,22 @@ def resolve_wrfinput_run(directory: str | Path, *, name: str | None = None,
                         if generation == "wrf_44" else ""))
         toml_text = toml_text.replace("[shared]\n", "[shared]\n" + selection, 1)
         toml_text = "# Thompson generation: " + json.dumps(generation_receipt) + "\n" + toml_text
+    if cu_gf_version is not None:
+        import json
+        import re
+        # cu_physics=3's generation. The flag wins over the release the files'
+        # TITLE names (WRF_RELEASE_GENERATIONS), so an existing key is replaced.
+        line = f"cu_gf_version = {json.dumps(cu_gf_version)}"
+        toml_text, count = re.subn(r"(?m)^cu_gf_version\s*=.*$", line, toml_text)
+        if not count:
+            toml_text = toml_text.replace("[shared]\n", "[shared]\n" + line + "\n", 1)
+    if scheme_selectors:
+        # --scheme KEY=VALUE: like --cu-gf-version, each wins over the
+        # release the files' TITLE names, so an existing key is replaced.
+        check_scheme_selectors(scheme_selectors)
+        from gpuwm.verify_exact.replay import set_toml_key
+        for key, value in scheme_selectors.items():
+            toml_text = set_toml_key(toml_text, key, value)
     experiment = build_experiment(
         tomllib.loads(toml_text), source=f"{directory}:wrfinput")
     kind = "wrfrst" if warm else "wrfinput"

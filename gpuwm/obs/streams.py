@@ -942,7 +942,8 @@ def _run_door(name: str, arguments: list[str]) -> dict:
             f"that needs it cannot be fetched: {reason}") from None
     result = subprocess.run([str(binary), *arguments], capture_output=True, text=True, errors="replace")
     if result.returncode != 0:
-        tail = [l for l in (result.stderr or "").splitlines() if l.strip()]
+        # rw-http's retry notes ("rw-http: HTTP 429 ... retrying") come before the door's own error.
+        tail = [l for l in (result.stderr or "").splitlines() if l.strip() and not l.startswith("rw-http:")]
         raise RuntimeError(f"{name} {arguments[0]}: {tail[0] if tail else result.returncode}")
     return json.loads(result.stdout)
 

@@ -69,7 +69,7 @@ fetch-bridges` stages it like every other binary and no Rust toolchain
 is required to get one.
 
 ```bash
-git clone https://github.com/FahrenheitResearch/arwen gpuwm && cd gpuwm
+git clone https://github.com/recastsystems/arwen gpuwm && cd gpuwm
 python -m venv .venv
 source .venv/bin/activate           # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -e gpuwm-data

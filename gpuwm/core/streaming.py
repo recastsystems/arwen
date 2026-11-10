@@ -5620,9 +5620,9 @@ def _tile_terrain_drag_static(cfg, terrain):
     """
     import numpy as np
 
-    from gpuwm.static.orographic import required_static_fields
+    from gpuwm.static.orographic import required_static_fields_for
 
-    names = required_static_fields(cfg.topo_wind, cfg.gwd_opt)
+    names = required_static_fields_for(cfg)
     if not names:
         return None
     return {"HGT_M": terrain,
@@ -5762,9 +5762,19 @@ def prepared_tile_state_factory(state, cfg, *, tables0=None, seed: int = 4242,
                 twin = _tile_scheme(getattr(driver, attr, None), lat, lon)
                 if twin is not None:
                     extra[key] = twin
+        if (getattr(tile_cfg, "kim_tofd", False)
+                and int(getattr(tile_cfg, "sf_sfclay_physics", 0)) == 1):
+            # Named breakage: the tile geography gather fills the terrain-drag
+            # carrier, not the surface layer's VAR plane, so every tile would
+            # run kim_tofd on the neutral zeros below, i.e. with no form drag.
+            raise StreamingRefused(
+                "kim_tofd = .true. (WRF v4.8.0 revised MM5 form drag) is not "
+                "carried by streamed tiles yet: the tile geography gather has "
+                "no VAR plane for the surface layer; run it resident")
         if (int(getattr(tile_cfg, "topo_wind", 0))
                 or int(getattr(tile_cfg, "gwd_opt", 0))):
-            from gpuwm.static.orographic import required_static_fields
+            from gpuwm.static.orographic import (drag_static_fields,
+                                                gwdo_version_of)
 
             if getattr(driver, "terrain_drag", None) is None:
                 raise StreamingRefused(
@@ -5777,8 +5787,9 @@ def prepared_tile_state_factory(state, cfg, *, tables0=None, seed: int = 4242,
                                dtype=np.float32)
             extra["terrain_drag_static"] = {
                 "HGT_M": neutral,
-                **{name: neutral for name in required_static_fields(
-                    int(tile_cfg.topo_wind), int(tile_cfg.gwd_opt))}}
+                **{name: neutral for name in drag_static_fields(
+                    int(tile_cfg.topo_wind), int(tile_cfg.gwd_opt),
+                    gwdo_version_of(tile_cfg))}}
         tile, _drv = _harness.make_physics_state(
             tile_cfg, seed, geography=geo, start_time=start_time,
             coord=coord, **extra)
