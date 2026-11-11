@@ -1,6 +1,15 @@
 # Changelog
 
-## 3.0.0 (2026-11-09)
+## 3.0.1 (2026-11-11)
+
+New:
+- Opt-in ocean waves (`--waves on`) now also run on large lakes. A lake of 5,000 km² or more that the forecast holds as water becomes wave water, with depths from ETOPO 2022 (the model's lake surface minus the lake bed); it starts calm and its waves grow from the forecast's own wind, so no outside wave model is needed. Lake cells under ice are left dry. Each lake found is listed in the wave preparation log; one the depth data does not cover is left out and says so. New in this release and checked on one case only: a Lake Superior gale on 5 November 2026, ArWen at 12 km for 9 hours, wave height compared at three NDBC buoys. Lake ice is checked by a unit test only, and lakes are not validated against a season of buoy observations. Nests carry no waves (only the outermost domain does), and on wave grids of about 3 km wave height in very shallow shore cells is not yet capped by depth-induced breaking.
+
+Fixed:
+- `gpuwm go --waves on` from a pip install fetches the wave data bridge (`rw_waves_data`) from the release bundle on first use, as the coupled wave preparation already did; it stopped with "rw_waves_data is required" unless `gpuwm fetch-bridges` had been run first.
+- The wave bathymetry download fetches a range again when the server ends it early; a single short range stopped the first `--waves on` run with "bathymetry acquisition incomplete".
+
+## 3.0.0 (2026-11-11)
 
 New:
 - WRF v4.8.0 is the reference: in strict numerics the HRRR recipe and the A071 configuration match native WRF 4.8.0 word for word through a whole forecast hour. WRF 4.7.1 behaviour stays selectable.
@@ -22,7 +31,6 @@ Fixed:
 - Noah-MP runs take the faster resident GPU route by default.
 - Observation downloads retry rate limits (HTTP 429) and server errors with backoff instead of failing on the first one.
 - Ocean waves give the same answer run to run: the wave exchange and partition sums use a fixed order, and each host stages one checksummed bathymetry.
-- Four RFMIP trace-gas files with a non-commercial licence are no longer shipped; a test scans shipped files for such licences.
 - `gpuwm domain` writes nested configurations with TEMPO microphysics; it stopped with an internal error before writing the file.
 - TEMPO microphysics runs with the Grell-Freitas and Kain-Fritsch cumulus schemes and with RTE+RRTMGP radiation; the forecast stopped at its start with those combinations.
 - The urban canopy keeps very small (subnormal) rain amounts in its water balance when its kernels are compiled by the run's compile pool; they were read as zero there.

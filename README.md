@@ -5,25 +5,25 @@ forecast kernels and Rust data paths for weather inputs and products.
 The Python package is `gpuwm`: `gpuwm go` takes a configuration from
 analysis inputs through a regional forecast to rendered products.
 
-CUDA remains the default. The [experimental AMD backend](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/amd-backend.md)
+CUDA remains the default. The [experimental AMD backend](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/amd-backend.md)
 is opt-in with `--backend amd` or `GPUWM_BACKEND=amd`; its page records the
 installation paths, measured single-card scope and numerical limits.
 
 WRF-exact results are demonstrated in strict mode for one 1-hour,
 3 km configuration against stock scalar WRF 4.6.1 on glibc 2.39;
-the [verification scope](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/README-EVIDENCE.md#wrf-comparison)
+the [verification scope](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/README-EVIDENCE.md#wrf-comparison)
 names the grid and physics used.
 
 ## What it does
 
 - **Regional forecasts:** `gpuwm domain --source` selects GFS, HRRR, ERA5, RAP, GEFS and other registered sources; `gpuwm sources --json` lists their routes.
-- **Source mappings:** the [source table](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/SOURCES.md) and [mapped-source guide](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/MAPPED-FORECAST.md) describe the inputs each route needs.
+- **Source mappings:** the [source table](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/SOURCES.md) and [mapped-source guide](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/MAPPED-FORECAST.md) describe the inputs each route needs.
 - **Nested grids:** `gpuwm domain --ladder 12-3` creates a nest; `[experiment] feedback = 1` selects the experimental two-way path.
-- **Moving nests:** `gpuwm cyclone-setup` builds a cyclone configuration with a following nest; the [cyclone guide](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/CYCLONE-SETUP.md) covers track selection and sizing.
+- **Moving nests:** `gpuwm cyclone-setup` builds a cyclone configuration with a following nest; the [cyclone guide](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/CYCLONE-SETUP.md) covers track selection and sizing.
 - **Ensembles:** `gpuwm go CONFIG --members N --recipe time-lagged` uses earlier source cycles; `--restart-roster JSON` continues the original members from checkpoints.
 - **Products:** `gpuwm render RUN --series --products all` draws maps with the Rust renderer; `gpuwm export-grib2 RUN --out DIR` writes surface and pressure-level GRIB2.
 - **Restart:** `gpuwm resume CONFIG --outdir RUN` finds a valid checkpoint; `gpuwm go CONFIG --restart CHECKPOINT` continues into a new output folder.
-- **More than one GPU:** `gpuwm go CONFIG --devices N` splits supported grids into resident slabs; [multi-GPU operation](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/MULTIGPU.md) describes the supported combinations.
+- **More than one GPU:** `gpuwm go CONFIG --devices N` splits supported grids into resident slabs; [multi-GPU operation](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/MULTIGPU.md) describes the supported combinations.
 
 ## Get ArWen
 
@@ -31,13 +31,13 @@ names the grid and physics used.
 | --- | --- |
 | [Windows desktop: GUI and TUI](https://github.com/recastsystems/arwen/releases/download/v2.9.0/ArWen-Desktop-1.0.10-Windows-x64.zip) | x86-64 Windows; compatible NVIDIA GPU and driver; internet for first setup |
 | [Linux desktop: GUI and TUI](https://github.com/recastsystems/arwen/releases/download/v2.9.0/ArWen-Desktop-1.0.10-Linux-x64-pip.tar.gz) | x86-64 Linux, glibc 2.39 or newer, such as Ubuntu 24.04; Python 3.11 or newer; X11 or Wayland with working OpenGL |
-| [Integration kit](https://github.com/recastsystems/arwen/releases/download/v3.0.0/ArWen-3.0.0-Integration-Kit.zip) | Developer guide, CLI/plan examples, catalogs, and client design notes |
+| [Integration kit](https://github.com/recastsystems/arwen/releases/download/v3.0.1/ArWen-3.0.1-Integration-Kit.zip) | Developer guide, CLI/plan examples, catalogs, and client design notes |
 
 The desktop archives contain the applications, native map library and map assets;
 Windows includes a graphical setup launcher that downloads a private Python and
 CUDA runtime on first use. The Python package `gpuwm` (below) carries the engine,
 native processing tools and TUI in its Windows and Linux platform wheels. The
-[release notes and checksums](https://github.com/recastsystems/arwen/releases/tag/v3.0.0)
+[release notes and checksums](https://github.com/recastsystems/arwen/releases/tag/v3.0.1)
 list the exact artifacts and qualification records.
 
 ## Get running
@@ -51,7 +51,7 @@ The platform wheels include the native tools; the desktop GUI is a separate down
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install 'gpuwm[all-cu12]==3.0.0'
+python -m pip install 'gpuwm[all-cu12]==3.0.1'
 gpuwm fetch-tables   # optional: stage Thompson tables ahead of the first run
 gpuwm fetch-geog
 gpuwm doctor
@@ -62,7 +62,7 @@ gpuwm doctor
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install 'gpuwm[all-cu12]==3.0.0'
+python -m pip install 'gpuwm[all-cu12]==3.0.1'
 gpuwm fetch-tables   # optional: stage Thompson tables ahead of the first run
 gpuwm fetch-geog
 gpuwm doctor
@@ -87,7 +87,7 @@ its start.
 `gpuwm doctor` reports each remedy as a command or a `#` comment explaining
 the manual step.
 For CUDA 13, offline installation, source builds, data setup and desktop
-launchers, use the [setup guide](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/SETUP.md).
+launchers, use the [setup guide](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/SETUP.md).
 
 For a developer installation from a source checkout, use `bash install.sh` on
 Linux or `powershell -File install.ps1` on Windows. Source installations build
@@ -141,9 +141,9 @@ gpuwm go nested.toml
 ```
 
 The generated configuration carries the parent and child grids.
-See [configuration](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/CONFIGURATION.md) for feedback and grid settings.
+See [configuration](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/CONFIGURATION.md) for feedback and grid settings.
 Sub-kilometer storm diagnostics are not resolved tornado dynamics;
-the [scale note](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/RESOLVED-SCALE.md) explains their interpretation.
+the [scale note](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/RESOLVED-SCALE.md) explains their interpretation.
 
 ### Continue an interrupted run
 
@@ -172,14 +172,14 @@ gpuwm export-grib2 RUN --out grib2
 ```
 
 The exporter writes surface and pressure-level files. The
-[GRIB2 guide](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/grib2-export.md) describes fields and definition choices.
+[GRIB2 guide](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/grib2-export.md) describes fields and definition choices.
 
 ## Measured runs
 
 These are individual Linux acceptance runs of the 2.9.2 candidate on one
 RTX 5090, recorded on 2026-10-17. Times are complete command wall times,
 including products, with geography installed and shared input caches as noted
-in the [measurement record](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/README-EVIDENCE.md#measured-runs).
+in the [measurement record](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/README-EVIDENCE.md#measured-runs).
 
 | Configuration | Forecast length | Command | Wall time |
 | --- | --- | --- | --- |
@@ -202,32 +202,32 @@ both cards; the HRRR-shape case on one RTX 5090 with products on):
 
 ## Documentation
 
-- [CLI manual](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/CLI-USER-MANUAL.md) and [option reference](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/CLI-OPTIONS.md).
-- [WRF input and restart files](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/WRF-INPUTS.md).
-- [Earth2Studio export](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/EXPORT-EARTH2.md): grids, consumer channels and GRIB2 fields.
-- [Physics choices](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/PHYSICS.md), [hardware](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/HARDWARE.md) and [output variables](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/OUTPUT-VARIABLES.md).
-- [Grid and spectral nudging](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/NUDGING.md): source analyses, WRF FDDA controls, example and measured tradeoffs.
-- [Verification](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/VERIFICATION.md) and [release changes](https://github.com/recastsystems/arwen/blob/v3.0.0/CHANGELOG.md).
-- [Desktop and terminal workspace](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/GUI.md).
-- [Stage contract](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/PIPELINE-STAGES.md) for running preprocessing,
+- [CLI manual](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/CLI-USER-MANUAL.md) and [option reference](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/CLI-OPTIONS.md).
+- [WRF input and restart files](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/WRF-INPUTS.md).
+- [Earth2Studio export](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/EXPORT-EARTH2.md): grids, consumer channels and GRIB2 fields.
+- [Physics choices](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/PHYSICS.md), [hardware](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/HARDWARE.md) and [output variables](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/OUTPUT-VARIABLES.md).
+- [Grid and spectral nudging](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/NUDGING.md): source analyses, WRF FDDA controls, example and measured tradeoffs.
+- [Verification](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/VERIFICATION.md) and [release changes](https://github.com/recastsystems/arwen/blob/v3.0.1/CHANGELOG.md).
+- [Desktop and terminal workspace](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/GUI.md).
+- [Stage contract](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/PIPELINE-STAGES.md) for running preprocessing,
   the simulation and rendering on your own terms.
-- [Smoke, dust and air quality](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/SMOKE-AND-AIR-QUALITY.md): wildfire
+- [Smoke, dust and air quality](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/SMOKE-AND-AIR-QUALITY.md): wildfire
   smoke, dust, sea salt, carbon and CAMS air-quality species are an opt-in
   product, off unless a configuration names `chem_sets`; the worked example is
-  in [CONFIGURATION.md](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/CONFIGURATION.md).
+  in [CONFIGURATION.md](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/CONFIGURATION.md).
 
 Report problems through [GitHub issues](https://github.com/recastsystems/arwen/issues)
 with the version, platform, command and error text.
 `gpuwm report RUN --output diagnostics.zip` collects a diagnostic bundle;
 review it for private information before sharing, following the
-[reporting guide](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/REPORTING-A-PROBLEM.md).
+[reporting guide](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/REPORTING-A-PROBLEM.md).
 
 ArWen is research software; use official meteorological services for safety warnings.
 
-The engine is licensed under [Apache-2.0](https://github.com/recastsystems/arwen/blob/v3.0.0/LICENSE).
-Third-party code and data retain their terms; see [NOTICE](https://github.com/recastsystems/arwen/blob/v3.0.0/NOTICE) and [provenance](https://github.com/recastsystems/arwen/blob/v3.0.0/PROVENANCE.md).
+The engine is licensed under [Apache-2.0](https://github.com/recastsystems/arwen/blob/v3.0.1/LICENSE).
+Third-party code and data retain their terms; see [NOTICE](https://github.com/recastsystems/arwen/blob/v3.0.1/NOTICE) and [provenance](https://github.com/recastsystems/arwen/blob/v3.0.1/PROVENANCE.md).
 
-Native forecast stores: [Icechunk output](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/ICECHUNK.md).
+Native forecast stores: [Icechunk output](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/ICECHUNK.md).
 
 ## Without an NVIDIA GPU
 
@@ -242,4 +242,4 @@ Forecasts require an NVIDIA GPU and a driver supporting CUDA 12.x with
 On a CUDA-13-only system, use `gpuwm[gpu-cu13]` instead. VRAM depends on
 the domain and physics; size it with `gpuwm check`. Doctor reports the
 detected runtime and the matching extra. See the
-[CPU preparation walkthrough](https://github.com/recastsystems/arwen/blob/v3.0.0/docs/public/WITHOUT-A-GPU.md).
+[CPU preparation walkthrough](https://github.com/recastsystems/arwen/blob/v3.0.1/docs/public/WITHOUT-A-GPU.md).
