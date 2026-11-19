@@ -945,11 +945,14 @@ def soilgrids_category_fractions(
             "depth_weights": [[str(depth), float(weight)]
                               for depth, weight in depth_weights.items()],
         })
+        # A footprint over open sea holds no SoilGrids pixel, and the
+        # library reports the range of none as null: no range, not a
+        # number (float(None) stopped such a grid with a TypeError).
         return fields["FRACTIONS"], {
             "raw_component_total_percent_min":
-                float(audit["raw_component_total_percent_min"]),
+                _percent_or_none(audit["raw_component_total_percent_min"]),
             "raw_component_total_percent_max":
-                float(audit["raw_component_total_percent_max"]),
+                _percent_or_none(audit["raw_component_total_percent_max"]),
             "valid_source_pixels": int(audit["valid_source_pixels"]),
         }
 
@@ -960,10 +963,17 @@ def soilgrids_category_fractions(
         category_count=category_count)
     totals = raw_total[valid]
     return fractions, {
-        "raw_component_total_percent_min": float(totals.min()),
-        "raw_component_total_percent_max": float(totals.max()),
+        "raw_component_total_percent_min":
+            float(totals.min()) if totals.size else None,
+        "raw_component_total_percent_max":
+            float(totals.max()) if totals.size else None,
         "valid_source_pixels": int(np.count_nonzero(valid)),
     }
+
+
+def _percent_or_none(value) -> float | None:
+    """A reported percentage, or ``None`` where no pixel reported one."""
+    return None if value is None else float(value)
 
 
 #: Cells over which a high-resolution field hands over to the
@@ -1794,6 +1804,38 @@ def _refuse_unusable_merged_statics(out, new_land) -> None:
                 "this footprint")
 
 
+def _water_where_nothing_donates(baseline, overrides, old_land):
+    """``overrides`` with the baseline's water kept where no land can donate.
+
+    A cell the high-resolution land cover makes land takes its
+    vegetation, albedo and deep-soil climatology from the nearest cell the
+    30-arc-second baseline calls land.  A grid whose baseline has no land
+    cell at all (a fine grid over open sea that the land cover finds an
+    islet or a reef in) has no such cell, so its new land has nothing to
+    take: it would reach the model with 0 K deep soil and no vegetation.
+    Those cells keep the baseline's water in every land-surface field the
+    overlay replaces (mask, land use, soil); the overlay's terrain stays.
+    Returns ``(overrides, cells kept as water)``.
+    """
+    new_land = np.asarray(overrides["LANDMASK"]) > 0.5
+    if old_land.any() or not new_land.any():
+        return overrides, 0
+    kept = dict(overrides)
+    for name, value in overrides.items():
+        if name == "HGT_M" or name not in baseline:
+            continue
+        water = np.asarray(baseline[name])
+        value = np.array(value, copy=True)
+        if water.shape != value.shape:
+            raise ValueError(
+                f"high-resolution {name} is {value.shape} and the baseline's "
+                f"is {water.shape}; the cells no land can donate to cannot "
+                "keep the baseline's water")
+        value[..., new_land] = water[..., new_land]
+        kept[name] = value
+    return kept, int(new_land.sum())
+
+
 def merge_highres_overrides(
         baseline: Mapping[str, np.ndarray],
         overrides: Mapping[str, np.ndarray]) -> tuple[dict[str, np.ndarray],
@@ -1815,9 +1857,21 @@ def merge_highres_overrides(
     if missing:
         raise KeyError(f"high-resolution overrides missing {missing}")
 
-    if all(np.asarray(value).ndim in (2, 3)
-           for source in (baseline, overrides)
-           for value in source.values()):
+    old_land = np.asarray(baseline["LANDMASK"]) > 0.5
+    overrides, kept_water = _water_where_nothing_donates(
+        baseline, overrides, old_land)
+
+    # A baseline with no land cell (a grid over open sea) has nothing to
+    # donate and needs no donor search: the merge is the water fills
+    # alone, done below.  It does not go to the static-fields library
+    # because the libraries shipped with 2.9.13 and 3.0.3 refuse it
+    # ("nearest-donor mask must be 2-D with a valid cell"): that refusal
+    # stopped a storm-following 96-cell 333 m grid over the sea off
+    # Florida on 2026-11-19, and this file alone carries the fix onto
+    # those installs.
+    if old_land.any() and all(np.asarray(value).ndim in (2, 3)
+                              for source in (baseline, overrides)
+                              for value in source.values()):
         bridge = _static_rust("merge_highres_overrides")
         if bridge is not None:
             merged, audit = _merge_via_rust(bridge, baseline, overrides,
@@ -1831,6 +1885,7 @@ def merge_highres_overrides(
                     int(audit["unchanged_land_water_cells"]),
                 "deep_soil_water_masked_cells":
                     int(audit["deep_soil_water_masked_cells"]),
+                "newly_land_without_donor_kept_water_cells": kept_water,
             }
 
     out = {name: np.array(value, copy=True)
@@ -1838,12 +1893,14 @@ def merge_highres_overrides(
     for name, value in overrides.items():
         out[name] = np.array(value, copy=True)
 
-    old_land = np.asarray(baseline["LANDMASK"]) > 0.5
     new_land = out["LANDMASK"] > 0.5
     newly_land = new_land & ~old_land
     newly_water = ~new_land & old_land
-    donor_y, donor_x = _nearest_donors(old_land)
-    yy, xx = donor_y[newly_land], donor_x[newly_land]
+    if newly_land.any():
+        donor_y, donor_x = _nearest_donors(old_land)
+        yy, xx = donor_y[newly_land], donor_x[newly_land]
+    else:
+        yy = xx = np.zeros(0, dtype=np.int32)
     fills = {
         "GREENFRAC": 0.0,
         "LAI12M": 0.0,
@@ -1894,6 +1951,7 @@ def merge_highres_overrides(
         # than a measurement.  Named so a reader of the receipt can tell
         # the 0.0 in SOILTEMP/TMN from a temperature.
         "deep_soil_water_masked_cells": water_masked,
+        "newly_land_without_donor_kept_water_cells": kept_water,
     }
     return out, audit
 

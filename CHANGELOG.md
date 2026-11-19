@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.4 (2026-11-19)
+
+Fixed:
+- A moving grid (`gpuwm downscale --follow`) cut from compressed parent histories runs again: its first cut failed with "numpy dtype dtype('O') has no classic NetCDF external type", and the run ended without its moving grid.
+- An HRRR start from an analysis whose soil moisture sits just above 1 at a few land-ice cells runs again (5 March 2022 22Z and 23Z: 1.02 at three cells in eastern Kansas stopped every start from those hours). The decoder sets a value up to 1.05 to 1 and says on the decode log how many cells and the largest value; it still refuses a value farther above 1, or a record with more than 1% of its cells above 1, naming the field and level.
+- A grid at 600 m or finer whose ground is all sea at 30 arc seconds builds its static fields again: such a grid (a storm-following 333 m grid off the coast) stopped with "nearest-donor mask must be 2-D with a valid cell", or, wholly at sea, "float() argument must be a string or a real number, not 'NoneType'", and the run ended without it. New land the 100 m land cover finds on such a grid (an islet) stays water, since no land is there to give it vegetation and deep-soil temperature, and the receipt counts it.
+- A moving grid (`gpuwm downscale --follow`) goes on after a move larger than itself, as when a moving 1 km grid jumps 60 km with a 32 km 333 m grid inside it: the grid starts again from its parent at the new place, with the parent's rain since it began, instead of stopping with "leaves no ground shared ... so it starts cold".
+- `gpuwm fetch-geog` and the other fetches no longer name themselves as the process they wait on when their own transfers hold every connection slot; the wait line says the slots are its own.
+
 ## 3.0.3 (2026-11-16)
 
 New:
