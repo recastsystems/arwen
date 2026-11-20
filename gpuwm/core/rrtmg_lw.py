@@ -3439,8 +3439,9 @@ def _gpu_source():
     import os as _os
     kdir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
                          "kernels")
-    parts = [open(_os.path.join(kdir, "rrtmg_lw.cu"),
-                  encoding="utf-8").read()]
+    from gpuwm.core.kernels import glibc_fastpath_compose
+    parts = [glibc_fastpath_compose("rrtmg_lw", "rrtmg_lw.cu", open(_os.path.join(kdir, "rrtmg_lw.cu"),
+                  encoding="utf-8").read())]
     for path in sorted(_glob.glob(_os.path.join(kdir, "rrtmg_lw_*.cu"))):
         part = open(path, encoding="utf-8").read()
         parts.append(part)
