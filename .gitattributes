@@ -251,3 +251,5 @@ gpuwm/data/mynn471/model.cu -whitespace
 gpuwm/data/mynn471/erff.cuh -whitespace
 # Byte-unmodified WRF 4.7.1 diagnostic oracle sources keep upstream indentation.
 tools/diag_wrf471_oracle/upstream/** -whitespace
+# The WRF v4.7.1 Kain-Fritsch adaptive-step oracle fixtures (jacobbieker/woof pull request 278).
+tests/data/oracles/kf_adaptive/** binary

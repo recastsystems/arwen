@@ -19,7 +19,7 @@ from gpuwm.fetch_routes import resolve_leads, route_for
 from gpuwm.source_adapters import get_source_adapter
 
 from cyclone_preset_fit import source_licence
-from cyclone_preset_fit import center as tc_point, holds_the_preset_root
+from cyclone_preset_fit import center as tc_point, cycle_for, holds_the_preset_root
 
 CYCLE = "2026090900"
 MOMENT = datetime(2026, 9, 9, 0)
@@ -57,6 +57,10 @@ def test_every_lead_publishing_source_begins_at_the_lead_it_is_given(source):
         lead = min(step * 2, adapter.max_forecast_hour - step)
         if lead <= 0:
             pytest.skip(f"{source} publishes no lead beyond one forcing interval")
+        # A route with dated eras (the GEFS v11 archives end in 2020) is asked
+        # about a cycle it publishes, at the walk cycle's hour.
+        cycle = cycle_for(source, CYCLE)
+        moment = datetime.strptime(cycle, "%Y%m%d%H")
         if not holds_the_preset_root(source):
             # The preset root fits nowhere in this source's window, so the door
             # refuses it by name and emits no file.  The door checks the lead
@@ -64,21 +68,21 @@ def test_every_lead_publishing_source_begins_at_the_lead_it_is_given(source):
             # fail this match with its own message; the route's ladder is then
             # asked directly that the window begins at the lead.
             with pytest.raises(ValueError, match="covering sources"):
-                tc.configuration_text(cycle=CYCLE, point=tc_point(source),
+                tc.configuration_text(cycle=cycle, point=tc_point(source),
                                       hours=step, forcing_source=source,
                                       start_hour=lead)
-            leads = resolve_leads(route_for(source), MOMENT, step,
+            leads = resolve_leads(route_for(source), moment, step,
                                   cadence=dw._fetch_cadence_h(source, lead),
                                   start_hour=lead)
             assert leads[0] == lead and leads[-1] == lead + step
             return
-        text, exp = tc.configuration_text(cycle=CYCLE, point=tc_point(source),
+        text, exp = tc.configuration_text(cycle=cycle, point=tc_point(source),
                                           hours=step, forcing_source=source,
                                           start_hour=lead)
         table = tomllib.loads(text)
-        assert exp.start_time == MOMENT + timedelta(hours=lead)
+        assert exp.start_time == moment + timedelta(hours=lead)
         assert table["fetch"]["forecast_start_hour"] == lead
-        assert table["fetch"]["cycle"] == "2026-09-09T00"
+        assert table["fetch"]["cycle"] == f"{moment:%Y-%m-%dT%H}"
         from gpuwm.fetch import validate_fetch_hints
         validate_fetch_hints(table["fetch"], source="fixture")
 

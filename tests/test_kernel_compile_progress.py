@@ -52,6 +52,35 @@ def test_a_compile_is_published_and_a_cache_load_is_not(tmp_path,
     assert second["compile_seconds"] >= first["compile_seconds"]
 
 
+def test_the_cache_is_scanned_again_only_after_its_directory_changed(
+        tmp_path, monkeypatch):
+    """A warm cache holds tens of thousands of entries and every module load
+    counts it twice: the count is kept until the directory's mtime moves."""
+    import os
+    import time
+    (tmp_path / "a").write_bytes(b"x")
+    old = time.time_ns() - 60_000_000_000
+    os.utime(tmp_path, ns=(old, old))
+    scans = []
+    real = os.scandir
+    monkeypatch.setattr(notice.os, "scandir",
+                        lambda path: scans.append(path) or real(path))
+    assert notice._cache_file_count(tmp_path) == 1
+    assert notice._cache_file_count(tmp_path) == 1
+    assert len(scans) == 1
+    (tmp_path / "b").write_bytes(b"x")
+    os.utime(tmp_path, ns=(old + 10_000_000_000,) * 2)   # whole seconds: any clock moves
+    assert notice._cache_file_count(tmp_path) == 2
+    assert len(scans) == 2
+    # a directory written in the last two seconds is counted every time
+    (tmp_path / "c").write_bytes(b"x")
+    os.utime(tmp_path)
+    assert notice._cache_file_count(tmp_path) == 3
+    assert notice._cache_file_count(tmp_path) == 3
+    assert len(scans) == 4
+    assert notice._cache_file_count(tmp_path / "missing") == 0
+
+
 def test_run_plan_relays_the_compile_as_a_declared_warning(tmp_path,
                                                           monkeypatch):
     from gpuwm import runplan
@@ -86,13 +115,14 @@ def test_the_loader_compiles_through_the_observer():
     tier and, since 01402fcb1, the integer-define tier of a no-FMA unit
     (the gsd_41 MYNN generation), and the SLUCM/BEP no-FTZ site (the WRF
     4.8 urban water balance, golden/wrf-fixes): each RawModule the loader
-    builds is observed beside its compile.
+    builds is observed beside its compile, the KEPS --maxrregcount=112 load
+    (530f9e4668) as well.
     """
 
     source = (Path(__file__).resolve().parents[1] / "gpuwm" / "core"
               / "kernels" / "__init__.py").read_text(encoding="utf-8")
     sites = source.count("cp.RawModule(")
-    assert sites == 5
+    assert sites == 6
     assert source.count("_compile_observed(mod, ") == sites
     assert "mod.compile()" not in source
 

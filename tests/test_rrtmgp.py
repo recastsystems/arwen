@@ -3792,7 +3792,7 @@ def test_preflight_prices_radius_columns_for_exactly_the_schemes_that_use_them()
 
     from gpuwm.config import RunConfig
     from gpuwm.core.preflight import rrtmgp_column_shapes
-    from gpuwm.core.rrtmgp import RRTMGPRadiation
+    from gpuwm.core.rrtmgp import RRTMGPRadiation, cloud_optics_scheme
 
     nz, ny, nx = 20, 1, 1
     plev_col = np.geomspace(100000.0, 1.1, nz + 1)
@@ -3833,12 +3833,18 @@ def test_preflight_prices_radius_columns_for_exactly_the_schemes_that_use_them()
     def flux(mp_physics, effi_um):
         # One state carrying every field any scheme's coupling asks for, so
         # the only thing that varies between the two calls is effi.
+        # P3 has one ice category and no snow (Registry.EM_COMMON:3043), so
+        # its frozen mass is the ice and snow together; cal_cldfra1's P3 arm
+        # counts qi alone, and 3e-4 alone in this dry layer is under its
+        # 0.01 truncation, which would leave the probe no ice to size.
+        one_ice = cloud_optics_scheme(mp_physics) == "p3"
+        frozen = qi + qs if one_ice else qi
         state = SimpleNamespace(
             # Registry.EM_COMMON:3017: WSM3 has combined qc/qr only.
             elapsed_seconds=0.0,
             qc=qc + qi if mp_physics == 3 else qc,
-            qi=cp.zeros_like(qi) if mp_physics == 3 else qi,
-            qs=cp.zeros_like(qs) if mp_physics == 3 else qs,
+            qi=cp.zeros_like(qi) if mp_physics == 3 else frozen,
+            qs=cp.zeros_like(qs) if mp_physics == 3 or one_ice else qs,
             qr=qs if mp_physics == 3 else cp.zeros(shape, cp.float32),
             nc=cp.full(shape, 1.0e8, cp.float32),
             nr=cp.full(shape, 1.0e3, cp.float32),
@@ -3848,13 +3854,18 @@ def test_preflight_prices_radius_columns_for_exactly_the_schemes_that_use_them()
             effr=cp.full(shape, 100.0, cp.float32),
             effi=cp.full(shape, np.float32(effi_um), cp.float32),
             effs=cp.full(shape, 20.0, cp.float32),
+            # CAM-MG hands RRTMGP its own LRADIUS/IRADIUS (9c74ab447d), so
+            # its ice radius carries the same 5-to-40 um step as effi.
+            lradius=cp.full(shape, 8.0, cp.float32),
+            iradius=cp.full(shape, np.float32(effi_um), cp.float32),
             physics=SimpleNamespace(microphysics_updates=1))
         radiation = RRTMGPRadiation(
             datetime(1974, 4, 3, 18), cp.asarray([[40.0]]),
             cp.asarray([[-100.0]]),
             trace_gas_overrides={"co2": 330.0e-6})
         result = radiation(
-            atmosphere=atmosphere, fields=fields, state=state,
+            atmosphere=dict(atmosphere, qi=frozen) if one_ice else atmosphere,
+            fields=fields, state=state,
             cfg=SimpleNamespace(mp_physics=mp_physics, dt=60.0, radt=12.0,
                                 radt_minutes=12.0))
         return np.concatenate([
@@ -3866,12 +3877,14 @@ def test_preflight_prices_radius_columns_for_exactly_the_schemes_that_use_them()
             nx=4, ny=3, nz=12, dx=2000.0, dy=2000.0, ztop=8000.0, dt=10.0,
             run_seconds=0.0, time_step_sound=4, moist=True,
             mp_physics=mp_physics, ra_physics=4, radt=12.0)
-        priced = {"columns/effc", "columns/effi",
-                  "columns/effs"} <= set(rrtmgp_column_shapes(cfg))
+        # The probe moves effi, so the column it must find priced is effi's.
+        # P3 and CAM-MG pack two radius columns (no snow radius), the
+        # three-radius schemes three.
+        priced = "columns/effi" in set(rrtmgp_column_shapes(cfg))
         consumes = not np.array_equal(flux(mp_physics, 5.0),
                                       flux(mp_physics, 40.0))
         assert priced == consumes, (
-            f"mp_physics={mp_physics}: preflight prices effc/effi/effs "
+            f"mp_physics={mp_physics}: preflight prices the effi "
             f"columns={priced}, but changing effi from 5 to 40 um moved "
             f"the radiation answer={consumes}")
 
@@ -4109,3 +4122,20 @@ def test_in_solver_planck_matches_the_kernel():
                 x, y = getattr(a, n), getattr(b, n)
                 assert bool(cp.all(x.view(cp.uint32) == y.view(cp.uint32))), (
                     ncol, nlay, top_at_1, n)
+
+
+
+def test_a_workspace_matches_a_model_top_fp32_cannot_represent():
+    """The adapter's FP32 state top and the workspace's float64 one are the
+    same top; a different top, level count or chunk is still drift.
+    Brought from jacobbieker/woof#106 (Apache-2.0)."""
+    from types import SimpleNamespace
+    from gpuwm.core.rrtmgp import workspace_matches
+
+    workspace = SimpleNamespace(nz=256, column_chunk=3125, p_top=1312.2)
+    state_top = float(np.float32(1312.2))
+    assert state_top != 1312.2
+    assert workspace_matches(workspace, nz=256, column_chunk=3125, p_top=state_top)
+    assert not workspace_matches(workspace, nz=256, column_chunk=3125, p_top=1000.0)
+    assert not workspace_matches(workspace, nz=255, column_chunk=3125, p_top=state_top)
+    assert not workspace_matches(workspace, nz=256, column_chunk=1, p_top=state_top)

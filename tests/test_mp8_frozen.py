@@ -465,8 +465,17 @@ FROZEN_MODULE_DIGESTS = {
         # 2.9.11 assembled-legacy replay (base 2.9.10 b8165c59fe vs f5e393fb8c, RTX 5070 Ti) reproduces all
         # 132 published acoustic arrays / 305,632 words and the coordinate and driver families with 0
         # differing words on the default route; strict words are the row's own CONUS receipts.
-        '223f21d4f97e5ae74bb3ade52d3a45d0c3538bdd711753fd428eaf7318b6cda0',
-        '116d49b68cb6a5215f2303d13d9b9320fc38c72a01d21f5f2a68e8ad788b9e08'),
+        # Re-frozen for the fork speed levers (fix/305-fork-speed: f229de8207a, 01c2fd1d6a7,
+        # 6e90ef3dc87; jacobbieker/woof PRs 519 helpers and 522): diagnose_p_level and
+        # frame_phi_level factor the same statements out, and advance_frame_phi_w_ring runs the
+        # specified/nested frame update over the ring only.  Reading on an RTX 5090 (NVRTC
+        # 12.9): tools/assembled_legacy_replay.py --family acoustic passes on the tip (132 published
+        # arrays, 305,632 words, 0 different, strict); tests/test_acoustic_frame_ring.py and
+        # tests/test_acoustic.py pass; a 1 h HRRR-suite 3 km forecast (HRRR 21 May 2024 18Z,
+        # 200x160x49) writes 0 of 203,576,523 history words different from 3.0.4 in fast numerics.
+        # Previously f77019d6/116d49b6.
+        'f77019d65f9d8e37b4e57a234e9d0dba5618586891a38b3bc24e31fa31a3d39b',
+        'ff7d292e278740afe3e0616f7e9bfe98610613ebc208bb1d2c36f0d6b9474ab5'),
     'advection': (
         # Re-pinned for A146 (a98f2482e): every float division by a compile-time
         # constant is spelled __fdiv_rn, because NVRTC compiles x / C as a
@@ -1690,6 +1699,9 @@ FROZEN_MODULE_DIGESTS = {
         # passes 162 of 162, and a 360 s legacy-RRTMG forecast with a 50 hPa
         # top (133x125x50, 18 UTC) writes byte-identical wrfout files with
         # either kernel.  Previously 44a83f0e/c9e02eea.
+        # Back to 3.0.4's digests: 67b362c57e (jacobbieker/woof PR 660) is reverted for 3.0.5, so
+        # rrtmg_sw.cu is 3.0.4's file byte for byte and gpuwm-hex releases that admit 3.0.4's radiation
+        # helpers admit 3.0.5 too.
         '43134d6d6d2be4b3e668c7ab92d5850f1f992a09812dd09c9536fce5d9ab791e',
         '663d12d7556f379bdd0724bb4f018113450ce45666e13f3ec3220615409acd08'),
     'rrtmgp_cloud': (

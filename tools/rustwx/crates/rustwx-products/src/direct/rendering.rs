@@ -50,6 +50,9 @@ pub(crate) fn direct_recipe_render_controls(
         (Some(crate::qpf::qpf_legend_mode()), None)
     } else if matches!(recipe.style, RenderStyle::WeatherVisibility) {
         (Some(LegendMode::Thresholds), Some(200.0))
+    } else if matches!(recipe.style, RenderStyle::WeatherHail) {
+        // Every hail step labelled: the inch steps (25.4, 38.1, 50.8, 76.2 ...) must be read off the bar.
+        (Some(LegendMode::Thresholds), None)
     } else if matches!(recipe.style, RenderStyle::AirQualityPm25 | RenderStyle::AirQualityOzone | RenderStyle::WeatherSnowfall | RenderStyle::WeatherSnowDepthChange) || filled_selector.field == CanonicalField::SnowfallLiquidEquivalent {
         (Some(LegendMode::Thresholds), None)
     } else if matches!(recipe.style, RenderStyle::WeatherHaines) {
@@ -584,6 +587,9 @@ fn derived_companion_wind_speed_fill(
 /// a filled field BEFORE its color scale — the single conversion table
 /// behind [`convert_filled_field`], factored out so the store viewer
 /// resolver converts raw stored values with the SAME arithmetic.
+/// The hail maps' colour-bar unit: mm, with the inch the scale's steps are built on.
+pub(crate) const HAIL_SIZE_UNITS: &str = "mm (25.4 mm = 1 in)";
+
 pub(crate) fn direct_fill_unit_conversion(
     recipe: &PlotRecipe,
     selector: FieldSelector,
@@ -644,6 +650,11 @@ pub(crate) fn direct_fill_unit_conversion(
         }
     } else if matches!(selector.field, CanonicalField::ModelSnowfall | CanonicalField::Snowfall10to1 | CanonicalField::SnowfallKuchera | CanonicalField::SnowfallLiquidEquivalent | CanonicalField::SnowDepth | CanonicalField::SnowDepthChange) {
         (UnitConvert::MmToInches, Some("in"))
+    } else if matches!(recipe.style, RenderStyle::WeatherHail) {
+        // Hail size in mm on the scale's inch steps (25.4, 38.1, 50.8, 76.2, 101.6 mm = 1, 1.5, 2, 3, 4 in), every
+        // step labelled (direct_recipe_render_controls); the bar says how the two read.  THE BREAKAGE THIS
+        // PREVENTS: the bar said only "mm", while hail reports and warnings read inches.
+        (UnitConvert::None, Some(HAIL_SIZE_UNITS))
     } else {
         (UnitConvert::None, None)
     }

@@ -112,20 +112,30 @@ FAST_MATH = r'''
 '''
 
 
+def _nvrtc_image(text,device,exact):
+    """The same source and arithmetic controls through NVRTC (hiprtc on AMD).
+
+    Breakage it prevents: a pip install carries NVRTC but no nvcc, so a 4.8.0 run without
+    a shipped image for its level count and architecture stopped at its first MYNN call.
+    """
+    import cupy as cp
+    from gpuwm.nvrtc_ptx_cache import compile_using_nvrtc
+    options=('-std=c++17','--ftz=false','--fmad='+('false' if exact else 'true'),
+             '--prec-div=true','--prec-sqrt=true')+(('-DGPUWM_WRF_EXACT=1',) if exact else ())
+    with cp.cuda.Device(device):
+        raw,_=compile_using_nvrtc(text,options,None,'mynn480.cu')
+        module=cp.cuda.function.Module()
+        module.load(raw if isinstance(raw,bytes) else raw.encode())
+    return module,module.get_function('mynn471_step')
+
+
 @lru_cache(maxsize=32)
 def image(nz,device,exact):
     import cupy as cp
     text=source(nz)
     from gpuwm.hip_backend import active
     if active():
-        from gpuwm.nvrtc_ptx_cache import compile_using_nvrtc
-        options=('-std=c++17','--ftz=false','--fmad='+('false' if exact else 'true'),
-                 '--prec-div=true','--prec-sqrt=true')+(('-DGPUWM_WRF_EXACT=1',) if exact else ())
-        with cp.cuda.Device(device):
-            raw,_=compile_using_nvrtc(text,options,None,'mynn480.cu')
-            module=cp.cuda.function.Module()
-            module.load(raw if isinstance(raw,bytes) else raw.encode())
-        return module,module.get_function('mynn471_step')
+        return _nvrtc_image(text,device,exact)
     arch='sm_'+''.join(map(str,cp.cuda.Device(device).compute_capability))
     mode='strict' if exact else 'fast'
     digest=hashlib.sha256(text.encode()).hexdigest()
@@ -139,8 +149,8 @@ def image(nz,device,exact):
     if not binary.exists():
         nvcc=shutil.which('nvcc') or '/usr/local/cuda/bin/nvcc'
         if not Path(nvcc).exists():
-            raise RuntimeError(f'MYNN 4.8.0 needs its source-bound {arch} nz={nz} {mode} image; '
-                               'run tools/mynn_wrf480_port/prewarm.py with CUDA nvcc installed')
+            # No shipped image and no nvcc (a pip install): compile through NVRTC.
+            return _nvrtc_image(text,device,exact)
         cache.mkdir(parents=True,exist_ok=True)
         unit=cache/(filename+'.cu')
         unit.write_text(text)

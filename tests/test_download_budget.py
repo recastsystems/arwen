@@ -197,16 +197,35 @@ def test_the_projection_counts_what_the_ef4_run_wrote_before_its_first_step():
     assert p["download_bytes"] >= 0.95 * EF4_DOWNLOAD
     assert p["preparation_bytes"] >= EF4_PREPARATION
     assert p["total_bytes"] >= _ef4_floor()
-    # The figure the page used to compare with free disk left both out.
-    assert p["total_bytes"] - p["download_bytes"] - p["preparation_bytes"] < 16.5e9
+    # The figure the page used to compare with free disk left both out:
+    # what remains is exactly history, checkpoints, pictures and compose
+    # scratch.  (A fixed 16.5e9 bound stood here; the picture term follows
+    # the renderer's own product catalog, and 3.0.4's renderer draws more
+    # products than the October build the bound was set against: 2.83 GB of
+    # pictures for this run against 1.16 GB.)
+    assert p["total_bytes"] - p["download_bytes"] - p["preparation_bytes"] == (
+        p["history_bytes"] + p["checkpoint_bytes"] + p["picture_bytes"]
+        + p["compose_scratch_bytes"])
 
 
 def test_every_route_and_transport_a_fetch_defaults_to_is_priced():
     """A source whose download is left out of every projection is the defect; adding one is a table row."""
     for source in fetch_routes.route_ids():
         route = fetch_routes.route_for(source)
-        request = {"source": source, "cycle": None, "hours": route.default_cadence,
-                   "cadence": route.default_cadence}
+        # The window a fetch of this route can take: from its first
+        # published lead (the GEFS reforecast has no f000), and one time
+        # for an analysis-only surface donor.
+        from route_fixture_windows import route_hours
+        hours = route_hours(source)
+        request = {"source": source, "cycle": None, "hours": hours,
+                   "cadence": hours or route.default_cadence,
+                   "forecast_start_hour": route.first_lead}
+        # A selector with no default (HAFS's storm id) is one the fetch
+        # refuses to guess; the request names one, as a real fetch must.
+        from source_parameter_examples import source_parameters_value
+        parameters = source_parameters_value(source)
+        if parameters is not None:
+            request["source_parameters"] = parameters
         estimate = download_budget.download_estimate(request)
         assert estimate["bytes"] is not None, (source, estimate["basis"])
     for source, legacy in download_budget.table()["legacy_sources"].items():
@@ -489,3 +508,27 @@ def test_an_era5_arco_window_moves_the_blocks_of_its_rows_not_whole_chunks():
     assert whole["transfer_bytes"] == 2 * 551_000_000
     assert 174.1e6 <= regional["transfer_bytes"] <= 0.25 * whole["transfer_bytes"]
     assert "latitude rows" in regional["basis"]
+
+
+def test_a_hafs_request_naming_its_storm_is_priced():
+    """HAFS's object names carry the storm id: the estimate resolves the
+    request's own --source-parameters as the fetch does, and prices the
+    parent and storm-following grids by their own measured objects.
+    THE BREAKAGE: every HAFS estimate was 'the fetch refuses this request:
+    --source-parameters requires STORM=VALUE', and gfs-pressure, hafs-a and
+    hafs-b had no priced row.  Brought from jacobbieker/woof#190 (Apache-2.0)."""
+    request = {"source": "hafs-a", "cycle": None, "hours": 6, "cadence": 3,
+               "forecast_start_hour": 0, "source_parameters": "STORM=12l"}
+    parent = download_budget.download_estimate(request)
+    assert parent["bytes"] is not None, parent["basis"]
+    storm = download_budget.download_estimate(
+        dict(request, source_parameters="STORM=12l,DOMAIN=storm"))
+    assert storm["bytes"] is not None, storm["basis"]
+    assert parent["objects"] == storm["objects"]
+    saved = parent["bytes"] - storm["bytes"]
+    assert saved > 0 and saved % 675_000_000 == 0, saved
+    for source in ("hafs-b", "gfs-pressure"):
+        estimate = download_budget.download_estimate(
+            dict(request, source=source,
+                 source_parameters="STORM=12l" if source == "hafs-b" else None))
+        assert estimate["bytes"] is not None, (source, estimate["basis"])

@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from source_parameter_examples import source_parameter_args
+from route_fixture_windows import analysis_only, route_cycle, route_hours, route_start
 
 from gpuwm import fetch, fetch_routes
 from gpuwm.era5_member import validate_selection
@@ -23,17 +25,21 @@ def args(*words):
     return parser.parse_args(["fetch", *words])
 
 
-@pytest.mark.parametrize("source", fetch_routes.route_ids())
+@pytest.mark.parametrize("source", [source for source in fetch_routes.route_ids()
+                                    if not analysis_only(source)])
 def test_every_route_rejects_a_partial_final_cadence(source):
+    """Every route with a series (an analysis-only donor has no cadence)."""
     route = fetch_routes.route_for(source)
-    cycle = datetime(2026, 8, 17, route.cycle_hours[0])
+    cycle = route_cycle(source)
+    start = route_start(source)
     # A173: the route lists no spacings; take the first coarser than an
     # hour that its ladder publishes and its preparation takes.
     cadence = next((step for step in fetch_routes.window_spacings(
-        route, 0, 12, cycle=cycle) if step > 1), None)
+        route, start, 12, cycle=cycle) if step > 1), None)
     assert cadence is not None
     with pytest.raises(ValueError, match="multiple"):
-        fetch_routes.resolve_leads(route, cycle, cadence + 1, cadence=cadence)
+        fetch_routes.resolve_leads(route, cycle, cadence + 1, cadence=cadence,
+                                   start_hour=start)
 
 
 @pytest.mark.parametrize("field,value", [
@@ -179,7 +185,8 @@ def test_bad_fetch_hints_are_refused_before_any_io(table):
 @pytest.mark.parametrize("source", fetch_routes.route_ids())
 def test_table_cli_resolves_latest_and_keeps_the_resolved_request(source, tmp_path, monkeypatch):
     route = fetch_routes.route_for(source)
-    selected = datetime(2026, 8, 17, route.cycle_hours[0])
+    selected = route_cycle(source)
+    hours, start = route_hours(source), route_start(source)
     calls = []
     def latest(name, last_hour, **kwargs):
         calls.append(("latest", name, last_hour, kwargs))
@@ -193,10 +200,11 @@ def test_table_cli_resolves_latest_and_keeps_the_resolved_request(source, tmp_pa
     monkeypatch.setattr(fetch_routes, "handoff_lines", lambda *a: ())
     # The whole-cycle rule (A136 L2: as-posted is the default, so this
     # names --whole-cycle and keeps every assertion).
-    parsed = args("--whole-cycle", "--source", source, "--cycle", "latest", "--hours", str(route.default_cadence),
-                  "--out", str(tmp_path / source))
+    parsed = args("--whole-cycle", "--source", source, "--cycle", "latest", "--hours", str(hours),
+                  "--out", str(tmp_path / source), *source_parameter_args(source),
+                  *(("--forecast-start-hour", str(start)) if start else ()))
     assert fetch.fetch_main(parsed) == 0
-    assert calls[0][:3] == ("latest", source, route.default_cadence)
+    assert calls[0][:3] == ("latest", source, start + hours)
     # Resolving latest already asked about the primary; only a declared
     # donor is asked again, and before the download.
     donors = [("published", row.source, selected, max(row.leads)) for row in route.donors]
@@ -349,8 +357,13 @@ def test_each_acquisition_ladder_accepts_one_analysis(source):
         assert fetch._era5_times(cycle, 0, 6) == (cycle,)
         return
     else:
+        # A route's one time is its first published lead: f003 for the
+        # GEFS reforecast, which publishes no f000.
         route = fetch_routes.route_for(source)
-        values = fetch_routes.resolve_leads(route, cycle, 0)
+        values = fetch_routes.resolve_leads(route, route_cycle(source), 0,
+                                            start_hour=route_start(source))
+        assert values == (route_start(source),)
+        return
     assert values == (0,)
 
 

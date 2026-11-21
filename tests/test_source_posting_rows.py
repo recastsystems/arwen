@@ -150,6 +150,12 @@ def test_the_load_time_probeable_rule_is_the_fetch_s():
 
     for source in fetch_routes.posting_sources():
         row = fetch_routes.posting_for(source)
+        if row.shape == "archive":
+            # A fixed historical archive (the GEFS v11 archives, the reforecast
+            # and its donors) is a route row: its objects can be asked for, but
+            # no run waits on it posting, so it is probeable and not waited.
+            assert not row.waited and fetch.cycle_is_probeable(source), source
+            continue
         assert row.waited == fetch.cycle_is_probeable(source), source
 
 
@@ -340,8 +346,10 @@ def test_expected_at_is_the_rule_s_arithmetic(source, cycle, rule):
         assert source_posting.expected_at(source, cycle, lead) == (
             cycle + timedelta(hours=cycle_grid_for(source, posting=True).delay(cycle, lead)))
         budget = fetch_routes.posting_for(source).late_after_minutes
+        # An archive row (the GEFS v11 archives, the reforecast and its
+        # donors) declares no budget: no run waits on it, so it is never late.
         assert source_posting.late_at(source, cycle, lead) == (
-            expected + timedelta(minutes=budget))
+            None if budget is None else expected + timedelta(minutes=budget))
         assert source_posting.publication_rule(source, cycle, lead) is rule
 
 

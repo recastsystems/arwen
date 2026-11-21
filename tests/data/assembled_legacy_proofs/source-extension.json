@@ -1,7 +1,7 @@
 {
   "schema": "measured-legacy-source-extension-v1",
   "baseline": "cd336e62d6e6b6312c9636e0fdfff84801909b6a",
-  "measured_tip": "5f81efef03ffe754ea0878035df4515e45031c63",
+  "measured_tip": "bf2a9fd6b686618f928863ad5e67fd513ed120d2",
   "sources": {
     "gpuwm/core/acoustic.py": {
       "before": {
@@ -9,8 +9,8 @@
         "sha256": "2552a40bdf24715e611f5500786a4636a7fb77daac45a6e2bc4b04d6f6ca3384"
       },
       "after": {
-        "bytes": 46006,
-        "sha256": "4e66f42ec5849dafc441f7941c4ddbe4cc0495a5f238fd57c108915fb4ac0d57"
+        "bytes": 47560,
+        "sha256": "41430ecb61196f0ba8b055babc345ce4d8fbc8d53cb754008a4a2eece4f162f8"
       }
     },
     "gpuwm/core/constants.py": {
@@ -39,8 +39,8 @@
         "sha256": "e44a76e72880e6cbacee4a3cf299ab7e1a0b418e737355b3b64bfd60358b67cc"
       },
       "after": {
-        "bytes": 95510,
-        "sha256": "91b780a317d9f9e8b95922cde7dc90d902a0539b09e4eb25e323d20d3de5062c"
+        "bytes": 95542,
+        "sha256": "d4b811d6d2e06171b4f5500e30b57470a5ed4fd969fcafd328d5e6396c786cdc"
       }
     },
     "gpuwm/wrf_exact.py": {
@@ -79,8 +79,8 @@
         "sha256": "89af01f989f6a61a697fba00f1effcfe393d74016a52a5cd100a184701adbc25"
       },
       "after": {
-        "bytes": 107771,
-        "sha256": "223f21d4f97e5ae74bb3ade52d3a45d0c3538bdd711753fd428eaf7318b6cda0"
+        "bytes": 112414,
+        "sha256": "f77019d65f9d8e37b4e57a234e9d0dba5618586891a38b3bc24e31fa31a3d39b"
       }
     },
     "gpuwm/core/kernels/smag2d.cu": {
@@ -152,12 +152,12 @@
   },
   "loader_slimming_replay": {
     "receipt": "slimming-loader-source-replay.json",
-    "sha256": "76f49fc6bc4ea2c601cbcfb7a1d9e8bb2d7d5b42e7a2af43cb7c294b5eb13952"
+    "sha256": "c26bf4a98c14dea3aa7edc99ed79f25684dba31f63688fb2ae3707abfb21099d"
   },
   "module_sources": {
     "acoustic": {
       "before": "22704608360351a64d84bbf90ed1574e8e62edb5b06f5deea85376d93fca5cf8",
-      "after": "116d49b68cb6a5215f2303d13d9b9320fc38c72a01d21f5f2a68e8ad788b9e08",
+      "after": "ff7d292e278740afe3e0616f7e9bfe98610613ebc208bb1d2c36f0d6b9474ab5",
       "source": "gpuwm/core/kernels/acoustic.cu"
     },
     "smag2d": {

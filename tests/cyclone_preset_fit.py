@@ -53,12 +53,25 @@ def cycle_for(source, default=WALK_CYCLE):
     """
     from datetime import datetime
 
-    from gpuwm import cf_archive_fetch
+    from gpuwm import cf_archive_fetch, fetch_routes
 
     try:
         metadata = cf_archive_fetch.row(source)
     except KeyError:
-        return default
+        # A table route with dated publication eras (the GEFS v11 archives end
+        # in 2020) refuses the walk cycle by name; ask it about a cycle it
+        # publishes, at the walk cycle's hour.
+        route = fetch_routes.table_route(source)
+        if route is None or not route.publication_eras:
+            return default
+        wanted = datetime.strptime(default, "%Y%m%d%H")
+        try:
+            fetch_routes.publication_era(route, wanted)
+            return default
+        except ValueError:
+            pass
+        from route_fixture_windows import route_cycle
+        return route_cycle(source, wanted.hour).strftime("%Y%m%d%H")
     first = datetime.fromisoformat(metadata["coverage_start"])
     last = datetime.fromisoformat(metadata["coverage_end"])
     wanted = datetime.strptime(default, "%Y%m%d%H")

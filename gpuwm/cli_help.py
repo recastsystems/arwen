@@ -5,7 +5,7 @@ import argparse
 import sys
 
 
-_START = """ArWen — GPU weather forecasts
+_START = """ArWen: GPU weather forecasts
 usage: gpuwm COMMAND [OPTIONS]
 
 Create and launch

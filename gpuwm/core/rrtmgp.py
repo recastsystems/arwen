@@ -95,6 +95,20 @@ DATA_DIR = data_assets.rrtmgp_data_dir()
 DTYPE = np.float32
 
 
+def workspace_matches(workspace, *, nz: int, column_chunk, p_top) -> bool:
+    """Whether a shared chunk workspace was sized for this call.
+
+    The adapter's top is the state's FP32 scalar (``DomainState.p_top``)
+    while the workspace holds the experiment's float64 one, so the tops
+    are compared in the state's own precision: a top FP32 cannot represent
+    (1312.2 Pa is 1312.199951171875 there) is the same top, not drift on
+    every radiation call (jacobbieker/woof#106).
+    """
+    return (int(workspace.nz) == int(nz)
+            and int(workspace.column_chunk) == column_chunk
+            and DTYPE(workspace.p_top) == DTYPE(p_top))
+
+
 #: Every NetCDF member this module opens, declared once.
 #:
 #: The registry publishes an asset requirement for this set
@@ -290,6 +304,18 @@ def effective_radius_bands(scheme: str) -> dict[str, tuple[float, float]]:
 
     if scheme == "milbrandt2":
         return dict(MILBRANDT2_EFFECTIVE_RADIUS_BANDS_UM)
+    if scheme == "cam-mg":
+        # CAM-MG's LRADIUS/IRADIUS are read only where the cell holds that
+        # condensate (else 10 / 25 um) and are then clamped to 2.5-60 /
+        # 5-140 um, as WRF's option-4 wrappers do (hydrometeor_paths,
+        # module_ra_rrtmg_lw.F:12607-12625), so a clear cell's radius is
+        # never radiated: before CAM-MG's first call it is the zero the
+        # state starts with, and that zero refused every CAM-MG run at its
+        # first radiation call ("effc ... effi is outside the
+        # physical-plausibility band", 3.0.5 front-door run).  The contract
+        # here is the one hydrometeor_paths applies: finite and non-negative.
+        return {"effc": (0.0, float("inf")), "effi": (0.0, float("inf")),
+                "effs": EFFECTIVE_RADIUS_PLAUSIBLE_UM["effs"]}
     if scheme == "morrison_aero":
         # mp40's native ice PSD is bounded by LAMMINI=1250 m-1,
         # not the generic 600 um ice band. Reproduce its staged FP32
@@ -3456,6 +3482,16 @@ def _validation_flags_device(*, play, plev, tlay, tlev, tsfc, exner, qv,
                      float(np.max(tables_sw.temp_ref)))
     if radii_bands is None:
         radii_bands = EFFECTIVE_RADIUS_PLAUSIBLE_UM
+    if have_effective:
+        # A scheme that supplies only some radii leaves the others on the
+        # dummy (qc, a mixing ratio).  CAM-MG gives LRADIUS and IRADIUS and
+        # no snow radius, so its effs slot read qc against the micron band
+        # and every CAM-MG radiation call was refused.  Only supplied radii
+        # are judged against a band; the dummy's sign is qc's own check.
+        radii_bands = {
+            name: (radii_bands[name] if name in effective
+                   else (-np.inf, np.inf))
+            for name in ("effc", "effi", "effs")}
     get_kernel("rrtmgp_validation", "rrtmgp_validate_call")(
         ((n + threads - 1) // threads,), (threads,), (
             play, plev, tlay, tlev, tsfc, exner, qv, qc, qr, qi, qs,
@@ -4159,6 +4195,11 @@ class RRTMGPRadiation:
         qr_cols = _radiation_reads_nonnegative(self._columns(qr3))
         qi_cols = _radiation_reads_nonnegative(self._columns(qi3))
         qs_cols = _radiation_reads_nonnegative(self._columns(qs3))
+        from gpuwm.core.cloud_fraction import _RadiationMoistureView
+        if isinstance(state, _RadiationMoistureView):
+            # The driver already added a KF-family cu_rad_feedback cloud
+            # (cloud_fraction.prepare_radiation_clouds).
+            qc_cols, qi_cols = _cumulus_merged_reads_nonnegative(qc_cols, qi_cols)
         for name in list(numbers):
             clamped = _radiation_reads_nonnegative(numbers[name])
             numbers[name] = clamped
@@ -4230,9 +4271,12 @@ class RRTMGPRadiation:
             temperature=tlay if active_bl else None,
         )
         from gpuwm.core.column_cumulus import merge_column_cumulus_clouds
+        unmerged_qc, unmerged_qi = qc_cols, qi_cols
         qc_cols, qi_cols, cldfra = merge_column_cumulus_clouds(
             qc_cols, qi_cols, cldfra, fields=fields, cfg=cfg,
             columns=self._columns)
+        if qc_cols is not unmerged_qc or qi_cols is not unmerged_qi:
+            qc_cols, qi_cols = _cumulus_merged_reads_nonnegative(qc_cols, qi_cols)
 
         if scheme == "cam-mg" and wrf_itimestep(state.elapsed_seconds, cfg.dt) != 1:
             cldfra = self._columns(state.cldfra_mp_all)
@@ -4246,6 +4290,8 @@ class RRTMGPRadiation:
             qc_cols,qi_cols,qs_cols,cldfra,blended=merge_cumulus_feedback(
                 qc_cols,qi_cols,qs_cols,cldfra,packed,aerosol=cfg.aercu_opt>0,
                 radii=background if cfg.aercu_opt>0 else None)
+            qc_cols, qi_cols, qs_cols = _cumulus_merged_reads_nonnegative(
+                qc_cols, qi_cols, qs_cols)
             if cfg.aercu_opt>0:
                 kwargs.update(blended)
                 effective_fields.update(blended)
@@ -4344,15 +4390,13 @@ class RRTMGPRadiation:
                 microphysics=scheme, cldfra=cldfra, validate=False, **kwargs)
 
         workspace = getattr(self, "chunk_workspace", None)
-        if workspace is not None:
-            if (int(workspace.nz) != nz
-                    or int(workspace.column_chunk) != self.column_chunk
-                    or float(workspace.p_top) != p_top):
-                raise ValueError(
-                    "RRTMGP adapter/workspace shape drift: "
-                    f"adapter nz/chunk/p_top={(nz, self.column_chunk, p_top)}, "
-                    "workspace "
-                    f"{(workspace.nz, workspace.column_chunk, workspace.p_top)}")
+        if workspace is not None and not workspace_matches(
+                workspace, nz=nz, column_chunk=self.column_chunk, p_top=p_top):
+            raise ValueError(
+                "RRTMGP adapter/workspace shape drift: "
+                f"adapter nz/chunk/p_top={(nz, self.column_chunk, p_top)}, "
+                "workspace "
+                f"{(workspace.nz, workspace.column_chunk, workspace.p_top)}")
 
         flux_shape = (ncol, nz + 1)
         lw_up = (cp.empty(flux_shape, dtype=DTYPE) if self.longwave
@@ -4886,6 +4930,34 @@ def _radiation_reads_nonnegative(columns):
 
     xp = cp.get_array_module(columns)
     return xp.maximum(columns, xp.asarray(0, dtype=columns.dtype))
+
+
+def _cumulus_merged_reads_nonnegative(*columns):
+    """Both modes: max(0, q) on condensate the cumulus scheme was added to.
+
+    WRF adds the cumulus cloud in the radiation driver
+    (module_radiation_driver.F:1264-1282 and 1344-1345, ``qi = qi +
+    qi_cu*cldfra_cu``) and RRTMG then reads ``QI1D(K)=max(0.,QI1D(K))``
+    (module_ra_rrtmg_lw.F:12091, module_ra_rrtmg_sw.F:10692; QC and QS the
+    same way).  The cumulus cloud can be negative in WRF itself: at the first
+    freezing level of an updraft DTFRZNEW sublimates
+    ``qs(liquid formula) - qu(table)`` of ice whether or not there is any
+    (module_cu_mskf.F:7091-7093, the same in module_cu_kfeta.F), and a shallow
+    plume that makes no new condensate there keeps it (WRF 4.7.1 on a real
+    12 km column: qi_KF = -5.48e-6).  Clamping here is WRF's order, so the
+    RRTMGP input check keeps refusing negative grid-scale ice and no longer
+    refuses WRF's own convective residual.  ``None`` passes through.
+    """
+    import cupy as cp
+
+    out = []
+    for array in columns:
+        if array is None:
+            out.append(array)
+            continue
+        xp = cp.get_array_module(array)
+        out.append(xp.maximum(array, xp.asarray(0, dtype=array.dtype)))
+    return tuple(out)
 
 
 def _require_finite_nonnegative(**fields):

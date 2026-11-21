@@ -1620,3 +1620,64 @@ written from papers, not bitwise to WRF. It contains no uncleared CESM table.
 The species mapping, source collection, units, limitations and output digest
 are recorded in gpuwm/data/cumulus_aerosol/public-source.json and
 docs/public-cumulus-aerosol.md.
+
+Portions from jacobbieker/woof
+------------------------------
+Some fixes, speed changes, tests and oracle data in this tree are ported from
+the public fork https://github.com/jacobbieker/woof, written by GitHub user
+jacobbieker and licensed under the Apache License, Version 2.0, the licence of
+this distribution, and adapted here. Each commit that brings one names its
+pull request, and CHANGELOG.md says which change came from which. By pull
+request:
+- 72: gpuwm/go_cli.py proof_digests reads a mapped single-domain proof.
+- 85: tilestream/driver.py, every owned stream waits on the caller's stream.
+- 106: gpuwm/core/rrtmgp.py and gpuwm/ingest/nest_init.py, a model top that
+  float32 cannot represent.
+- 109: gpuwm/core/relocation_runner.py, the containment slide.
+- 115 (its recovery part): gpuwm/core/health.py, gpuwm/core/model.py,
+  gpuwm/core/streaming.py and gpuwm/stability_recovery.py.
+- 123: tests/data/oracles/windfarm_placement_wrf471, the placement words of
+  the fork's WRF v4.7.1 wind-farm layout oracle, made by compiling WRF's own
+  placement code; WRF itself is public domain.
+- 150: gpuwm/simulated_radar.py (radar snapshots under the resolved run
+  directory) and gpuwm/core/thompson_entry.py (the ice-table row for a NaN or
+  out-of-range temperature).
+- 190 (its pricing part): gpuwm/download_budget.py and
+  gpuwm/data/download-bytes.v1.json.
+- 219: gpuwm/core/kernels/f64cr.cuh, rounded error-free transformations.
+- 226: gpuwm/core/rrtmg_legacy.py, device guards read once per call.
+- 239: gpuwm/kernel_plan.py, the compile pool capped by available memory.
+- 269: gpuwm/core/mynn471_gpu.py arena_layout, the MYNN 4.7.1 private-array
+  layout for the run's level count.
+- 278: the cumulus rain and NCA clock on every adaptive step
+  (gpuwm/core/physics.py, tools/rustwx/crates/rw-cu99-launch), BMJ refused
+  with an adaptive step and cudt > 0 (gpuwm/config.py,
+  gpuwm/namelist_import.py), and the WRF v4.7.1 Kain-Fritsch adaptive-step
+  oracle (tools/kf_adaptive_wrf471_oracle, tests/data/oracles/kf_adaptive).
+  The WRF sources that oracle builds are public domain; the WRF notice above
+  applies to them.
+- 299: gpuwm/kernel_compile_notice.py, the kernel cache counted again only
+  after its directory changed.
+- 344: gpuwm/domain_wizard.py and tests/source_parameter_examples.py, the
+  HAFS storm id.
+- 369: gpuwm/core/kernels/nwp_hail.cu, the zero-shape power skip.
+- 372 and 403 (their core half): gpuwm/core/level_output.py.
+- 375: gpuwm/core/kernels/mskf.cu, the rain flux floored at 0 (the same floor
+  in gpuwm/core/kernels/kfcup.cu is ours).
+- 377: gpuwm/core/kernels/__init__.py, Lin's LIN_KMAX define before its
+  header, and tests/test_lin_deep_column_tier.py.
+- 381: gpuwm/io/restart.py, the column seam's cumulus rebuild allowance.
+- 450: gpuwm/ingest/wrfinput.py oml_cold_start_fields, OMLINIT's slab-ocean
+  state kept at a cold start.
+- 479: gpuwm/core/storm_track_writer.py, the warning when the TC bridge is
+  missing.
+- 519 (its per-level helpers) and 522: gpuwm/core/kernels/acoustic.cu,
+  gpuwm/core/acoustic.py and gpuwm/core/kernel_shape.py (diagnose_p_level,
+  frame_phi_level and the ring frame update).
+- 529: gpuwm/core/mskf.py, 256 columns per SM.
+- 604: gpuwm/core/physics.py initialize_physics, sst_skin keeps the bound
+  lake water temperature.
+- 634 (its code lines): gpuwm/go_cli.py, --native-shared-gpu refused on a
+  configuration launch.
+tests/_numerics_child.py and the tests that came with these changes are from
+the same pull requests.

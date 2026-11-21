@@ -1,4 +1,4 @@
-# Integrating ArWen 2.7
+# Integrating ArWen
 
 ## Choose the boundary
 

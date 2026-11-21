@@ -132,6 +132,17 @@ pub static FIELD_MAP: &[FieldMapping] = &[
     f("RAINNC", Some("rainnc"), Rank::Surface, "mm", "ACCUMULATED TOTAL GRID SCALE PRECIPITATION", FieldSource::History, ""),
     f("SNOWNC", Some("snownc"), Rank::Surface, "mm", "ACCUMULATED TOTAL GRID SCALE SNOW AND ICE", FieldSource::History, ""),
     f("GRAUPELNC", Some("graupelnc"), Rank::Surface, "mm", "ACCUMULATED TOTAL GRID SCALE GRAUPEL", FieldSource::History, ""),
+    // --- hail ------------------------------------------------------------------
+    // gpuwm-hex 0.6.x hexcore.hailcast writes ArWen's HAILCAST under HRRR's name and unit in the diagnostics stream
+    // (hourly maximum, mm); hail_max_hailcast reads it.  Every field set: it is a surface product row.
+    f("HAILCAST_DIAM_MAX", Some("HAILCAST_DIAM_MAX"), Rank::Surface, "mm", "MAX HAILCAST DIAMETER", FieldSource::History, ""),
+    // The size distribution's largest hail, in metres as WRF and HRRR write it (hail_max_surface / hail_max_column
+    // scale m to mm).  hexcore.hailcast writes HAIL_MAXK1 / HAIL_MAX2D itself in m; an MPAS run without it (MPAS-A,
+    // RRFS-MPAS) carries TEMPO's own words in mm, read through [`alternate_carriers`] times 0.001.  THE BREAKAGE THIS
+    // FIXES: these rows read TEMPO's mm words as metres, so a 25 mm stone drew and exported as 25 m (25,000 mm), and
+    // as mpassit-only rows no hex render frame carried them at all.
+    f("HAIL_MAXK1", Some("HAIL_MAXK1"), Rank::Surface, "m", "MAX HAIL DIAMETER AT THE LOWEST LEVEL", FieldSource::History, ""),
+    f("HAIL_MAX2D", Some("HAIL_MAX2D"), Rank::Surface, "m", "MAX HAIL DIAMETER IN THE COLUMN", FieldSource::History, ""),
     // --- land surface --------------------------------------------------------
     f("TSLB", Some("tslb"), Rank::Soil, "K", "SOIL TEMPERATURE", FieldSource::History, ""),
     f("SMOIS", Some("smois"), Rank::Soil, "m3 m-3", "SOIL MOISTURE", FieldSource::History, ""),
@@ -220,8 +231,6 @@ pub static FIELD_MAP: &[FieldMapping] = &[
     f("SWDDIF", Some("swddif"), Rank::Surface, "W m-2", "SHORTWAVE SURFACE DOWNWARD DIFFUSE IRRADIANCE", FieldSource::History, "mpassit"),
     f("SWUPT", Some("swupt"), Rank::Surface, "W m-2", "INSTANTANEOUS UPWELLING SHORTWAVE FLUX AT TOP", FieldSource::History, "mpassit"),
     f("OLR", Some("olrtoa"), Rank::Surface, "W m-2", "TOA OUTGOING LONG WAVE", FieldSource::History, "mpassit"),
-    f("HAIL_MAXK1", Some("max_hail_diameter_sfc_acc"), Rank::Surface, "m", "MAX HAIL DIAMETER AT THE LOWEST LEVEL", FieldSource::History, "mpassit"),
-    f("HAIL_MAX2D", Some("max_hail_diameter_column_acc"), Rank::Surface, "m", "MAX HAIL DIAMETER IN THE COLUMN", FieldSource::History, "mpassit"),
     f("QVGRAUPEL", Some("volg"), Rank::Mass3d, "m3 kg-1", "Graupel particle volume mixing ratio", FieldSource::History, "mpassit"),
     f("QNWFA", Some("nwfa"), Rank::Mass3d, "kg-1", "water-friendly aerosol number concentration", FieldSource::History, "mpassit"),
     f("QNIFA", Some("nifa"), Rank::Mass3d, "kg-1", "ice-friendly aerosol number concentration", FieldSource::History, "mpassit"),
@@ -280,6 +289,23 @@ pub static CONSERVATIVE_FIELDS: &[&str] = &[
 /// that a blend would smear into the coast.
 pub static NEAREST_FIELDS: &[&str] = &["LANDMASK", "LU_INDEX", "TSLB", "SMOIS", "XLAND", "ISLTYP", "IVGTYP"];
 
+/// Interval maxima of a size: a pixel takes its cell's own value, so a stone's peak is not averaged away
+/// against the cells around it that hold none (a linear blend lowered a lone 50 mm cell; a conservative one
+/// would spread it).  They are in mm or m, so the accumulation rule (mm is conservative) names them apart.
+pub static PEAK_FIELDS: &[&str] = &["HAILCAST_DIAM_MAX", "HAIL_MAXK1", "HAIL_MAX2D"];
+
+/// Further MPAS carriers of a WRF variable, each with the factor that brings it to the row's unit, tried in
+/// order when the row's own carrier (and [`native_history_name`]) is in neither the history nor its diag file.
+pub fn alternate_carriers(wrf_name: &str) -> &'static [(&'static str, f32)] {
+    match wrf_name {
+        // TEMPO's own size-distribution words (RRFS-MPAS / MPAS-A Registry, units "mm"), the largest of each
+        // diagnostics window: mm to the row's m.
+        "HAIL_MAXK1" => &[("max_hail_diameter_sfc_acc", 0.001)],
+        "HAIL_MAX2D" => &[("max_hail_diameter_column_acc", 0.001)],
+        _ => &[],
+    }
+}
+
 /// The note that marks a row only the `mpassit` field set emits, so the
 /// `full` and `surface` render frames keep exactly the fields they had.
 pub const MPASSIT_ONLY: &str = "mpassit";
@@ -287,7 +313,7 @@ pub const MPASSIT_ONLY: &str = "mpassit";
 pub fn remap_class(wrf_name: &str) -> RemapClass {
     if CONSERVATIVE_FIELDS.contains(&wrf_name) {
         RemapClass::Conservative
-    } else if NEAREST_FIELDS.contains(&wrf_name) {
+    } else if NEAREST_FIELDS.contains(&wrf_name) || PEAK_FIELDS.contains(&wrf_name) {
         RemapClass::Nearest
     } else {
         RemapClass::Linear
@@ -355,7 +381,7 @@ mod tests {
     fn every_accumulation_is_conservative_and_every_category_nearest() {
         for m in FIELD_MAP {
             let class = remap_class(m.wrf_name);
-            if m.units == "mm" {
+            if m.units == "mm" && !PEAK_FIELDS.contains(&m.wrf_name) {
                 assert_eq!(class, RemapClass::Conservative, "{} is an accumulation", m.wrf_name);
             }
             if m.units.is_empty() && m.source != FieldSource::Constant {
@@ -472,5 +498,35 @@ mod convective_tests {
         let m = FIELD_MAP.iter().find(|m| m.wrf_name == "CUPREC").expect("CUPREC is mapped");
         assert_eq!(m.mpas_name, Some("cuprec"));
         assert!(field_set_allows("surface", m));
+    }
+}
+
+#[cfg(test)]
+mod hail_tests {
+    use super::*;
+
+    fn row_of(name: &str) -> &'static FieldMapping {
+        FIELD_MAP.iter().find(|m| m.wrf_name == name).unwrap_or_else(|| panic!("{name} is not mapped"))
+    }
+
+    /// THE BREAKAGE THIS GUARDS: TEMPO's hail words are mm and the WRF rows are m; read as metres a 25 mm stone
+    /// drew as 25 m.  Each hail row states its unit, hex's own carriers come first, and TEMPO's mm words are brought
+    /// to m; HAILCAST stays in mm (HRRR's unit for it), and every hail maximum keeps its peak.
+    #[test]
+    fn hail_rows_state_their_units_and_bring_tempo_mm_to_m() {
+        assert_eq!(row_of("HAILCAST_DIAM_MAX").units, "mm");
+        assert_eq!(row_of("HAILCAST_DIAM_MAX").mpas_name, Some("HAILCAST_DIAM_MAX"));
+        for (name, tempo) in [("HAIL_MAXK1", "max_hail_diameter_sfc_acc"), ("HAIL_MAX2D", "max_hail_diameter_column_acc")] {
+            let row = row_of(name);
+            assert_eq!((row.units, row.mpas_name), ("m", Some(name)), "{name}: hex's own words, in m, first");
+            assert_eq!(alternate_carriers(name), &[(tempo, 0.001_f32)], "{name}: TEMPO's mm words times 0.001");
+            for set in ["full", "surface", "mpassit"] {
+                assert!(field_set_allows(set, row), "{name} rides the {set} set");
+            }
+        }
+        for name in PEAK_FIELDS {
+            assert_eq!(remap_class(name), RemapClass::Nearest, "{name} keeps its peak");
+        }
+        assert!(alternate_carriers("T2").is_empty());
     }
 }

@@ -740,8 +740,13 @@ def test_run_experiment_front_door_lift_and_residual_refusals(
     # A real Experiment always carries the attribute (build_experiment
     # defaults it to OFF); a double without it raises AttributeError from
     # inside the front door and never reaches the refusal under test.
+    # ``root`` likewise: the front door reads ``root.run.dfi_opt`` before
+    # the ingest (a DFI run owns the whole device state, so its tiles are
+    # dropped there), and a real Experiment always has a root domain.
+    no_dfi = SimpleNamespace(run=SimpleNamespace(dfi_opt=0))
     single = SimpleNamespace(relocation=manual, domains=(object(),),
-                             feedback=0, tiles=_STREAMING_OFF, simulated_radar=RADAR_OFF)
+                             feedback=0, tiles=_STREAMING_OFF, simulated_radar=RADAR_OFF,
+                             root=no_dfi)
     # The gate lives in run_experiment's body: the wrapper opens the step
     # log off exp.start_time first (01d3e4ec2f), which this double omits.
     with pytest.raises(ValueError, match="no nest to move"):
@@ -762,7 +767,8 @@ def test_run_experiment_front_door_lift_and_residual_refusals(
         wrfout_module, "quarantine_orphan_wrfouts", _sentinel)
     tree = SimpleNamespace(relocation=manual,
                            domains=(object(), object()), feedback=0,
-                           tiles=_STREAMING_OFF, simulated_radar=RADAR_OFF)
+                           tiles=_STREAMING_OFF, simulated_radar=RADAR_OFF,
+                           root=no_dfi)
     with pytest.raises(_ReachedPreparation):
         runtime._run_experiment(tree, None, tmp_path / "out2")
 
@@ -1319,6 +1325,77 @@ def test_containment_slides_the_parent_and_compensates_the_mover():
     assert contained["descendants"][0]["earth_fixed"] is True
     assert runner.containment_moves_executed == 1
     assert model.experiment_fingerprint != "base-fingerprint"
+
+
+def test_containment_slide_is_bounded_by_its_own_cap_not_the_movers():
+    """A slide past the MOVER's cap but inside the containment cap runs.
+
+    The slide is clamped to [relocation.containment]
+    max_move_parent_cells, then executed through relocate_child with the
+    config's governance re-aimed at the sliding parent.  The re-aim used
+    to carry the mover's max_move_parent_cells along, so a slide the
+    containment cap admitted was refused there ("the move is 5 parent
+    cells, over the configured maximum of 2") and the run ended.
+    Brought from jacobbieker/woof#109 (Apache-2.0).
+    """
+    import gpuwm.core.nest_relocation as nest_relocation
+
+    for contain_cap in (5, None):
+        parent_plane, parent, child, d03 = _tree3()
+        runner, model, clocks = _containment_runner(
+            parent, child, d03, parent_plane, mover_cap=2,
+            contain_cap=contain_cap)
+        judged = []
+        real_check = nest_relocation.check_admissible
+
+        def spy(plan, bounds, _real=real_check, _judged=judged):
+            _judged.append((plan.placement_to.grid_id,
+                            bounds.max_move_parent_cells))
+            return _real(plan, bounds)
+
+        nest_relocation.check_admissible = spy
+        try:
+            runner.on_period_begin(model, clocks)
+        finally:
+            nest_relocation.check_admissible = real_check
+        contained = runner.receipts[0]
+        assert contained["event"] == "contained", contained
+        # Deviation +14 asks round(14/3) = 5; the containment cap (5, or
+        # none) does not cut it, and the mover's cap of 2 must not either.
+        assert contained["requested_shift_parent_cells"] == [5, 0]
+        assert contained["executed_shift_parent_cells"] == [5, 0]
+        assert contained["clamped_by"] == []
+        assert child.cfg.i_parent_start == 85 + 5
+        assert d03.cfg.i_parent_start == 70 - 15
+        # Judged against the containment's cap, never the mover's.
+        assert judged == [(2, contain_cap)]
+
+
+def test_containment_slide_walks_back_from_carrying_a_sibling_off_its_ground():
+    """A sibling of the mover rides along with the slide; relocate_child
+    refuses -- after the parent is rebuilt -- one carried entirely off its
+    own ground, so the runner's walk must hold that slide first.
+    Brought from jacobbieker/woof#109 (Apache-2.0)."""
+    from dataclasses import replace
+
+    parent_plane, parent, child, d03 = _tree3()
+    sibling_run = replace(d03.cfg.run, nx=6, ny=6)
+    sibling = SimpleNamespace(
+        cfg=replace(d03.cfg, grid_id=4, i_parent_start=20,
+                    j_parent_start=20, run=sibling_run),
+        state=SimpleNamespace(), grid="d04-grid", parent=child,
+        children=[], _started=True)
+    child.children = [d03, sibling]
+    runner, model, clocks = _containment_runner(
+        parent, child, d03, parent_plane, mover_cap=2, contain_cap=5)
+    runner.on_period_begin(model, clocks)
+    held = runner.receipts[0]
+    # One d02 parent cell is 3 d02 cells, 9 of the sibling's: any slide
+    # carries a 6-cell sibling off its ground, so it holds, by name.
+    assert held["event"] == "containment_held", held
+    assert "descendant_off_its_ground" in held["clamped_by"]
+    assert child.cfg.i_parent_start == 85
+    assert d03.cfg.i_parent_start == 70
 
 
 def test_containment_inside_the_deadband_is_silent():

@@ -107,15 +107,20 @@ extern "C" __global__ void afwa_ptype(
  int c=blockIdx.x*blockDim.x+threadIdx.x;if(c>=n||!(precip[c]>0.0f))return;
  float mod=t2[c]+sw[c]/100.0f,maxtmp=mod,melt=0.0f;
  int type=0,top=nz-1;bool saturation=false;
- // Native cloud_top_tmp has no assignment if this cold precipitating
- // column never reaches RH>80%. Preserve that undefined result explicitly.
+ // Native cloud_top_tmp has no assignment if no level of this cold
+ // precipitating column lies above the ground. Preserve that undefined
+ // result explicitly.
  float cloudtop=nanf("");
  if(mod>275.15f)type=1;
  else {
   for(int k=nz-1;k>=0;--k){size_t x=(size_t)k*n+c;
    if(z[x]-ht[c]>0.0f){
     maxtmp=fmaxf(t[x],maxtmp);float rh=af_rh(p[x],t[x],q[x]);
-    if(rh>80.0f&&!saturation){cloudtop=t[x];top=k;saturation=true;type=2;}
+    // module_diag_afwa.F:1888 "rh .gt. 80 .and. saturation .eqv. .false.":
+    // Fortran binds .and. before .eqv., so WRF tests (rh>80 .and. sat)
+    // .eqv. .false. and moves the cloud top down at every level that is not
+    // a saturated continuation.
+    if(!(rh>80.0f&&saturation)){cloudtop=t[x];top=k;saturation=true;type=2;}
     if(rh<=70.0f&&saturation)saturation=false;
    }
   }

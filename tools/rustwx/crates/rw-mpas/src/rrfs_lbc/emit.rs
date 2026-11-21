@@ -542,7 +542,7 @@ pub fn write_lbc_file(
     // Every boundary field at once, each encoded and written at its own offset
     // on the cores; the file holds the same bytes as writing them in turn.
     // THE BREAKAGE IT FIXES: one core encoded the 13 GB of an RRFS v2 conus3km
-    // boundary hour field by field (box V5090, 2026-10-28).
+    // boundary hour field by field (measured 2026-10-28).
     let mut named: Vec<(&str, &[f32])> = vec![("lbc_qv", fields.qv)];
     for (name, values) in &fields.extra {named.push((name.as_str(), *values));}
     named.extend([("lbc_u", fields.u), ("lbc_w", fields.w), ("lbc_rho", fields.rho), ("lbc_theta", fields.theta)]);

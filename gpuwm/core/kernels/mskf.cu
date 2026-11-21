@@ -2120,7 +2120,13 @@ TRPPT = ((TRPPT+PPTLIQ(KQ))+PPTICE(KQ));
                 DDR(NK) = DDR(NK) * DDINC;
             }
             CPR = TRPPT;
-            PPTFLX = TRPPT - TDER;
+            /* Declared divergence from WRF, the one kf.cu already carries
+             * for module_cu_kfeta.F: when the cap above sets DDINC =
+             * TRPPT/TDER, binary32 TDER*DDINC can round above TRPPT, and the
+             * bare TRPPT-TDER is then minus a few ulp, so PRATEC is negative
+             * and RAINC accumulates below zero.  The float64 answer there is
+             * 0.  From jacobbieker/woof pull request 375 (Apache-2.0). */
+            PPTFLX = fmaxf(TRPPT - TDER, 0.0f);
             PEFF = PPTFLX / TRPPT;
             if (LDB > 1) {
                 for (NK = 1; NK <= LDB - 1; ++NK) {

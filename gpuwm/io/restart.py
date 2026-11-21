@@ -4282,6 +4282,17 @@ def _stock_cumulus_rebuild_arrays(scheme) -> frozenset:
     from importlib import import_module
     from gpuwm.physics_registry import component_options
     cls = type(scheme)
+    # The generic MPAS column seam re-classes its cumulus callable as a
+    # same-named subclass that only records the A-grid momentum pair
+    # (gpuwm.core.mpas_column_suite._capture_cumulus_momentum: no slots, no
+    # state), so the stock class is its base.  THE BREAKAGE: KIAPS SAS's
+    # held PBL height ``_hold``, declared rebuildable on its registry row,
+    # was refused as unclassified at the first history snapshot or
+    # checkpoint of a column-seam run (jacobbieker/woof#381).
+    while (cls.__bases__ and cls.__dict__.get("__slots__") == ()
+           and cls.__qualname__ == cls.__bases__[0].__qualname__
+           and cls.__module__ == cls.__bases__[0].__module__):
+        cls = cls.__bases__[0]
     dotted = f"{cls.__module__}.{cls.__qualname__}"
     for option in component_options("cumulus").values():
         if (option.get("consumers") or {}).get("stock_callable_class") != dotted:

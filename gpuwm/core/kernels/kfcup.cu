@@ -1176,7 +1176,12 @@ __device__ void kc_para(const KcTable& tb, const KcWs& ws, const KcParaIn& in,
             DDR(NK) = DDR(NK) * DDINC;
         }
         CPR = TRPPT;
-        PPTFLX = TRPPT - TDER;
+        /* The same floor as kf.cu and mskf.cu: when the cap above sets
+         * DDINC = TRPPT/TDER the float64 answer is 0, but binary32
+         * TDER*DDINC can round above TRPPT and the bare difference is minus
+         * a few ulp, so RAINC would accumulate below zero (the MSKF case of
+         * jacobbieker/woof pull request 375; the fork left this line bare). */
+        PPTFLX = fmaxf(TRPPT - TDER, 0.0f);
         PEFF = PPTFLX / TRPPT;
         if (LDB > 1) {
             for (NK = 1; NK <= LDB - 1; ++NK) {

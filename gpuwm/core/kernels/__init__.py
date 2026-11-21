@@ -98,7 +98,7 @@ _EXTRA_HEADERS: dict[str, tuple[str, ...]] = {
     "idealized_forcing": ("glibc_flt32.cuh", "glibc_trig_flt32.cuh"),
     "trajectory": ("glibc_flt32.cuh", "glibc_flt32_extra.cuh", "glibc_trig_flt32.cuh"),
     "tracer_pblmix": ("mynn_scalar_mix.cu",),
-    "wind_mav": ("glibc_flt32.cuh", "glibc_trig_flt32.cuh", "portable_libm64.cuh", "glibc_flt64.cuh"),
+    "wind_mav": ("glibc_flt32.cuh", "glibc_flt32_extra.cuh", "glibc_trig_flt32.cuh", "portable_libm64.cuh", "glibc_flt64.cuh"),
     # WRF v4.8.0 original Fitch + THRUST (windfarm_induction=0, wind_fitch_480.cu);
     # the same glibc asinf words wind_mav.cu's rotor-area integral uses.
     "wind_fitch_480": ("glibc_flt32.cuh", "glibc_trig_flt32.cuh"),
@@ -1621,7 +1621,7 @@ MODULE_KEY_ROOT = "gpuwm.core.kernels"
 
 
 # Headers that consume the loader integer tier.
-_HEADERS_NEED_INT_DEFINES = frozenset({'goddard', 'cu_osas', 'km5_geometry', 'flg_column', 'cammgmp'})
+_HEADERS_NEED_INT_DEFINES = frozenset({'goddard', 'cu_osas', 'km5_geometry', 'flg_column', 'cammgmp', 'lin'})
 
 def module_source_int_defines(
         name: str, defines: tuple[tuple[str, int], ...],

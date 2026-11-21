@@ -374,6 +374,32 @@ class ValidationReport:
                      if self.status_bits & bit)
 
 
+class StepStabilityError(RuntimeError):
+    """The per-step stability gate's verdict, raised as a typed failure.
+
+    Still a :class:`RuntimeError` with the gate's own text, so every reader
+    that matched the old untyped error still matches.  Typed so that the
+    nested health recovery (:mod:`gpuwm.stability_recovery`) can tell a
+    failed model state from any other runtime error: a blow-up nearly
+    always trips this gate before the full-state validator sees it, and
+    while it was untyped the recovery never saw the failure at all -- its
+    receipt read ``attempts: []`` and ``failures: []`` with no reason.
+    From jacobbieker/woof#115.
+    """
+
+    def __init__(self, message, *, grid_id=None, step=None, variable=None):
+        super().__init__(message)
+        self.grid_id = None if grid_id is None else int(grid_id)
+        self.step = None if step is None else int(step)
+        self.variable = variable
+
+    @property
+    def phase(self) -> str:
+        """Where the gate fired, in the full-state validator's spelling."""
+        return ("step" if self.grid_id is None
+                else f"step.d{self.grid_id:02d}")
+
+
 class HealthCheckError(FloatingPointError):
     """A synchronized model-state health gate failed."""
 

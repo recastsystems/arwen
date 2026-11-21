@@ -1091,7 +1091,7 @@ class CreateMixin:
             # Schemes no set of this source matches (composed_physics): `gpuwm domain --physics-choices` writes them
             # into the experiment, and the fit prices them.
             intent["physics_choices"] = dict(draft["physics_choices"])
-        for key in ("chain", "buffer_km", "era5_provider"):
+        for key in ("chain", "buffer_km", "era5_provider", "source_parameters"):
             if draft.get(key):
                 intent[key] = draft[key]
         for key, value in (draft.get("event_keys") or {}).items():

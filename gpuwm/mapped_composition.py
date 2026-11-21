@@ -1315,7 +1315,13 @@ def _compose_bound_fields(
     # declared companion, whose receipt names both.
     other = [member for member in primary_members
              if member is not None and member != donor_member]
-    if companion is None and donor_member is not None and other:
+    # A cycle-invariant static (one record broadcast to every time: the
+    # GEFS reforecast's land mask, whose GRIB2 says member 1) carries no
+    # trajectory, so it lends under any member; refusing it stopped every
+    # control-member (c00) reforecast preparation.
+    static_broadcast = alignment == "cycle_invariant_broadcast"
+    if (companion is None and donor_member is not None and other
+            and not static_broadcast):
         raise ValueError(
             f"contributing source binding {binding_name!r} decoded member "
             f"{donor_member!r} under primary member {other[0]!r}; borrowing "

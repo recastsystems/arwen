@@ -145,6 +145,44 @@ class InloopTest(unittest.TestCase):
             release.set()
             live.close()
 
+    def test_a_symlinked_run_directory_still_releases_every_snapshot(self):
+        """THE BREAKAGE: snapshots were owned under the unresolved run
+        directory while output_committed resolves each landing, so through a
+        symlinked (or relative) run directory no snapshot was released, the
+        RADAR_SCRATCH_FRAMES slots ran out and the next capture waited for
+        ever.  Brought from jacobbieker/woof#150 (Apache-2.0)."""
+        real = self.root / "real"
+        real.mkdir()
+        link = self.root / "link"
+        link.symlink_to(real, target_is_directory=True)
+        scanned = []
+        live = radar.LiveSimulatedRadar(radar.SimulatedRadarOptions.from_mapping({"timing": "history"}),
+                                        link, runner=lambda paths, **kw: scanned.extend(paths))
+        live._render_snapshot = lambda path: None
+        done = threading.Event()
+        failures = []
+
+        def captures():
+            try:
+                for index in range(radar.RADAR_SCRATCH_FRAMES + 2):
+                    live.capture(self.node, self.when + timedelta(minutes=5 * index), self.template, {})
+                live.drain()
+            except BaseException as error:
+                failures.append(error)
+            finally:
+                done.set()
+        thread = threading.Thread(target=captures, daemon=True)
+        thread.start()
+        try:
+            self.assertTrue(done.wait(10), "a capture waited for a scratch slot that was never released")
+            self.assertEqual(failures, [])
+            self.assertEqual(len(scanned), radar.RADAR_SCRATCH_FRAMES + 2)
+            self.assertEqual(live._owned_snapshots, {})
+            self.assertEqual(list((real / ".radar-scratch").rglob("wrfout*")), [])
+        finally:
+            live._cancelled.set()
+            live.close()
+
     def test_duplicate_capture_never_removes_an_earlier_inflight_snapshot(self):
         entered, release = threading.Event(), threading.Event()
         def native(paths, **kw):
@@ -214,7 +252,11 @@ class InloopTest(unittest.TestCase):
         submit.body = prefix
         scope = {"Fraction": Fraction, "timedelta": timedelta}
         exec(compile(ast.Module(body=[selector, submit], type_ignores=[]), "history-clock", "exec"), scope)
-        worker = SimpleNamespace(_simulated_radar=None, start_time=self.when, _capture_radar=mock.Mock())
+        # _submit opens the native auxiliary streams (CLWRF/RASM) on the
+        # initial frame before it captures radar; the double carries that
+        # hook so the clock under test is the only thing exercised here.
+        worker = SimpleNamespace(_simulated_radar=None, start_time=self.when, _capture_radar=mock.Mock(),
+                                 submit_native_auxiliary=mock.Mock())
         self.node.cfg.full_history_interval_s = 3600
         self.node.clock = SimpleNamespace(tick_den=100, spec=SimpleNamespace(start_ticks=0, history_begin_ticks=0))
         for seconds, quick in ((0, False), (300, True), (3600, False), (3900, True)):

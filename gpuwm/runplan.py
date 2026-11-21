@@ -441,6 +441,7 @@ _INTENT_FLAGS = {
     "cadence": "--cadence",
     "era5_product": "--era5-product",
     "era5_provider": "--era5-provider",
+    "source_parameters": "--source-parameters",
     "data_dir": "--data-dir",
     "forcing": "--forcing",
     "vtable": "--vtable",
@@ -506,6 +507,10 @@ _INTENT_DELIVERY = {
     "cadence": "config",
     "era5_product": "config",
     "era5_provider": "config",
+    # The values a route's object names need from the user (HAFS's storm
+    # id, jacobbieker/woof#344): the wizard resolves them before it writes
+    # anything and bakes them into the [fetch] table the run fetches from.
+    "source_parameters": "config",
     "history_interval_s": "config",
     "nest_history_interval_s": "config",
     # The vertical level count: the wizard resamples its own eta ladder to
@@ -1021,7 +1026,8 @@ def _build_intent(intent: object, *, route: str,
     from gpuwm.fetch import validate_fetch_hints
     intent = _keyless_era5_default(intent, str(source))
     selection = {key: intent[key] for key in
-                 ("member", "cadence", "era5_product", "era5_provider") if key in intent}
+                 ("member", "cadence", "era5_product", "era5_provider",
+                  "source_parameters") if key in intent}
     if selection:
         if selection.get("era5_product") == "ensemble_members":
             selection["retrieve"] = True

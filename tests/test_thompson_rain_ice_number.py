@@ -205,3 +205,22 @@ def test_the_cold_start_number_writers_do_not_move_with_numpys_avx512_loops():
     moved = sorted(name for name in on if on[name] != off[name])
     assert not moved, (
         f"{moved} change with NumPy's AVX-512 loops ({targets}) switched off")
+
+
+def test_a_nan_or_huge_temperature_takes_ice_row_one_without_an_invalid_cast():
+    """A NaN or out-of-range temperature converts to x86's 'integer
+    indefinite', the most negative integer, so retab row 1, as the WRF build
+    and our Rust cold start take it; NumPy on AArch64 saturated it to row 94
+    instead.  The port now never hands NumPy that cast (on x86 the old code
+    still answered row 1, but through an invalid cast this test refuses).
+    Brought from jacobbieker/woof#150 (Apache-2.0)."""
+    import warnings
+    q = np.full(3, F(1.0e-4), dtype=np.float32)
+    temperature = np.array([np.nan, F(3.0e38), F(-3.0e38)], dtype=np.float32)
+    reference = make_ice_number(q[:1], np.array([F(150.0)], dtype=np.float32))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        with np.errstate(invalid="raise", over="ignore"):
+            numbers = make_ice_number(q, temperature)
+    assert numbers.shape == (3,)
+    assert np.isfinite(reference).all()

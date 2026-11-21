@@ -329,6 +329,111 @@ def _bind_netcdf4(library: ctypes.CDLL) -> None:
     _NETCDF4_BOUND = True
 
 
+#: The entry point the DEFAULT history writer (compressed frames) needs and
+#: a library built before compressed frames lacks.
+NETCDF4_ENTRY: Final[bytes] = b"gpuwm_ncwrite_create_netcdf4"
+
+#: The outcome of this process's one checkout rebuild, if it tried one:
+#: None before any attempt, "" after a build that worked, else the failure.
+_REBUILD_OUTCOME: str | None = None
+
+
+def _cargo() -> str | None:
+    """cargo on PATH, else rustup's default install location, else None."""
+
+    import shutil
+
+    found = shutil.which("cargo")
+    if found:
+        return found
+    home = os.environ.get("CARGO_HOME") or str(Path.home() / ".cargo")
+    candidate = Path(home) / "bin" / ("cargo.exe" if os.name == "nt" else "cargo")
+    return str(candidate) if candidate.is_file() else None
+
+
+def _rebuild_checkout_library(stale: Path) -> str:
+    """Build this checkout's netcdf-writer once; "" on success, else why not.
+
+    The breakage it prevents: a source checkout with no release pins reads
+    the shared flat ``~/.gpuwm/bridges`` copy unjudged, and on a machine where
+    that copy predates compressed frames, every
+    default history frame from such a checkout was refused (a level-output
+    test and any plain run alike) although the checkout holds the source of
+    the library it needed.  The build goes into the checkout's own
+    ``tools/rustwx/target/release``, which the ladder reads first; the
+    shared copy is never written, because other installs may read it.
+    """
+
+    global _REBUILD_OUTCOME
+    if _REBUILD_OUTCOME is not None:
+        return _REBUILD_OUTCOME
+    import subprocess
+    import sys
+
+    from gpuwm.rustwx import crate_dir
+
+    workspace = crate_dir()
+    if not (workspace / "Cargo.toml").is_file() or not (
+            workspace / "crates" / "netcdf-writer").is_dir():
+        _REBUILD_OUTCOME = "this install has no tools/rustwx checkout to build from"
+        return _REBUILD_OUTCOME
+    cargo = _cargo()
+    if cargo is None:
+        _REBUILD_OUTCOME = "no cargo was found on PATH or in ~/.cargo/bin"
+        return _REBUILD_OUTCOME
+    from gpuwm.explain import warn
+
+    warn(f"{stale} predates compressed history frames (it exports no "
+         f"{NETCDF4_ENTRY.decode()}); building this checkout's netcdf-writer "
+         f"into {workspace / 'target' / 'release'} before the frame is "
+         "written (the stale file is left as it is)")
+    command = [cargo, "build", "--release", "--locked", "--offline",
+               "-p", "netcdf-writer"]
+    try:
+        done = subprocess.run(command, cwd=workspace, capture_output=True,
+                              text=True, timeout=1800)
+        if (done.returncode != 0 and "requires rustc" in (done.stderr or "")
+                and not os.environ.get("RUSTUP_TOOLCHAIN")):
+            # The workspace declares its rust-version; a machine whose
+            # rustup default is older (1.93.1 against the workspace's 1.94 on one test host) still
+            # has a newer stable beside it.
+            done = subprocess.run(command, cwd=workspace, capture_output=True,
+                                  text=True, timeout=1800,
+                                  env={**os.environ, "RUSTUP_TOOLCHAIN": "stable"})
+    except (OSError, subprocess.TimeoutExpired) as error:
+        _REBUILD_OUTCOME = f"`{' '.join(command[1:])}` could not run: {error}"
+        return _REBUILD_OUTCOME
+    if done.returncode != 0:
+        tail = " | ".join((done.stderr or done.stdout).strip().splitlines()[-3:])
+        _REBUILD_OUTCOME = (f"`cargo {' '.join(command[1:])}` in {workspace} "
+                            f"failed (exit {done.returncode}): {tail}")
+        return _REBUILD_OUTCOME
+    print(f"gpuwm: built {workspace / 'target' / 'release' / library_names()[0]}",
+          file=sys.stderr)
+    _REBUILD_OUTCOME = ""
+    return _REBUILD_OUTCOME
+
+
+def _refresh_stale_checkout_library() -> str | None:
+    """Replace a loaded library that predates compressed frames, if this
+    is a checkout that can build one; None when it now has them, else why
+    it still does not.  An explicit override is never second-guessed."""
+
+    global _LIBRARY
+    path = resolve_ncwrite_bridge()
+    if os.environ.get(NCWRITE_BRIDGE_ENV):
+        return "it was named by " + NCWRITE_BRIDGE_ENV
+    why = _rebuild_checkout_library(path)
+    if why:
+        return why
+    _LIBRARY = None
+    load()
+    if not _NETCDF4_BOUND:
+        return (f"the rebuilt {resolve_ncwrite_bridge()} still exports no "
+                f"{NETCDF4_ENTRY.decode()}")
+    return None
+
+
 def netcdf4_unavailable_reason() -> str | None:
     """Why compressed NetCDF-4 frames cannot be written here, or None."""
 
@@ -340,9 +445,17 @@ def netcdf4_unavailable_reason() -> str | None:
     except Exception as error:  # noqa: BLE001 - the reason is the message
         return str(error)
     if not _NETCDF4_BOUND:
-        return (f"{resolve_ncwrite_bridge()} exports no "
+        stale = resolve_ncwrite_bridge()
+        try:
+            why = _refresh_stale_checkout_library()
+        except Exception as error:  # noqa: BLE001 - the reason is the message
+            why = f"{type(error).__name__}: {error}"
+        if why is None:
+            return None
+        return (f"{stale} exports no "
                 "gpuwm_ncwrite_create_netcdf4, so it predates compressed "
-                "history frames; rebuild tools/rustwx (cargo build --release "
+                f"history frames, and it was not rebuilt here ({why}); "
+                "rebuild tools/rustwx (cargo build --release "
                 "--locked --offline -p netcdf-writer), run `gpuwm "
                 "fetch-bridges`, or write uncompressed frames with "
                 "GPUWM_HISTORY_COMPRESSION=none")
@@ -704,6 +817,11 @@ class ClassicSchema:
         reason = netcdf4_unavailable_reason()
         if reason is not None:
             raise NcWriteError(reason)
+        if self._library is not _LIBRARY:
+            raise NcWriteError(
+                "this schema was defined on a netcdf-writer library that has "
+                "since been replaced by a rebuild; define it again (ask "
+                "netcdf4_unavailable_reason() before ClassicSchema)")
         raw = str(path).encode("utf-8")
         handle = self._live()
         self._handle = None

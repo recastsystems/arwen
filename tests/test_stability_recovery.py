@@ -323,3 +323,132 @@ def test_retry_receipt_preserves_abandoned_force_observation(monkeypatch, tmp_pa
     assert recovery.run(execute) == "replayed"
     abandoned = recovery.receipt["attempts"][0]["discarded_leg_force_observations"]
     assert abandoned["d02"]["process_force_count"] == 11
+
+
+
+def _step_gate_error(grid_id=2, step=4):
+    from gpuwm.core.health import StepStabilityError
+    return StepStabilityError(
+        f"d{grid_id:02d} integration produced a non-finite state at model step {step}",
+        grid_id=grid_id, step=step, variable="u/w/theta'")
+
+
+def test_step_gate_failure_is_typed_and_keeps_its_message():
+    """Brought from jacobbieker/woof#115 (Apache-2.0)."""
+    from gpuwm.core.health import StepStabilityError
+    error = _step_gate_error(grid_id=3, step=4)
+    # Still the RuntimeError every reader matched, with the same text.
+    assert isinstance(error, RuntimeError)
+    assert isinstance(error, StepStabilityError)
+    assert str(error) == "d03 integration produced a non-finite state at model step 4"
+    assert (error.grid_id, error.step, error.phase) == (3, 4, "step.d03")
+    assert error.variable == "u/w/theta'"
+
+
+def test_step_gate_failure_enters_recovery_and_retries(monkeypatch, tmp_path):
+    """A blow-up trips the per-step gate before the full-state validator;
+    that failure must reach the recovery, not bypass it.  THE BREAKAGE: the
+    gate raised a plain RuntimeError, the recovery caught only
+    HealthCheckError, and its receipt read attempts: [] and failures: [].
+    Brought from jacobbieker/woof#115 (Apache-2.0)."""
+    model, exp, _ = _checkpoint(monkeypatch, tmp_path)
+    recovery = NestedHealthRecovery(model=model, experiment=exp,
+                                    output_directory=tmp_path)
+    calls = []
+
+    def execute(active):
+        calls.append(active)
+        if len(calls) == 1:
+            model.root.clock.ticks = 3700
+            model.root.clock.elapsed_seconds = 3700
+            raise _step_gate_error()
+        return "replayed"
+
+    assert recovery.run(execute) == "replayed"
+    receipt = json.loads(recovery.receipt_path.read_text())
+    assert receipt["status"] == "RECOVERED"
+    assert len(receipt["attempts"]) == 1
+    failure = receipt["failures"][0]
+    assert failure["error_type"] == "StepStabilityError"
+    assert (failure["domain"], failure["phase"]) == ("d02", "step.d02")
+    assert failure["variable"] == "u/w/theta'"
+
+
+def test_unrecoverable_step_gate_failure_says_why(monkeypatch, tmp_path):
+    """A moving tree cannot be rolled back; the receipt names the failure
+    and the refusal.  Brought from jacobbieker/woof#115 (Apache-2.0)."""
+    model, exp, _ = _checkpoint(monkeypatch, tmp_path)
+    exp = replace(exp, relocation=SimpleNamespace(enabled=True))
+    recovery = NestedHealthRecovery(model=model, experiment=exp,
+                                    output_directory=tmp_path)
+    error = _step_gate_error(grid_id=3)
+
+    def execute(_active):
+        raise error
+
+    with pytest.raises(RuntimeError) as observed:
+        recovery.run(execute)
+    assert observed.value is error
+    receipt = json.loads(recovery.receipt_path.read_text())
+    assert receipt["status"] == "REFUSED"
+    assert receipt["attempts"] == []
+    assert receipt["failures"][0]["domain"] == "d03"
+    assert "moving" in receipt["refusal"]
+
+
+def test_the_step_gates_raise_the_typed_failure():
+    """Both per-step gates (the inline one and the deferred ledger one)
+    raise StepStabilityError, so the recovery sees them."""
+    import inspect
+    from gpuwm.core import model as model_module, streaming
+    inline = inspect.getsource(model_module.execute_experiment)
+    assert inline.count("raise StepStabilityError(") == 2
+    assert "StepStabilityError(" in inspect.getsource(streaming.defer_step_health)
+
+
+def test_deferred_drain_failure_enters_recovery_and_retries(monkeypatch, tmp_path):
+    """On a default run the health ledger is on, and a blow-up is found at
+    its deferred drain, not at the per-step gate.  THE BREAKAGE: the drain
+    raised an untyped FloatingPointError, so a nested 12-3 km run that blew
+    up at a 600 s start ended with attempts: [] and failures: [] (3.0.5
+    front-door run).  The drain now raises the typed DeferredHealthError."""
+    from gpuwm.core.health_ledger import DeferredHealthError
+    model, exp, _ = _checkpoint(monkeypatch, tmp_path)
+    recovery = NestedHealthRecovery(model=model, experiment=exp,
+                                    output_directory=tmp_path)
+    calls = []
+
+    def execute(active):
+        calls.append(active)
+        if len(calls) == 1:
+            model.root.clock.ticks = 3700
+            model.root.clock.elapsed_seconds = 3700
+            raise DeferredHealthError(
+                "microphysics RAINNC contains a non-finite value",
+                site="microphysics RAINNC")
+        return "replayed"
+
+    assert recovery.run(execute) == "replayed"
+    receipt = json.loads(recovery.receipt_path.read_text())
+    assert receipt["status"] == "RECOVERED"
+    assert len(receipt["attempts"]) == 1
+    assert receipt["failures"][0]["error_type"] == "DeferredHealthError"
+    assert receipt["failures"][0]["phase"] == "microphysics RAINNC"
+
+
+def test_the_deferred_drain_types_a_site_s_nonfinite_refusal():
+    """A site whose description raises a plain FloatingPointError reaches
+    the caller as DeferredHealthError with the same text."""
+    import numpy as np
+    from gpuwm.core.health_ledger import DeferredHealthError, HealthLedger
+
+    def describe(_flags):
+        raise FloatingPointError("the GFS PBL returned non-finite u")
+
+    ledger = HealthLedger.__new__(HealthLedger)
+    ledger._index = {"gfs_pbl": 0}
+    with pytest.raises(DeferredHealthError) as observed:
+        ledger._raise_flags(np.array([1], dtype=np.uint32), {"gfs_pbl": describe})
+    assert isinstance(observed.value, FloatingPointError)
+    assert str(observed.value) == "the GFS PBL returned non-finite u"
+    assert observed.value.phase == "gfs_pbl"

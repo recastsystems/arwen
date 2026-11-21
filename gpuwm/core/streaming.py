@@ -9292,12 +9292,16 @@ def defer_step_health(stepper, state, cfg, *, boundary_width: int,
              | (cp.logical_not(cp.isfinite(record[5])).astype(cp.uint32) << 1))
 
     def refuse(bits):
+        from gpuwm.core.health import StepStabilityError
         detail = ("a non-finite state" if bits & 1 else
                   "a non-finite vertical Courant number: a model layer's "
                   "live thickness is non-positive or non-finite")
-        raise RuntimeError(
+        # Typed, so the nested health recovery sees it (jacobbieker/woof#115).
+        raise StepStabilityError(
             f"d{grid_id:02d} integration produced {detail} by model step "
-            f"{step_count}" + health_ledger.deferred_note())
+            f"{step_count}" + health_ledger.deferred_note(),
+            grid_id=grid_id, step=step_count,
+            variable="u/w/theta'" if bits & 1 else "vertical Courant number")
 
     ledger.record(f"d{grid_id:02d}.integration", flags.reshape(1), refuse)
     return True

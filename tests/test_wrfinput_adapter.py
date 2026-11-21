@@ -50,7 +50,9 @@ class NoGPU(MetaPathFinder):
 sys.meta_path.insert(0, NoGPU())
 ''')
     result = subprocess.run([sys.executable, '-m', 'gpuwm.wrfinput_forecast', '--help'],
-                            env=dict(os.environ, PYTHONPATH=str(tmp_path)),
+                            # The blocker first; a source checkout's own path after it.
+                            env=dict(os.environ, PYTHONPATH=os.pathsep.join(
+                                p for p in (str(tmp_path), os.environ.get('PYTHONPATH', '')) if p)),
                             cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert '--wrfinput' in result.stdout and '--outdir' in result.stdout

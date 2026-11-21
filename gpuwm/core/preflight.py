@@ -9306,6 +9306,12 @@ def rrtmgp_column_shapes(
         # radius columns at all -- the under-priced direction, which lets a
         # run breach the budget rather than refusing it.
         lay += ["effc", "effi"]
+    elif cfg.mp_physics in (11, 55):
+        # The same two columns for the two other schemes the adapter packs
+        # without a snow radius: CAM-MG hands over its own LRADIUS/IRADIUS
+        # (9c74ab447d), and Jensen-ISHMAEL rides P3's row ("p3" in
+        # gpuwm/core/rrtmgp.py's scheme map) without being a P3 variant.
+        lay += ["effc", "effi"]
     for name in lay:
         shapes[f"columns/{name}"] = ((ncol, nz), 4)
     for name in ("metadata_jt", "metadata_jp", "metadata_iatm",

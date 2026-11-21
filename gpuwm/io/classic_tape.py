@@ -317,6 +317,13 @@ class ClassicTape:
         from gpuwm.io import nc_writer_bridge
 
         netcdf4 = self._container == NETCDF4_DEFLATE
+        if netcdf4:
+            # Asked before the schema exists: a checkout whose library
+            # predates compressed frames rebuilds it here, and a schema
+            # handle belongs to the library that made it.
+            reason = nc_writer_bridge.netcdf4_unavailable_reason()
+            if reason is not None:
+                raise nc_writer_bridge.NcWriteError(reason)
         # The NetCDF-4 frame takes the same schema; CDF-5 is only the
         # schema's (most permissive) classic validation, never written.
         schema = nc_writer_bridge.ClassicSchema(

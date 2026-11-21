@@ -22,15 +22,25 @@ List the whole registry with `gpuwm prep --list-sources`, or one row with
 | `hrrr-prs` | `hrrr-pressure`, `hrrr-wrfprs` | 1 h | f048 | 1799x1059 Lambert at 3 km (CONUS) |
 | `hrrr-native` | `hrrr-mapped-native` | 1 h | f048 | 1799x1059 Lambert at 3 km, native hybrid levels; same-cycle pressure product supplies analysis soil |
 | `gem-gdps` | `gem`, `gdps`, `gem-global` | 3 h | f240 | global |
+| `gem-hrdps` | `hrdps`, `gem-hrdps-continental`, `hrdps-continental` | 1 h | f048 | rotated lat-lon at 2.5 km (Canada and the northern United States) |
+| `gem-rdps` | `rdps`, `gem-regional` | 1 h | f084 | rotated lat-lon at 10 km (North America) |
 | `icon-global` | `icon`, `icon-13km`, `dwd-icon`, `dwd-icon-global` | 3 h | f180 (00/12Z), f120 (06/18Z) | global, 2,949,120-cell icosahedral mesh at nominally 13 km |
 | `icon-eu` | `dwd-icon-eu`, `icon-eu-regular` | 1 h | f120 | lat 29.5..70.5, lon -23.5..62.5 |
 | `icon-d2` | `icon-2km`, `dwd-icon-d2` | 1 h | f048 | lat 44.0..57.3, lon 0.0..17.3, 542,040-cell icosahedral mesh at nominally 2.2 km |
 | `gfs` | `gfs-0p25`, `gfs-0.25` | 3 h | f384 | global |
 | `gdas` | `gdas-0p25`, `gdas-0.25` | 1 h | f009 | global |
 | `gefs` | `gefs-ensemble` | 3 h | f384 | global |
+| `gefs-v11` | `gefs-legacy` | 6 h | f384 | global, 1 degree; cycles from 2018-07-27 00Z to 2020-09-23 06Z (`--source gefs` on those cycles selects it) |
+| `gefs-v11-flat` | -- | 6 h | f384 | global, 1 degree; cycles from 2017-01-01 00Z to 2018-07-26 18Z (`--source gefs` on those cycles selects it) |
+| `gefs-reforecast` | -- | 3 h | f003 to f384 (no f000: `--forecast-start-hour 3`) | global, the GEFSv12 reforecast's five daily 00Z members; land and sea ice from its two surface donors |
+| `gefs-reforecast-weekly` | -- | 3 h | f003 to f840 (no f000: `--forecast-start-hour 3`) | as `gefs-reforecast`, the eleven Wednesday members (`--source gefs-reforecast` on a Wednesday selects it) |
+| `gfs-pressure` | -- | 3 h | f120 | global, GFS's whole 0.25-degree pressure product |
+| `hafs-a` | `hfsa` | 3 h | f126 | the storm's parent grid, or its storm-following grid with `DOMAIN=storm`; name the storm with `--source-parameters STORM=09l` |
+| `hafs-b` | `hfsb` | 3 h | f126 | as `hafs-a`, from HAFS-B |
 | `aigfs` | `ai-gfs` | 6 h | f384 | global |
 | `aigefs` | `ai-gefs` | 6 h | f384 | global |
 | `ecmwf-open-data` | `ecmwf`, `ifs` | 3 h | f360 | global |
+| `ecmwf-open-data-0p1` | `ifs-0p1`, `ifs-hres`, `ecmwf-hres`, `ecmwf-0p1` | 3 h | f360 (00/12Z), f144 (06/18Z) | global, 0.1 degree; cycles from 2026-10-20 12Z |
 | `ecmwf-ens` | `ifs-ens`, `ecmwf-ensemble` | 3 h | f360 | global, one perturbed member (`p01`..`p50`) |
 | `aifs` | `aifs-v2`, `aifs-single` | 6 h | f360 | global |
 | `rap` | `rap-awip32` | 1 h | f051 | AWIPS 221, 349x277 Lambert at 32 km (North America) |
@@ -106,21 +116,26 @@ bare grid rectangle would accept.
 ## Which sources `gpuwm fetch` downloads
 
 Every row in the table above except `era5-l137` and `20crv3` (see
-"Sources with no fetch door" below). Fifteen of them are rows in the
+"Sources with no fetch door" below). Most of them are rows in the
 packaged acquisition-route document
 (`gpuwm/authorities/rw-wps-fetch-routes.v1.json`), read by the one engine
 in `gpuwm/fetch_routes.py`; four keep the hand-written transports that
 predate it, and `20crv3-cf` reads the NOAA PSL annual CF archive through
 the native CF subset contract (`gpuwm/authorities/native-cf-fetch.v1.json`,
-1836 to 2015, 3-hourly). The route document has a sixteenth row,
-`rrfs-ens`: `gpuwm fetch` downloads its public member subset, and the
-wizard does not plan it, because that column stops at 250 hPa and carries
-no land state (its registry row is `explicit_composition_required`).
+1836 to 2015, 3-hourly). The route document also has rows the wizard does
+not plan. `rrfs-ens`: `gpuwm fetch` downloads its public member subset,
+and the wizard does not plan it, because that column stops at 250 hPa and
+carries no land state (its registry row is `explicit_composition_required`).
+`gefs-reforecast-land` (the reforecast's static land-surface file) and
+`ncep-r1-seaice` (the NCEP reanalysis' yearly sea-ice file): one time each,
+the surface donors a `gefs-reforecast` fetch downloads beside its members;
+neither can start an atmosphere alone (`adapter_mapping_required`), so the
+wizard refuses them by that state.
 `docs/public/DATA.md` publishes the working command for each.
 
 | how the bytes arrive | sources |
 |---|---|
-| table route (whole published objects, in parallel) | `hrrr-prs`, `hrrr-native`, `rap`, `rap-native`, `rrfs`, `rrfs-ens`, `gefs`, `aigfs`, `aigefs`, `ecmwf-open-data`, `ecmwf-ens`, `aifs`, `icon-global`, `icon-eu`, `icon-d2`, `gem-gdps` |
+| table route (whole published objects, in parallel) | `hrrr-prs`, `hrrr-native`, `rap`, `rap-native`, `rrfs`, `rrfs-ens`, `gefs`, `gefs-v11`, `gefs-v11-flat`, `gefs-reforecast`, `gefs-reforecast-weekly`, `gefs-reforecast-land`, `ncep-r1-seaice`, `gfs-pressure`, `hafs-a`, `hafs-b`, `aigfs`, `aigefs`, `ecmwf-open-data`, `ecmwf-open-data-0p1`, `ecmwf-ens`, `aifs`, `icon-global`, `icon-eu`, `icon-d2`, `gem-gdps`, `gem-hrdps`, `gem-rdps` |
 | native CF subset (the publisher's own subsetting service) | `20crv3-cf` (NOAA PSL THREDDS, annual per-variable files) |
 | hand-written transport (publisher-side subsetting) | `gfs`, `gdas` (NOMADS grib-filter or the S3 archive), `hrrr` (`.idx` byte ranges, live-cycle wait), `era5` (the public ARCO Zarr store with no key, or a Copernicus CDS retrieval under your own key) |
 

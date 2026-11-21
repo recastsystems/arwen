@@ -518,35 +518,64 @@ extern "C" __global__ void mav_prepare_arms(float* weights,float* directions,int
  directions[arm]=angles[j]/180.f*3.14159265358979323846f;
 }
 // WRF share/module_llxy.F: set_lc/llij_lc, set_ps/llij_ps and set_merc/llij_merc.
-__device__ float mav_wrap(float a){if(a>180.f)a=a-360.f;if(a< -180.f)a=a+360.f;return a;}
+__device__ float mav_wrap(float a){if(a>180.f)a=__fsub_rn(a,360.f);if(a< -180.f)a=__fadd_rn(a,360.f);return a;}
+// Every operation is a separately rounded float32 operation, as gfortran's
+// real(4) code computes it, in both arithmetic modes: an fma contraction or
+// CUDA's log10f moves a turbine planted on a cell edge into the next cell
+// (tests/test_wind_placement_wrf471_oracle.py, WRF's own placements).
+// The default arm maps glibc_sinf/glibc_cosf to CUDA's sinf/cosf for the
+// per-step kernels (gpuwm/core/kernels/__init__.py); placement runs once at
+// setup and keeps the glibc_flt32.cuh routines' words in both arms.
+#pragma push_macro("glibc_sinf")
+#pragma push_macro("glibc_cosf")
+#undef glibc_sinf
+#undef glibc_cosf
+#define MP_M __fmul_rn
+#define MP_D __fdiv_rn
+#define MP_A __fadd_rn
+#define MP_S __fsub_rn
 extern "C" __global__ void mav_project_ll(const float* ll,const float* lat,const float* lon,int* col,
  int nt,int nx,int ny,int projection,float dx,float tl1,float tl2,float stdlon){
  int t=blockIdx.x*blockDim.x+threadIdx.x;if(t>=nt)return;
  const float rad=3.14159265358979323846f/180.f,deg=180.f/3.14159265358979323846f;
- float lat1=lat[0],lon1=lon[0],la=ll[2*t],lo=ll[2*t+1],h=tl1<0.f?-1.f:1.f,re=6370000.f/dx,i,j;
+ float lat1=lat[0],lon1=lon[0],la=ll[2*t],lo=ll[2*t+1],h=tl1<0.f?-1.f:1.f,re=MP_D(6370000.f,dx),i,j;
  if(projection==1){
+  // lc_cone, set_lc and llij_lc (share/module_llxy.F).
   float cone;
-  if(fabsf(tl1-tl2)>.1f){
-   cone=log10f(glibc_cosf(tl1*rad))-log10f(glibc_cosf(tl2*rad));
-   cone=cone/(log10f(glibc_tanf((45.f-fabsf(tl1)/2.f)*rad))-log10f(glibc_tanf((45.f-fabsf(tl2)/2.f)*rad)));
-  }else cone=glibc_sinf(fabsf(tl1)*rad);
-  float ctl=glibc_cosf(tl1*rad),tan1=glibc_tanf((90.f*h-tl1)*rad/2.f);
-  float rsw=re*ctl/cone*gfk_pow(glibc_tanf((90.f*h-lat1)*rad/2.f)/tan1,cone);
-  float arg=cone*(mav_wrap(lon1-stdlon)*rad),pi=h-h*rsw*glibc_sinf(arg),pj=h+rsw*glibc_cosf(arg);
-  float rm=re*ctl/cone*gfk_pow(glibc_tanf((90.f*h-la)*rad/2.f)/tan1,cone);
-  arg=cone*(mav_wrap(lo-stdlon)*rad);i=h*(pi+h*rm*glibc_sinf(arg));j=h*(pj-rm*glibc_cosf(arg));
+  if(fabsf(MP_S(tl1,tl2))>.1f){
+   cone=MP_S(gfk_log10(glibc_cosf(MP_M(tl1,rad))),gfk_log10(glibc_cosf(MP_M(tl2,rad))));
+   cone=MP_D(cone,MP_S(gfk_log10(glibc_tanf(MP_M(MP_S(45.f,MP_D(fabsf(tl1),2.f)),rad))),
+                       gfk_log10(glibc_tanf(MP_M(MP_S(45.f,MP_D(fabsf(tl2),2.f)),rad)))));
+  }else cone=glibc_sinf(MP_M(fabsf(tl1),rad));
+  float ctl=glibc_cosf(MP_M(tl1,rad)),tan1=glibc_tanf(MP_D(MP_M(MP_S(MP_M(90.f,h),tl1),rad),2.f));
+  float rsw=MP_M(MP_D(MP_M(re,ctl),cone),gfk_pow(MP_D(glibc_tanf(MP_D(MP_M(MP_S(MP_M(90.f,h),lat1),rad),2.f)),tan1),cone));
+  float arg=MP_M(cone,MP_M(mav_wrap(MP_S(lon1,stdlon)),rad));
+  float pi=MP_S(h,MP_M(MP_M(h,rsw),glibc_sinf(arg))),pj=MP_A(h,MP_M(rsw,glibc_cosf(arg)));
+  float rm=MP_M(MP_D(MP_M(re,ctl),cone),gfk_pow(MP_D(glibc_tanf(MP_D(MP_M(MP_S(MP_M(90.f,h),la),rad),2.f)),tan1),cone));
+  arg=MP_M(cone,MP_M(mav_wrap(MP_S(lo,stdlon)),rad));
+  i=MP_M(h,MP_A(pi,MP_M(MP_M(h,rm),glibc_sinf(arg))));j=MP_M(h,MP_S(pj,MP_M(rm,glibc_cosf(arg))));
  }else if(projection==2){
-  float ref=stdlon+90.f,scale=1.f+h*glibc_sinf(tl1*rad),a=lat1*rad;
-  float rsw=re*glibc_cosf(a)*scale/(1.f+h*glibc_sinf(a)),alo=(lon1-ref)*rad;
-  float pi=1.f-rsw*glibc_cosf(alo),pj=1.f-h*rsw*glibc_sinf(alo);
-  a=la*rad;float rm=re*glibc_cosf(a)*scale/(1.f+h*glibc_sinf(a));alo=(lo-ref)*rad;
-  i=pi+rm*glibc_cosf(alo);j=pj+h*rm*glibc_sinf(alo);
+  // set_ps and llij_ps.
+  float ref=MP_A(stdlon,90.f),scale=MP_A(1.f,MP_M(h,glibc_sinf(MP_M(tl1,rad)))),a=MP_M(lat1,rad);
+  float rsw=MP_D(MP_M(MP_M(re,glibc_cosf(a)),scale),MP_A(1.f,MP_M(h,glibc_sinf(a)))),alo=MP_M(MP_S(lon1,ref),rad);
+  float pi=MP_S(1.f,MP_M(rsw,glibc_cosf(alo))),pj=MP_S(1.f,MP_M(MP_M(h,rsw),glibc_sinf(alo)));
+  a=MP_M(la,rad);float rm=MP_D(MP_M(MP_M(re,glibc_cosf(a)),scale),MP_A(1.f,MP_M(h,glibc_sinf(a))));alo=MP_M(MP_S(lo,ref),rad);
+  i=MP_A(pi,MP_M(rm,glibc_cosf(alo)));j=MP_A(pj,MP_M(MP_M(h,rm),glibc_sinf(alo)));
  }else{
-  float dl=dx/(6370000.f*glibc_cosf(rad*tl1)),rsw=lat1==0.f?0.f:gfk_log(glibc_tanf(.5f*((lat1+90.f)*rad)))/dl;
-  i=1.f+mav_wrap(lo-lon1)/(dl*deg);j=1.f+gfk_log(glibc_tanf(.5f*((la+90.f)*rad)))/dl-rsw;
+  // set_merc and llij_merc.
+  float dl=MP_D(dx,MP_M(6370000.f,glibc_cosf(MP_M(rad,tl1))));
+  float rsw=lat1==0.f?0.f:MP_D(gfk_log(glibc_tanf(MP_M(.5f,MP_M(MP_A(lat1,90.f),rad)))),dl);
+  i=MP_A(1.f,MP_D(mav_wrap(MP_S(lo,lon1)),MP_M(dl,deg)));
+  j=MP_S(MP_A(1.f,MP_D(gfk_log(glibc_tanf(MP_M(.5f,MP_M(MP_A(la,90.f),rad)))),dl)),rsw);
  }
  int ix=int(roundf(i))-1,iy=int(roundf(j))-1;col[t]=(ix<0 || iy<0 || ix>=nx || iy>=ny)?-1:iy*nx+ix;
 }
+#undef MP_M
+#undef MP_D
+#undef MP_A
+#undef MP_S
+#pragma pop_macro("glibc_sinf")
+#pragma pop_macro("glibc_cosf")
 // WRF upstream Fitch induction additions: MIT, Fraunhofer IWES (2022).
 // Full notice and immutable source pin are in tools/wind_mav_wrf471_oracle.
 __device__ __forceinline__ float fi_area(float z1,float z2,float diameter,float density){

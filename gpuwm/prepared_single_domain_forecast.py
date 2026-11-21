@@ -12693,11 +12693,11 @@ def main(argv=None, *, observer=None, prestaged_boundaries=None,
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-
 def _wrf_reference_receipt(cfg) -> dict:
     """gpuwm.wrf_reference.wrf_reference_receipt, for the report."""
     from gpuwm.wrf_reference import wrf_reference_receipt
     return wrf_reference_receipt(cfg)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

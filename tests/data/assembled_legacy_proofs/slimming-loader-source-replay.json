@@ -1,15 +1,15 @@
 {
   "schema": "measured-slimming-loader-source-replay-v1",
-  "base": "dc3753350b907007cefa558b69095efde070d3c7",
-  "tip": "5f81efef03ffe754ea0878035df4515e45031c63",
+  "base": "6137973e1fec4a616345d98280425cbf88ce347d",
+  "tip": "bf2a9fd6b686618f928863ad5e67fd513ed120d2",
   "source": "gpuwm/core/kernels/__init__.py",
   "before": {
-    "bytes": 94037,
-    "sha256": "172c1e61edce2fd7f9cc948636fed13aaa9e870452a1d98a060573554c7d19ff"
-  },
-  "after": {
     "bytes": 95510,
     "sha256": "91b780a317d9f9e8b95922cde7dc90d902a0539b09e4eb25e323d20d3de5062c"
+  },
+  "after": {
+    "bytes": 95542,
+    "sha256": "d4b811d6d2e06171b4f5500e30b57470a5ed4fd969fcafd328d5e6396c786cdc"
   },
   "generator": "tools/assembled_legacy_replay.py",
   "generator_sha256": "f53f4c541b052cdbef7ad554f8aae5b4c624e91a2b40515496b2523bea9e42fb",
@@ -40,22 +40,22 @@
     }
   },
   "artifacts": {
-    "base-coordinate/source-audit.json": "f1eac44ce612e97fc9a60432eae75729f0698307fb49af806d805d7c1dede6fb",
-    "base-coordinate/direct-native-proof.json": "2990ff0d788dde0ff6db1472d20e76cd0b50b7e9fd4a8c0900e7a08ce73a6653",
-    "tip-coordinate/source-audit.json": "851cb421915db20e2224902cfc7905794b615a8001603f82ab189696a283f987",
-    "tip-coordinate/direct-native-proof.json": "21ba615dacadb4dea6db04d156d861a60e033dbaab136f5a48f5dcf43f373f23",
-    "base-drivers/source-audit.json": "7bc9c13069b112670ceffa5ab670c9a8808bf3fb4fb3c44e56d890a581e2782d",
-    "base-drivers/horizontal-driver.json": "288b85f5f4358a06076c7d4914974c3460ca05f076a7c899d188ba55ed4bca35",
-    "base-drivers/vertical-driver.json": "319920fe2bd369712434eff1cb677fa5305cb4a7a71d46bef6853d052cb31348",
-    "base-drivers/km-mutations.json": "0ad75f053859694b81d88c13f8be3c0c59237ddf0783448d51e279e5c9684ffd",
-    "tip-drivers/source-audit.json": "ade012e390865e1e1fdb349716e6b03ecbefec71ca2ec735fb88f89b23f14a72",
-    "tip-drivers/horizontal-driver.json": "288b85f5f4358a06076c7d4914974c3460ca05f076a7c899d188ba55ed4bca35",
-    "tip-drivers/vertical-driver.json": "319920fe2bd369712434eff1cb677fa5305cb4a7a71d46bef6853d052cb31348",
-    "tip-drivers/km-mutations.json": "0ad75f053859694b81d88c13f8be3c0c59237ddf0783448d51e279e5c9684ffd",
-    "base-acoustic/source-audit.json": "cb6bb081d723a0f3ba02a7d427832f199e847ae2a70a4e21ea46d12356d78e5a",
-    "base-acoustic/acoustic-published-default-proof.json": "6a1043e98767831afa47e79c5f300f2184f588b9d692783a0dccd2e82a0f24a6",
-    "tip-acoustic/source-audit.json": "d17304b1a5e0c539a4f302c5611646553923fb9fe821859339617d7c0d35b0ee",
-    "tip-acoustic/acoustic-published-default-proof.json": "9cc846de1a90c155b9e98f5aa50992664e70788f3c9a7c15d683cabcb78dffc3"
+    "base-coordinate/source-audit.json": "eafaee6f49dbf72da365a9a47dba5f99211f2412fdd3642535097863479e3d44",
+    "base-coordinate/direct-native-proof.json": "deaf51c6540f49386465ef10da48a8f669555c1f5e4b138cc88b207b2a54ab48",
+    "tip-coordinate/source-audit.json": "ac2da27d09bead0932c86bc28ab1c45aede71c5d6d156a3eb0c427409351ddfa",
+    "tip-coordinate/direct-native-proof.json": "2800f50e28deba4c7f08830ba106f1ccb80a11a30179ef92889e36b41b810d1c",
+    "base-drivers/source-audit.json": "abf0ce5959bff00504fd576ec580f26f512def712cd2f5a34f906b8461e0b991",
+    "base-drivers/horizontal-driver.json": "a001e539de1bc38636bec3b80d57ebdb0d5211bce5d6ebf6492bde9519f755ef",
+    "base-drivers/vertical-driver.json": "07c75fcaf07809815c417931b38e2706936e50c8fe35e2ccc2eaf1ff814b9b08",
+    "base-drivers/km-mutations.json": "1d087b7a09b8e2765d214b64847559d135fdba9c7ec7ee11663cfe82aee30d38",
+    "tip-drivers/source-audit.json": "19200aedc48c630e10a49db5e6eb9698ae1c054815ac468bd7dfe703f56fb2a2",
+    "tip-drivers/horizontal-driver.json": "a001e539de1bc38636bec3b80d57ebdb0d5211bce5d6ebf6492bde9519f755ef",
+    "tip-drivers/vertical-driver.json": "07c75fcaf07809815c417931b38e2706936e50c8fe35e2ccc2eaf1ff814b9b08",
+    "tip-drivers/km-mutations.json": "1d087b7a09b8e2765d214b64847559d135fdba9c7ec7ee11663cfe82aee30d38",
+    "base-acoustic/source-audit.json": "2d8381b048da21010f8aa71c4ad2931b6f04109751cd3b079084fa56fbb00079",
+    "base-acoustic/acoustic-published-default-proof.json": "27c96983fa76b14b55480ea5d5994ab33a5f547764d341083428df26e20420ce",
+    "tip-acoustic/source-audit.json": "cecb4e165f478d9b876f2e4c6e4418c09dc73f4ff868f7576dc8cd21a807d036",
+    "tip-acoustic/acoustic-published-default-proof.json": "96c8c175ccb726941f05732e9d09afc8c5ef1d7c51728b538491cff4a440b989"
   },
   "ysu_comment_transition": {
     "before": "cf74efe50f9613ad69fe41a052bd3867fb057a34c0a6adc3a8cd656cc1159686",
@@ -63,7 +63,7 @@
     "identical_without_comments": true
   },
   "capture_identity": {
-    "device": "b'NVIDIA GeForce RTX 5090'",
+    "device": "b'NVIDIA GeForce RTX 5070 Ti'",
     "compute_capability": [
       12,
       0
@@ -76,7 +76,7 @@
     "module_source_sha256": {
       "smag2d": "7dec200c373ce4a01684df3dca4d3797b511bba4c50c0c71465f979a2fb380a2",
       "diff_opt1": "9737655267fca7f30d0a4053008997de55a8e12f4fe552622a09f70ea994e271",
-      "acoustic": "116d49b68cb6a5215f2303d13d9b9320fc38c72a01d21f5f2a68e8ad788b9e08"
+      "acoustic": "ff7d292e278740afe3e0616f7e9bfe98610613ebc208bb1d2c36f0d6b9474ab5"
     },
     "module_options": {
       "smag2d": [
@@ -115,5 +115,34 @@
     "default_acoustic_diffusion_route": false
   },
   "ysu_compiled_source_sha256": "cf74efe50f9613ad69fe41a052bd3867fb057a34c0a6adc3a8cd656cc1159686",
+  "moved_sources": {
+    "gpuwm/core/acoustic.py": {
+      "sealed": {
+        "bytes": 46006,
+        "sha256": "4e66f42ec5849dafc441f7941c4ddbe4cc0495a5f238fd57c108915fb4ac0d57"
+      },
+      "after": {
+        "bytes": 47560,
+        "sha256": "41430ecb61196f0ba8b055babc345ce4d8fbc8d53cb754008a4a2eece4f162f8"
+      }
+    }
+  },
+  "moved_kernels": {
+    "gpuwm/core/kernels/acoustic.cu": {
+      "module": "acoustic",
+      "before": {
+        "bytes": 107771,
+        "sha256": "223f21d4f97e5ae74bb3ade52d3a45d0c3538bdd711753fd428eaf7318b6cda0"
+      },
+      "after": {
+        "bytes": 112414,
+        "sha256": "f77019d65f9d8e37b4e57a234e9d0dba5618586891a38b3bc24e31fa31a3d39b"
+      },
+      "module_source_sha256": {
+        "before": "116d49b68cb6a5215f2303d13d9b9320fc38c72a01d21f5f2a68e8ad788b9e08",
+        "after": "ff7d292e278740afe3e0616f7e9bfe98610613ebc208bb1d2c36f0d6b9474ab5"
+      }
+    }
+  },
   "pin_changes": []
 }

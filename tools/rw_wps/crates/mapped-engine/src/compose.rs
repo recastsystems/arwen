@@ -1525,7 +1525,14 @@ pub fn run_compose(invocation: &Invocation, progress: &mut dyn FnMut(Value)) -> 
             progress(json!({"event": "horizontal_regrid", "binding": binding.name, "regrid": receipt}));
             (donor, Some(receipt))
         } else { (donor_collection, None) };
-        donor_collection.direct.retain(|(_, _, name), _| binding.fields.contains(name));
+        // Keep what the binding borrows: its own fields and, for a companion,
+        // the levels it stacks above the primary's top.  Keeping only
+        // `binding.fields` dropped a companion's air temperature, winds,
+        // height and humidity, so every rrfs-ens preparation was refused at
+        // the join ("decoded fields [...surface...] instead of the bound
+        // [...]") from 2.9.10 to 3.0.4 (3.0.5 front-door run).
+        let kept_names = binding.donor_fields();
+        donor_collection.direct.retain(|(_, _, name), _| kept_names.contains(name));
         let (plan, mut receipt) = crate::join::plan_bound_fields(
             &crate::join::PrimaryHeader {
                 latitude: stream.latitude(),

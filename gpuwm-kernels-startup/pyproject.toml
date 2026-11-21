@@ -10,6 +10,9 @@ license-files = ["LICENSE", "NOTICE", "licenses/*"]
 requires-python = ">=3.11"
 dependencies = []
 dynamic = ["version"]
+[project.urls]
+Homepage = "https://github.com/recastsystems/arwen"
+Repository = "https://github.com/recastsystems/arwen"
 [tool.setuptools.dynamic]
 version = { file = ["gpuwm_kernels_startup/VERSION"] }
 [tool.setuptools.packages.find]

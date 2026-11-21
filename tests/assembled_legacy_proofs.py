@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-SOURCE_EXTENSION_SHA = 'caab52b63f14348aac3f3e97f06f4db1f0f2b0a9528b336e5ec613af8e2229a5'
+SOURCE_EXTENSION_SHA = '1bc5fc245d8af66fb905d5dd1077f233091ae75ee819ebec97edb0abfa31d82b'
 DIFFUSION_CACHE_EXTENSION_SHA = "7c25859ca56cc0bece13349224df0e20d4633ba01829bf8fafda2c4cbece6400"
 
 PROOF_SHAS = {
@@ -210,7 +210,11 @@ def _source_extension(root, name, before, after, schema=None):
         # option moved the loader): base dc3753350b (public 2.9.13) against
         # 5f81efef03, zero differing words in all three families on an RTX 5090
         # (sm_120), NVRTC 13.4.92. Previously 93a5e7e316.
-        assert replay["base"] == "dc3753350b907007cefa558b69095efde070d3c7"
+        # Re-measured for the 3.0.5 fold (the frame update over the ring, jacobbieker/woof PR 522, moved
+        # acoustic.py and acoustic.cu; the folds moved the loader): base 6137973e1f (public 3.0.4) against
+        # bf2a9fd6b6, zero differing words in all three families on an RTX 5070 Ti (sm_120), CuPy 14.2.0,
+        # NVRTC 13.4.92; acoustic.cu admitted as a moved kernel. Previously dc3753350b.
+        assert replay["base"] == "6137973e1fec4a616345d98280425cbf88ce347d"
         assert replay["measurements"] == measured["measurements"]
         assert replay["numerics"] == "strict"
         assert replay["generator"] == "tools/assembled_legacy_replay.py"

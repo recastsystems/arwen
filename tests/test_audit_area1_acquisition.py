@@ -5,6 +5,8 @@ from pathlib import Path
 import dataclasses
 
 import pytest
+from source_parameter_examples import source_parameter_args
+from route_fixture_windows import route_cycle, route_start
 
 from gpuwm import cli, fetch, fetch_routes, runplan
 from gpuwm.filesystem_paths import canonical_path
@@ -322,7 +324,10 @@ def test_c015_staged_chain_consumes_local_manifest_without_network(tmp_path, mon
     # A stationary experiment: the chain reads its relocation contract
     # before it composes the preparation.
     from gpuwm.experiment import RelocationConfig
-    exp = SimpleNamespace(relocation=RelocationConfig(), domains=())
+    # One domain with no chem sets: the chain's chem fetch (f6fdd81d3d)
+    # reads the first domain's run before it composes the preparation.
+    exp = SimpleNamespace(relocation=RelocationConfig(),
+                          domains=(SimpleNamespace(run=SimpleNamespace(chem_sets=None)),))
     with pytest.raises(Prepared):
         runplan._staged_chain(plan, exp=exp, config_path=config,
                               run_dir=tmp_path / "run", observer=observer)
@@ -1040,8 +1045,14 @@ def test_r_no_source_branch_reads_the_window_before_it_is_checked(hours):
 
 def test_r_single_analysis_remains_valid_acquisition():
     for source in fetch.fetch_front_door_sources():
-        fetch.validate_fetch_hints({"source": source, "cycle": _archive_test_cycle(source), "hours": 0},
-                                  source="unit")
+        table = {"source": source, "cycle": _archive_test_cycle(source), "hours": 0}
+        if source in fetch_routes.route_ids() and route_start(source):
+            # A route's one analysis is its first published lead.
+            table["forecast_start_hour"] = route_start(source)
+        from source_parameter_examples import source_parameters_value
+        if source_parameters_value(source) is not None:
+            table["source_parameters"] = source_parameters_value(source)
+        fetch.validate_fetch_hints(table, source="unit")
 
 
 def test_r_a_whole_cadence_still_plans_its_window():
@@ -1086,7 +1097,18 @@ def _archive_test_cycle(source):
     from gpuwm import cf_archive_fetch
     if fetch.native_cf_fetch_contract(source) is not None:
         return cf_archive_fetch.row(fetch_routes.canonical_source(source))["coverage_start"][:13]
+    if source in fetch_routes.route_ids():
+        # The route's own publication period (GEFS v11 ends in 2020, the
+        # 0.1 degree IFS opens on 2026-10-20).
+        return f"{route_cycle(source, 0):%Y-%m-%dT%H}"
     return "2026-08-17T00"
+
+
+def _start_args(source):
+    """--forecast-start-hour for a route with no f000 (the GEFS reforecast)."""
+    if source in fetch_routes.route_ids() and route_start(source):
+        return ("--forecast-start-hour", str(route_start(source)))
+    return ()
 
 
 def _emit_domain(tmp_path, source, accepted=()):
@@ -1101,6 +1123,7 @@ def _emit_domain(tmp_path, source, accepted=()):
         "domain", f"--point={centre[0]:.4f},{centre[1]:.4f}",
         "--card", "16gb", "--root-dx", "3", "--hours", "6",
         "--source", source, "--cycle", _archive_test_cycle(source), "--out", str(out),
+        *source_parameter_args(source), *_start_args(source),
         *[token for name in accepted for token in ("--accept-licence", name)]])
     assert rc == 0, f"{source} did not plan"
     return out

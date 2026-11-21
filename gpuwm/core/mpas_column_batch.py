@@ -1513,8 +1513,9 @@ class MpasColumnBatchPhysics:
         """The most recent Noah-MP step census (or None before one):
         per-class column counts plus ``glacier_path``, the execution
         provenance of the glacier dispatch when glacier columns ran."""
-        census = getattr(self._driver, "last_noahmp_census", None)
-        return None if census is None else dict(census)
+        from gpuwm.core.noahmp_runtime import published_noahmp_census
+        return published_noahmp_census(
+            getattr(self._driver, "last_noahmp_census", None))
 
     @property
     def step_index(self) -> int:

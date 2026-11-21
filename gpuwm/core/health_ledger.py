@@ -165,7 +165,15 @@ class HealthLedger:
         for site, describe in descriptions.items():
             flags = int(host[self._index[site]])
             if flags:
-                describe(flags)
+                try:
+                    describe(flags)
+                except DeferredHealthError:
+                    raise
+                except FloatingPointError as error:
+                    # The site's own text, typed, so the nested health
+                    # recovery answers a non-finite state found here as it
+                    # answers the step gate (see DeferredHealthError).
+                    raise DeferredHealthError(str(error), site=site) from error
                 raise FloatingPointError(
                     f"{site} reported health flags {flags:#x} but its "
                     "description did not raise; a health site must refuse")
@@ -326,14 +334,36 @@ def check_finite(array, *, site: str, message: str) -> bool:
 
 
 def _raise_nonfinite(message: str) -> None:
-    raise FloatingPointError(message + deferred_note())
+    raise DeferredHealthError(message + deferred_note())
+
+
+class DeferredHealthError(FloatingPointError):
+    """A non-finite model state found at a deferred health drain, typed.
+
+    Still a :class:`FloatingPointError` with the site's own text, so every
+    reader that matched the untyped error still matches.  Typed so that the
+    nested health recovery (:mod:`gpuwm.stability_recovery`) answers it.
+    THE BREAKAGE: on a default run the ledger is on, and a blow-up is nearly
+    always found here (the step's own arrays are checked a few steps late)
+    rather than at the per-step gate; the recovery took only the gate's and
+    the full-state validator's types, so a nested run that blew up ended with
+    a receipt of ``attempts: []`` and ``failures: []`` and no retry (3.0.5
+    front-door run, a 12-3 km nest started at a 600 s step).
+    """
+
+    def __init__(self, message, *, site=None):
+        super().__init__(message)
+        self.site = None if site is None else str(site)
+        self.phase = self.site or ""
+        self.variable = None
 
 
 def deferred_note(ledger: "HealthLedger | None" = None) -> str:
     """The sentence appended to a deferred failure, so nobody is misled."""
     return (" (detected at a deferred health drain, so the run advanced past "
             "the step that produced it; re-run with the ledger disabled to "
-            "stop on the exact step)")
+            "stop on the exact step: run the forecast stage again with "
+            "--health-debug, e.g. gpuwm sim ... --health-debug)")
 
 
 def masked_clear(mask, array) -> None:

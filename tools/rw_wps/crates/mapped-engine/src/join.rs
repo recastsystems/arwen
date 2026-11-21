@@ -1040,7 +1040,14 @@ pub fn plan_bound_fields(
         .flatten()
         .filter(|member| Some(*member) != donor_member.as_ref())
         .collect();
-    if binding.companion.is_none() && donor_member.is_some() && !other.is_empty() {
+    // A cycle-invariant static (one record broadcast to every time: the
+    // GEFS reforecast's land mask, whose GRIB2 says member 1) carries no
+    // trajectory, so it lends under any member; refusing it stopped every
+    // control-member (c00) reforecast preparation.
+    let static_broadcast = alignment == "cycle_invariant_broadcast";
+    if binding.companion.is_none() && donor_member.is_some() && !other.is_empty()
+        && !static_broadcast
+    {
         return Err(frame_invalid(format!(
             "contributing source binding {quoted} decoded member {} under \
              primary member {}; borrowing another member's fields would mix \
@@ -2091,6 +2098,27 @@ mod tests {
              member '1'; borrowing another member's fields would mix two \
              trajectories in one frame, which only a declared companion may do"
         );
+    }
+
+    #[test]
+    fn a_cycle_invariant_static_lends_under_any_member() {
+        let time = at("2026-10-05 12:00:00");
+        let cycles = BTreeMap::from([((time, Some("0".to_owned())), time)]);
+        let names = BTreeSet::new();
+        let header = PrimaryHeader {
+            latitude: &[10.0, 11.0],
+            longitude: &[0.0, 1.0, 2.0],
+            vertical_values: &[],
+            source_cycles: &cycles,
+            direct_names: &names,
+        };
+        let mut record = field(time, "land_fraction", grid(2, 3));
+        record.member = Some("1".into());
+        let mut donor = collection(&[10.0, 11.0], &[0.0, 1.0, 2.0], vec![]);
+        donor.direct.insert((time, Some("1".into()), "land_fraction".into()), record);
+        donor.source_cycles.insert((time, Some("1".into())), time);
+        assert!(plan_bound_fields(&header, &donor, &binding("cycle_invariant_broadcast")).is_ok());
+        assert!(plan_bound_fields(&header, &donor, &binding("valid_time_exact")).is_err());
     }
 
     #[test]

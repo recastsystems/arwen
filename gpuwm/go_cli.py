@@ -1732,8 +1732,6 @@ def proof_digests(prepared_root: Path) -> dict:
     not compute a digest the runner will then compare against itself.
     """
 
-    from gpuwm.fetch import sha256_file
-
     proof_path = Path(prepared_root) / "proof.json"
     if not proof_path.is_file():
         raise GoRefusal(
@@ -1742,17 +1740,26 @@ def proof_digests(prepared_root: Path) -> dict:
     payload = json.loads(proof_path.read_text(encoding="utf-8"))
     cache = payload.get("prepared_cache")
     content = cache.get("content_sha256") if isinstance(cache, dict) else None
-    manifest_digest = payload.get("input_manifest_sha256")
-    if not isinstance(content, str) or not isinstance(manifest_digest, str):
+    if not isinstance(content, str):
         raise GoRefusal(
             f"{proof_path} carries no single prepared-cache identity, "
             "which is what a multi-domain hierarchy product looks like.  "
             "Its runner is gpuwm-prepared-tree-forecast (module form: "
             "python -m gpuwm.prepared_domain_tree_forecast); see "
             f"{MANUAL_CHAIN}")
-    return {"proof": sha256_file(proof_path),
-            "source_manifest": manifest_digest,
-            "prepared_content": content}
+    # A mapped route (aifs, icon-global, ...) records no top-level
+    # input_manifest_sha256: its manifest is the evidence copy the runner
+    # re-hashes.  The triple is the one `gpuwm sim` binds, read by the same
+    # function, instead of calling a single-domain proof a hierarchy
+    # product (jacobbieker/woof#72).
+    from gpuwm.stage_cli import StageRefusal, single_domain_digests
+
+    try:
+        digests = single_domain_digests(
+            {"document": proof_path, "payload": payload, "layout": "single"})
+    except StageRefusal as refusal:
+        raise GoRefusal(str(refusal)) from None
+    return dict(digests)
 
 
 def head_digests(prepared_root: Path, head_sha256: str) -> dict:
@@ -6340,6 +6347,11 @@ def _go_config_main(args, *, observer=None) -> int:
                         "configuration launches retain their stage workers")
     if getattr(args, "allow_shared_gpu", False):
         raise GoRefusal("--allow-shared-gpu currently requires WRF inputs")
+    # Only the WRF-input door translates this flag (gpuwm.wrfinput_go); on a
+    # configuration launch it was dropped silently and the run took an
+    # exclusive, supervised card (jacobbieker/woof#634).
+    if getattr(args, "native_shared_gpu", False):
+        raise GoRefusal("--native-shared-gpu requires WRF inputs")
     if getattr(args, "benchmark", False):
         raise GoRefusal("--benchmark requires WRF inputs")
     if getattr(args, "run_seconds", None) is not None:

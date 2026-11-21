@@ -27,6 +27,8 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from source_parameter_examples import source_parameter_args
+from route_fixture_windows import route_cycle, route_hours, route_start
 
 from gpuwm.cli import main as cli_main
 from gpuwm import source_adapters as registry
@@ -69,8 +71,13 @@ def _plan_cycle(source: str) -> str:
 
     from datetime import datetime, timedelta
 
+    from gpuwm import fetch_routes
     from gpuwm.fetch import native_cf_fetch_contract
 
+    if source in fetch_routes.route_ids():
+        # A table route's own publication period (the GEFS v11 archives end
+        # in 2020; the 0.1 degree IFS opens on 2026-10-20).
+        return f"{route_cycle(source, 0):%Y-%m-%dT%H}"
     try:
         contract = native_cf_fetch_contract(source)
     except (KeyError, ValueError):
@@ -103,8 +110,20 @@ def _emit(tmp_path: Path, source: str, *extra: str,
     rc = cli_main([
         "domain", f"--point={lat:.4f},{lon:.4f}", "--card", extra_card,
         "--root-dx", "3", "--hours", hours, "--source", source,
-        "--cycle", cycle, "--out", str(out), *licence_args, *extra])
+        "--cycle", cycle, "--out", str(out), *licence_args,
+        *source_parameter_args(source), *_start_args(source), *extra])
     return rc, out
+
+
+def _start_args(source: str) -> tuple[str, ...]:
+    """--forecast-start-hour for a route that publishes no f000 (the GEFS
+    reforecast starts at f003), read from its row; none otherwise."""
+
+    from gpuwm import fetch_routes
+
+    if source not in fetch_routes.route_ids() or not route_start(source):
+        return ()
+    return ("--forecast-start-hour", str(route_start(source)))
 
 
 # ---------------------------------------------------------------------------
@@ -211,11 +230,17 @@ def test_a_fetch_only_source_is_refused_by_the_wizard_naming_its_state(
     wizard says so by the registry row's state instead of writing a
     configuration nothing could prepare."""
 
-    assert get_source_adapter(source).status is AdapterStatus.COMPOSITION_REQUIRED
+    # The row's own state, whichever it is: rrfs-ens was the first such
+    # route (explicit_composition_required); the analysis-only surface
+    # donors (ncep-r1-seaice, gefs-reforecast-land) are
+    # adapter_mapping_required, and the wizard names that state as well.
+    status = get_source_adapter(source).status
+    assert status in (AdapterStatus.COMPOSITION_REQUIRED,
+                      AdapterStatus.MAPPING_REQUIRED), status
     rc, out = _emit(tmp_path / source, source)
     err = capsys.readouterr().err
     assert rc == 2 and not out.exists(), err
-    assert "explicit_composition_required" in err, err
+    assert status.value in err, err
 
 
 @pytest.mark.parametrize("source", _planable_sources_with_public_bytes())
@@ -283,6 +308,7 @@ def test_printed_fetch_step_plans_through_the_real_planner(
         cadence=(int(flags["--cadence"]) if "--cadence" in flags else None),
         start_hour=int(flags.get("--forecast-start-hour", 0)),
         host=None, member=None,
+        source_parameters=flags.get("--source-parameters"),
         area=flags.get("--area"), out=Path(flags["--out"]))
 
 
@@ -470,11 +496,21 @@ def test_hand_written_fetch_table_validates_for_every_routed_source(source):
     accepted rather than refused as an unknown source.
     """
 
+    from gpuwm import fetch_routes
     from gpuwm.fetch import validate_fetch_hints
 
-    validate_fetch_hints({"source": source, "cycle": "2026-08-17T00",
-                          "hours": 6, "out": "data"},
-                         source="hand-written.toml")
+    table = {"source": source, "cycle": "2026-08-17T00", "hours": 6, "out": "data"}
+    if source in fetch_routes.route_ids():
+        # Each route asked about a window it publishes: its own period,
+        # its first lead, and one time for an analysis-only donor.
+        table.update(cycle=f"{route_cycle(source, 0):%Y-%m-%dT%H}",
+                     hours=route_hours(source, 6))
+        if route_start(source):
+            table["forecast_start_hour"] = route_start(source)
+        from source_parameter_examples import source_parameters_value
+        if source_parameters_value(source) is not None:
+            table["source_parameters"] = source_parameters_value(source)
+    validate_fetch_hints(table, source="hand-written.toml")
 
 
 # ---------------------------------------------------------------------------

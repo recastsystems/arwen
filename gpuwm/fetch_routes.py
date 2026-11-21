@@ -1354,11 +1354,39 @@ def first_preparable_cycle(route: Route) -> datetime | None:
 def planning_cycles(route: Route) -> tuple[datetime, ...]:
     """Stand-in cycles for pricing the newest preparable layout at each hour."""
     if not route.publication_eras:
-        return tuple(datetime(2001, 1, 1, hour) for hour in route.cycle_hours)
+        # Not before a dated publication row hands the source to another
+        # route: a 2001 stand-in for `gefs` is the GEFS v11 flat archive's
+        # cycle (source_adapters.source_for_cycle), which begins in 2017, so
+        # every `gefs` request with cycle "latest" was priced as refused.
+        floor = _publication_redirect_floor(route.source_id)
+        stand_ins = []
+        for hour in route.cycle_hours:
+            cycle = max(datetime(2001, 1, 1), floor).replace(
+                hour=hour, minute=0, second=0, microsecond=0)
+            if cycle < floor:
+                cycle += timedelta(days=1)
+            for _ in range(7):      # a weekday row (the reforecast's Wednesdays)
+                if source_adapters.source_for_cycle(route.source_id, cycle) == route.source_id:
+                    break
+                cycle += timedelta(days=1)
+            stand_ins.append(cycle)
+        return tuple(stand_ins)
     cycles = [cycle for era in route.publication_eras if not era.prep_refusal
               for cycle in _era_cycles(era)]
     return tuple(max(cycle for cycle in cycles if cycle.hour == hour)
                  for hour in route.cycle_hours if any(cycle.hour == hour for cycle in cycles))
+
+
+def _publication_redirect_floor(source: str) -> datetime:
+    """The end of the last dated row that hands SOURCE to another route
+    (authorities/source-publications.v1.json), or 2001-01-01."""
+
+    rows = json.loads((Path(source_adapters.__file__).parent / "authorities"
+                       / "source-publications.v1.json").read_text(encoding="utf-8"))
+    ends = [datetime.fromisoformat(row["valid_until"])
+            for row in rows["sources"].get(source, ())
+            if row.get("valid_until") and row.get("source") != source]
+    return max(ends, default=datetime(2001, 1, 1))
 
 
 def _lead_steps(route: Route, cycle: datetime) -> tuple[tuple[int, int], ...]:
@@ -1587,7 +1615,14 @@ def resolve_leads(route: Route, cycle: datetime, hours: int, *,
                                  floor=1)
                   if named else None)
         remedy = ""
-        if served is not None and served != cadence:
+        if missing[0] < route.first_lead:
+            # The GEFS reforecast publishes no f000: its first state is
+            # f003, so a window must start there.
+            remedy = (f"\n  remedy: start the window at f{route.first_lead:03d}, "
+                      f"its first published lead (--forecast-start-hour "
+                      f"{route.first_lead}, or forecast_start_hour = "
+                      f"{route.first_lead} in [fetch]).")
+        elif served is not None and served != cadence:
             # Worded for every door that names a cadence: the flag, and
             # the [fetch] key a configuration or a saved setup carries.
             remedy = (f"\n  remedy: cadence {served} (--cadence {served}, or "

@@ -2431,16 +2431,23 @@ def execute_experiment(
                           step_health(steppers.get(grid_id), node.state,
                                       node.cfg.run,
                                       boundary_width=node.cfg.run.spec_bdy_width))
+                # Typed, so the nested health recovery sees the failure
+                # (jacobbieker/woof#115).
+                from gpuwm.core.health import StepStabilityError
                 if report["nan"]:
-                    raise RuntimeError(
+                    raise StepStabilityError(
                         f"d{grid_id:02d} integration produced a non-finite state "
-                        f"at model step {clock.step_count + 1}")
+                        f"at model step {clock.step_count + 1}",
+                        grid_id=grid_id, step=clock.step_count + 1,
+                        variable="u/w/theta'")
                 cfl = report["cfl"]
                 if cfl is not None and not math.isfinite(float(cfl)):
-                    raise RuntimeError(
+                    raise StepStabilityError(
                         f"d{grid_id:02d} integration produced a non-finite "
                         f"vertical Courant number at model step {clock.step_count + 1}: "
-                        "a model layer's live thickness is non-positive or non-finite")
+                        "a model layer's live thickness is non-positive or non-finite",
+                        grid_id=grid_id, step=clock.step_count + 1,
+                        variable="vertical Courant number")
             if step_ledger is not None:
                 step_ledger.poll()
             poison()

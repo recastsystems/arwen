@@ -151,10 +151,14 @@ def _draft(source, grid, profile=None):
         anchor = max(first, min(datetime.fromisoformat(CYCLE), last - timedelta(hours=3)))
         cf_archive_fetch.validate_window(source, anchor, 3)
         cycle = anchor.strftime("%Y-%m-%dT%H")
+    # A route whose object names need a user value (HAFS's storm id, jacobbieker/woof#344) is
+    # refused by name without one, so the draft carries the example every source walk passes.
+    from source_parameter_examples import source_parameters_value
     return {"name": "agreement", "source": source, "cycle": cycle, "hours": 3, "card": "24gb",
             "lat": lat, "lon": lon, "width_km": BOX_KM, "height_km": BOX_KM,
             "start_hour": _first_lead(source), "products": None, "profile": profile,
-            "dx_km": grid.get("dx_km"), "ladder": grid.get("ladder"), "chain": grid.get("chain")}
+            "dx_km": grid.get("dx_km"), "ladder": grid.get("ladder"), "chain": grid.get("chain"),
+            "source_parameters": source_parameters_value(source)}
 
 
 def _point(source):

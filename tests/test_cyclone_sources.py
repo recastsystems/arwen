@@ -17,6 +17,7 @@ from gpuwm.source_adapters import get_source_adapter
 
 from cyclone_preset_fit import source_licence
 from cyclone_preset_fit import center, cycle_for, holds_the_preset_root
+from route_fixture_windows import route_start
 
 
 def refused_for_its_window(source):
@@ -25,7 +26,8 @@ def refused_for_its_window(source):
         return False
     with pytest.raises(ValueError, match="covering sources"):
         tc.configuration_text(cycle=cycle_for(source), point=center(source),
-                              forcing_source=source)
+                              forcing_source=source,
+                              start_hour=route_start(source))
     return True
 
 
@@ -38,7 +40,8 @@ def test_all_fetchable_sources_author_valid_configuration(source):
         if refused_for_its_window(source):
             return
         text, exp = tc.configuration_text(cycle=cycle_for(source), point=center(source),
-                                          forcing_source=source)
+                                          forcing_source=source,
+                                          start_hour=route_start(source))
         table = tomllib.loads(text)
         assert table["fetch"]["source"] == source
         validate_fetch_hints(table["fetch"], source="fixture")
@@ -64,7 +67,8 @@ def test_the_plan_route_is_the_one_the_authored_configuration_belongs_to(source)
         if refused_for_its_window(source):
             return
         text, _exp = tc.configuration_text(cycle=cycle_for(source), point=center(source),
-                                           forcing_source=source)
+                                           forcing_source=source,
+                                           start_hour=route_start(source))
         table = tomllib.loads(text)
         assert cs.plan_route(source) == (
             "experiment" if "case_data" in table else "prepared")
@@ -176,7 +180,8 @@ def test_wps_interval_uses_same_registry_value_as_fetch_and_memory(source):
         if refused_for_its_window(source):
             return
         _, experiment = tc.configuration_text(cycle=cycle_for(source), point=center(source),
-                                              forcing_source=source)
+                                              forcing_source=source,
+                                              start_hour=route_start(source))
         interval = get_source_adapter(source).forcing_interval_seconds
         text = render_wps_namelist(experiment, interval_seconds=interval)
         assert f" interval_seconds = {int(interval)}," in text

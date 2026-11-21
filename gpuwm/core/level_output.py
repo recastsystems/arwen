@@ -24,13 +24,17 @@ def scratch_shapes(cfg):
 def initialize(state, cfg):
     if not active(cfg):
         return
-    from gpuwm.core.state import cp
+    from gpuwm.core.state import _array_module_for
     for name, shape in scratch_shapes(cfg).items():
         state.scratch(shape, name)
-    if cfg.p_lev_diags:
-        state.existing_scratch('level_press_targets')[...] = cp.asarray(cfg.press_levels, dtype=cp.float32)
-    if cfg.z_lev_diags:
-        state.existing_scratch('level_z_targets')[...] = cp.asarray(cfg.z_levels, dtype=cp.float32)
+    # The target's own array module: a prepared-cache restore builds a host
+    # (NumPy) setup state, and a CuPy right-hand side cannot be stored into
+    # it ("Implicit conversion to a NumPy array is not allowed").
+    for flag, slot, levels in ((cfg.p_lev_diags, 'level_press_targets', cfg.press_levels),
+                               (cfg.z_lev_diags, 'level_z_targets', cfg.z_levels)):
+        if flag:
+            target = state.existing_scratch(slot)
+            target[...] = _array_module_for(target).asarray(levels, dtype=np.float32)
 
 
 def capture_atmosphere(state, cfg, atmosphere):
@@ -83,6 +87,19 @@ def compute(state, cfg, seconds, *, initial=False):
                           missing=cfg.z_lev_missing)
 
 
+def reference_constants(cfg, metadata):
+    """(P00, T00, TLP) as float32: the input file's when its frame carries
+    them, else the base state the run is built on: WRF's Registry defaults
+    base_pres = 1e5 Pa and base_lapse = 50 K with the run's base_temp, the
+    values gpuwm.core.grid builds the base state from.  A ``gpuwm go``
+    preparation and every nest have no input-file frame.  THE BREAKAGE:
+    p_lev_diags or z_lev_diags on a real-data ``gpuwm go`` case stopped
+    before step 1 with 'requires input reference constant P00'."""
+    defaults = {'P00': 100000.0, 'T00': float(cfg.base_temp), 'TLP': 50.0}
+    return [np.float32(np.asarray(metadata[name]).reshape(-1)[0]) if name in metadata
+            else np.float32(defaults[name]) for name in ('P00', 'T00', 'TLP')]
+
+
 def initial_diagnostics(state, cfg, metadata):
     """start_em initializes p_hyd from total P, then recurs upward for PW."""
     from gpuwm.core.kernels import get_kernel
@@ -94,11 +111,7 @@ def initial_diagnostics(state, cfg, metadata):
     # These are the actual file's reference-profile constants, not a new
     # case-specific reference profile. Prepared non-file inputs supply their
     # own constants through the same metadata frame.
-    constants = []
-    for name in ('P00', 'T00', 'TLP'):
-        if name not in metadata:
-            raise ValueError('native level initialization requires input reference constant '+name)
-        constants.append(np.float32(np.asarray(metadata[name]).reshape(-1)[0]))
+    constants = reference_constants(cfg, metadata)
     n = cfg.nx*cfg.ny
     get_kernel('level_diagnostics', 'level_initial_pressure')(((n+127)//128,), (128,),
         (state.p, state.pb, state.ht, state.c3f, state.c4f, s('level_pw'), s('level_pressure_bounds'),

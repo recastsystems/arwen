@@ -138,7 +138,7 @@ impl CarriedRegisters for AerosolWeights {
 /// the two registers the column before it left (TemperatureWeights in case 7,
 /// AerosolWeights in the GOCART vertical pass). Run in order on one core, the
 /// case-7 loop cost minutes on RRFS v2 conus3km (2,341,818 cells) while the
-/// other cores waited (box V5090, 2026-10-28). The cells are cut into pieces;
+/// other cores waited (measured 2026-10-28). The cells are cut into pieces;
 /// the column just before each piece is run from two unrelated states (finite,
 /// and NaN with distinct payloads). Every way a column can let its entry state
 /// through (keep a register, copy it, multiply it, the 0*x fall-through)

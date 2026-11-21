@@ -176,7 +176,11 @@ def test_nested_pd_lbc_is_folded_once_before_advection(monkeypatch):
     state = FakeState()
     cfg = SimpleNamespace(
         nested=True, specified=False, open_x=False, open_y=False,
-        moist_adv_opt=1, dx=1.0, dy=1.0, spec_zone=1)
+        moist_adv_opt=1, dx=1.0, dy=1.0, spec_zone=1,
+        # No passive tracers (0747f1ef90 reads these on every final stage).
+        tracer_opt=0, madwrf_opt=0, tracer_adv_opt=1,
+        # advance_scalars_stage asks for cu_physics on qv (Tiedtke 16).
+        cu_physics=0)
     dt = 2.0
     moist.advance_scalars_stage(
         state, cfg, np.zeros((1, 3, 5), dtype=np.float32),

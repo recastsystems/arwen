@@ -9,10 +9,10 @@
     "cupy.ReductionKernel",
     "cupy.cuda.compiler.compile_using_nvrtc"
   ],
-  "site_count": 443,
+  "site_count": 444,
   "site_count_by_kind": {
     "cupy.ElementwiseKernel": 38,
-    "cupy.RawKernel": 53,
+    "cupy.RawKernel": 54,
     "cupy.RawModule": 241,
     "cupy.ReductionKernel": 11,
     "cupy.cuda.compiler.compile_using_nvrtc": 100
@@ -30,7 +30,7 @@
     },
     "tests": {
       "cupy.ElementwiseKernel": 5,
-      "cupy.RawKernel": 16,
+      "cupy.RawKernel": 17,
       "cupy.RawModule": 95,
       "cupy.ReductionKernel": 2,
       "cupy.cuda.compiler.compile_using_nvrtc": 32
@@ -412,7 +412,7 @@
     },
     {
       "file": "gpuwm/core/health_ledger.py",
-      "line": 363,
+      "line": 393,
       "column": 24,
       "surface": "package",
       "constructor": "cp.ElementwiseKernel",
@@ -902,12 +902,12 @@
     },
     {
       "file": "gpuwm/core/mynn471_gpu.py",
-      "line": 101,
-      "column": 18,
+      "line": 157,
+      "column": 14,
       "surface": "package",
       "constructor": "compile_using_nvrtc",
       "constructor_kind": "cupy.cuda.compiler.compile_using_nvrtc",
-      "enclosing": "image",
+      "enclosing": "_nvrtc_image",
       "takes_caller_options": true,
       "options_argument_present": true,
       "options_expression": "options",
@@ -918,7 +918,7 @@
     },
     {
       "file": "gpuwm/core/mynn471_gpu.py",
-      "line": 184,
+      "line": 252,
       "column": 11,
       "surface": "package",
       "constructor": "cp.RawKernel",
@@ -938,7 +938,7 @@
     },
     {
       "file": "gpuwm/core/mynn471_gpu.py",
-      "line": 354,
+      "line": 422,
       "column": 11,
       "surface": "package",
       "constructor": "cp.RawKernel",
@@ -954,12 +954,12 @@
     },
     {
       "file": "gpuwm/core/mynn480_gpu.py",
-      "line": 125,
-      "column": 18,
+      "line": 126,
+      "column": 14,
       "surface": "package",
       "constructor": "compile_using_nvrtc",
       "constructor_kind": "cupy.cuda.compiler.compile_using_nvrtc",
-      "enclosing": "image",
+      "enclosing": "_nvrtc_image",
       "takes_caller_options": true,
       "options_argument_present": true,
       "options_expression": "options",
@@ -3483,6 +3483,22 @@
       "text": "vector = cp.RawModule(code=source, options=('-std=c++17',)).get_function('saxpy')"
     },
     {
+      "file": "tests/test_both_streamed_nesting.py",
+      "line": 190,
+      "column": 11,
+      "surface": "tests",
+      "constructor": "cp.RawKernel",
+      "constructor_kind": "cupy.RawKernel",
+      "enclosing": "_force_tables_land_late",
+      "takes_caller_options": true,
+      "options_argument_present": false,
+      "options_expression": null,
+      "options": null,
+      "options_element_expressions": null,
+      "options_are_literal": false,
+      "text": "spin = cp.RawKernel(r'''"
+    },
+    {
       "file": "tests/test_chem_advect_mono_wrf471_parity.py",
       "line": 231,
       "column": 30,
@@ -4142,7 +4158,7 @@
     },
     {
       "file": "tests/test_mp8_frozen.py",
-      "line": 3194,
+      "line": 3206,
       "column": 8,
       "surface": "tests",
       "constructor": "cp.RawModule",

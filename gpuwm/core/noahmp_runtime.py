@@ -2381,6 +2381,31 @@ def _noahmp_post_lsm_diagnostics(fields, *,
     ).astype(cp.float32)
 
 
+_CENSUS_COUNTS = ("land", "water", "sea_ice", "glacier")
+
+
+def published_noahmp_census(census):
+    """A step census as the receipt a caller reads (``last_noahmp_census``).
+
+    The resident route keeps its column counts on the device, so the step
+    itself makes no host read and stays capturable.  The receipt is JSON
+    and is compared with the caller's executed layout, so here, outside the
+    step, the counts become host integers and ``glacier_path`` is kept only
+    when glacier columns ran, as the host route publishes it.
+    THE BREAKAGE THIS PREVENTS (gpuwm 3.0.4 and 3.0.5 at e8d7c8098d): every
+    hex forecast on the ArWen physics route with Noah-MP stopped at step 0,
+    on a glacier path named with no glacier column and then on counts that
+    could not be written to the step receipt.
+    """
+    if census is None:
+        return None
+    published = {key: int(value) if key in _CENSUS_COUNTS else value
+                 for key, value in census.items()}
+    if not published.get("glacier"):
+        published.pop("glacier_path", None)
+    return published
+
+
 def _lsm_step_slab(
     fields,
     atmosphere: Mapping[str, object],
@@ -2560,7 +2585,13 @@ def _lsm_step_slab(
                          snicar_options=options.get("snicar_options"),
                          noahmp_snow_age=noahmp_snow_age,
                          opt_tksno=options.get("opt_tksno", 1))
-        census["glacier_path"] = "noahmp-glacier/resident-cuda"
+        # run_glacier_slab runs the compiled glacier unit of
+        # kernels/noahmp_glacier.cu (glacier_module), so the census names it
+        # by the token the device evaluator publishes; a caller that checks
+        # the token against the CUDA glacier unit stopped at step 0 on any
+        # mesh with glacier columns on the old "noahmp-glacier/resident-cuda".
+        census["glacier_path"] = _glacier_execution_provenance(
+            _glacier_evaluate_on_device)
     elif n_glacier:
         if not params.glacier_path:
             gj, gi = (int(w[0]) for w in np.nonzero(cp.asnumpy(glacier)))

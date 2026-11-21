@@ -1,4 +1,4 @@
-# ArWen 2.7 integration kit
+# ArWen integration kit
 
 This kit documents the versioned CLI, plan documents, and durable run files used to integrate applications with ArWen. It includes a Python subprocess client, interface examples, and capability catalogs. The desktop GUI and Rust TUI use the same forecast engine; the example client is an interface adapter, not a separate Python simulation API.
 

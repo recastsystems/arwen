@@ -108,6 +108,38 @@ def _mapping_top_pa(profile_id: str) -> float | None:
     if str(vertical.get("kind", "")) != "pressure":
         # Coefficient-based coordinates need their own pressure coverage evidence.
         return None
+    top = _pressure_ladder_top_pa(profile_id, vertical)
+    if top is None:
+        return None
+    # A composition whose companion stacks its levels above the primary's
+    # top (rrfs-ens: the member subset stops at 250 hPa, the declared
+    # deterministic RRFS companion reaches 2 hPa) prepares the composed
+    # column, so the companion's ladder is the bound. Read from the
+    # companion mapping's own levels, not from the product's planner.
+    from gpuwm.source_authorities import (packaged_composition,
+                                          packaged_contributing_mappings)
+    try:
+        composition = packaged_composition(profile_id)
+    except (KeyError, FileNotFoundError, ValueError):
+        return top
+    contributing = packaged_contributing_mappings(profile_id)
+    for binding in (composition.get("field_sources") or {}).values():
+        companion = (binding or {}).get("companion") or {}
+        if companion.get("vertical_extension") != "above_primary_top":
+            continue
+        assert "air_temperature" in companion.get("fields", ()), (
+            f"{profile_id}: a companion that extends the column must carry "
+            "the air temperature above the primary top")
+        donor = json.loads(contributing[binding["mapping_role"]].read_text(
+            encoding="utf-8"))
+        reach = _pressure_ladder_top_pa(
+            profile_id, donor.get("coordinates", {}).get("vertical", {}))
+        if reach is not None:
+            top = min(top, reach)
+    return top
+
+
+def _pressure_ladder_top_pa(profile_id: str, vertical: dict) -> float | None:
     levels = vertical.get("levels")
     if not levels:
         return None

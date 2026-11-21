@@ -2837,10 +2837,14 @@ def test_no_fit_advice_names_only_profiles_the_same_source_accepts(
     opt_in = [token for licence in _named_licence_opt_in(source)
               for token in ("--accept-licence", licence)]
 
+    # HAFS's storm id (jacobbieker/woof#344): refused by name without one.
+    from source_parameter_examples import source_parameter_args
+
     def _argv(vram: str) -> list[str]:
         return ["domain", f"--point={point}", "--ladder", "12",
                 "--source", source, "--cycle", cycle,
-                "--hours", "6", "--vram-gib", vram, *start, *opt_in]
+                "--hours", "6", "--vram-gib", vram, *start, *opt_in,
+                *source_parameter_args(source)]
 
     # Force the fit loop's own refusal -- the one that ranks lighter
     # profiles.  The card size that reaches it depends on the source's

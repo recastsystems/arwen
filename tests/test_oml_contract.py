@@ -43,6 +43,17 @@ def test_output_metadata_has_all_seven_fields():
         assert row.netcdf_name == name.upper() and row.dtype == "f4"
 
 
+def test_cold_start_keeps_omlinit_carriers():
+    # real.exe writes H0ML = TMOML = 0; OMLINIT replaces them at a cold start
+    # (module_sf_oml.F:200-230), so the wrfinput field pass must not copy them
+    # back over the initialized state.  From jacobbieker/woof pull request 450.
+    from gpuwm.ingest.wrfinput import oml_cold_start_fields
+    owned = oml_cold_start_fields(run_config(sf_ocean_physics=1))
+    assert owned == set(ocean_option()["state_fields"])
+    assert {name.lower() for name in ocean_option()["input_fields"]} <= owned
+    assert oml_cold_start_fields(run_config()) == frozenset()
+
+
 def test_wrf_input_axes_are_mass_columns():
     from gpuwm.ingest.wrfinput import WRFINPUT_DIMENSIONS
     for name in ocean_option()["input_fields"]:

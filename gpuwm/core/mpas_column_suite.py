@@ -769,8 +769,9 @@ class MpasColumnSuitePhysics(MpasColumnBatchPhysics):
 
     @property
     def last_noahmp_census(self):
-        census = getattr(self._driver, "last_noahmp_census", None)
-        return None if census is None else dict(census)
+        from gpuwm.core.noahmp_runtime import published_noahmp_census
+        return published_noahmp_census(
+            getattr(self._driver, "last_noahmp_census", None))
 
     @property
     def last_ruc_census(self):

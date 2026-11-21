@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -36,8 +37,56 @@ def schema(nz):
             field[key]=affine(field[key],second['arguments'][name][key])
     for key in first['slab_fields']:
         first['slab_fields'][key]=affine(first['slab_fields'][key],second['slab_fields'][key])
-    first['scratch_bytes']=affine(first['scratch_bytes'],second['scratch_bytes'])
+    first['scratch_bytes']=arena_layout(int(nz))[1]
     return first
+
+
+#: A private array's place in the arena, ``m471_array<T>(m471_work,OFFSET,m471_n)``,
+#: with OFFSET affine in MYNN471_NZ as generalize.py wrote it from the 49- and
+#: 50-level lowerings.
+_ARENA_OFFSET=re.compile(r'm471_array<(\w+)>\(m471_work,\((-?\d+)\*\(MYNN471_NZ-49\)\+(\d+)(?:\+(\d+))?\),m471_n\)')
+
+
+@lru_cache(maxsize=1)
+def _arena_rows():
+    """((base, slope) of every arena slot in arena order, the 49-level total,
+    the total's slope): the private-array arena as lowered at 49 levels."""
+    text=(DATA/'model.cu').read_text()
+    rows=sorted({(int(b)+int(c or 0),int(a)) for _,a,b,c in _ARENA_OFFSET.findall(text)}|{(0,0)})
+    first=json.loads((DATA/'schema49.json').read_text())['scratch_bytes']
+    second=json.loads((DATA/'schema50.json').read_text())['scratch_bytes']
+    return tuple(rows),first,second-first
+
+
+@lru_cache(maxsize=64)
+def arena_layout(nz):
+    """({(slope, base): offset}, scratch bytes) of the private-array arena
+    for ``nz`` levels.
+
+    The slots in model.cu are 8-byte multiples: at 49 levels a (kts:kte)
+    array of 196 bytes and a (kts:kte+1) array of 200 bytes both take 200
+    bytes, and at 50 levels they take 200 and 208.  The affine fit through
+    those two lowerings therefore moves a slot that really grows 4 bytes a
+    level by 0 or 8 bytes a level.  Away from 49 and 50 levels the fitted
+    slots overlapped (below 49) or ran into the next array (above 50), and
+    below 24 levels some offsets went negative, before the arena.
+
+    Here every slot keeps at least its 49-level size, and above 49 levels
+    grows by its fitted growth but never less than 8 bytes a level.  That
+    holds every array shape this arena has (1-D at nz or nz+1, 5 x (nz+1),
+    8 x nz, 8 x (nz+1), and fixed scalars and tables);
+    tests/test_mynn_wrf471_options.py checks each slot against every shape
+    its two lowerings admit.  At 49 levels the layout is the lowered one.
+
+    The layout is ported from jacobbieker/woof pull request 269
+    (Apache-2.0).
+    """
+    rows,total49,total_slope=_arena_rows()
+    offsets,at={},0
+    for (base,slope),(following,following_slope) in zip(rows,rows[1:]+((total49,total_slope),)):
+        offsets[(slope,base)]=at
+        at+=following-base+max(following_slope-slope,8)*max(int(nz)-49,0)
+    return offsets,at
 
 
 def scratch_shapes(ncol,nz):
@@ -66,8 +115,16 @@ def source(nz):
     prefix=old[:old.index('extern "C" __global__')]
     start=old.index('__device__ __forceinline__ real mynn_scale_exponent(')
     end=old.index('// Fortran real**real,',start)
+    model=(DATA/'model.cu').read_text()
+    if int(nz)!=49:
+        # Every arena offset at its slot for nz levels (arena_layout).  49
+        # levels keeps the lowered text, so its prebuilt images still bind.
+        offsets,_=arena_layout(int(nz))
+        model=_ARENA_OFFSET.sub(
+            lambda m:f'm471_array<{m[1]}>(m471_work,{offsets[(int(m[2]),int(m[3])+int(m[4] or 0))]},m471_n)',
+            model)
     return (prefix+old[start:end]+FAST_MATH+'\n#define MYNN471_NZ '+str(int(nz))+'\n'
-            +(DATA/'model.cu').read_text()+POST_SOURCE)
+            +model+POST_SOURCE)
 
 
 # Strict mode retains the referee's libm operation order. The regular
@@ -85,6 +142,25 @@ FAST_MATH = r'''
 '''
 
 
+def _nvrtc_image(text,device,exact):
+    """The same source and arithmetic controls through NVRTC (hiprtc on AMD).
+
+    Breakage it prevents: a pip install carries NVRTC but no nvcc, so a 4.7.1 run at any
+    level count or architecture without a shipped image (every count but 49, on sm_89 and
+    sm_120) stopped at its first MYNN call with 'needs its source-bound ... image'.
+    """
+    import cupy as cp
+    from gpuwm.nvrtc_ptx_cache import compile_using_nvrtc
+    options=('-std=c++17','--ftz=false','--fmad='+('false' if exact else 'true'),
+             '--prec-div=true','--prec-sqrt=true')+(('-DGPUWM_WRF_EXACT=1',) if exact else ())
+    with cp.cuda.Device(device):
+        raw,_=compile_using_nvrtc(text,options,None,'mynn471.cu')
+        module=cp.cuda.function.Module()
+        module.load(raw if isinstance(raw,bytes) else raw.encode())
+    names=['mynn471_step'] if exact else ['mynn471_phase'+str(i) for i in PHASES]
+    return module,tuple(module.get_function(name) for name in names)
+
+
 @lru_cache(maxsize=32)
 def image(nz,device,exact):
     import cupy as cp
@@ -94,15 +170,7 @@ def image(nz,device,exact):
         # AMD backend: nvcc cannot build a gfx code object. The same source and
         # arithmetic controls go through the shared HIP route (prebuilt lookup,
         # then hiprtc). CUDA keeps the nvcc image route below unchanged.
-        from gpuwm.nvrtc_ptx_cache import compile_using_nvrtc
-        options=('-std=c++17','--ftz=false','--fmad='+('false' if exact else 'true'),
-                 '--prec-div=true','--prec-sqrt=true')+(('-DGPUWM_WRF_EXACT=1',) if exact else ())
-        with cp.cuda.Device(device):
-            raw,_=compile_using_nvrtc(text,options,None,'mynn471.cu')
-            module=cp.cuda.function.Module()
-            module.load(raw if isinstance(raw,bytes) else raw.encode())
-        names=['mynn471_step'] if exact else ['mynn471_phase'+str(i) for i in PHASES]
-        return module,tuple(module.get_function(name) for name in names)
+        return _nvrtc_image(text,device,exact)
     arch='sm_'+''.join(map(str,cp.cuda.Device(device).compute_capability))
     mode='strict' if exact else 'fast'
     digest=hashlib.sha256(text.encode()).hexdigest()
@@ -116,8 +184,8 @@ def image(nz,device,exact):
     if not binary.exists():
         nvcc=shutil.which('nvcc') or '/usr/local/cuda/bin/nvcc'
         if not Path(nvcc).exists():
-            raise RuntimeError(f'MYNN 4.7.1 needs its source-bound {arch} nz={nz} {mode} image; '
-                               'run the parallel MYNN image prewarm with CUDA nvcc installed')
+            # No shipped image and no nvcc (a pip install): compile through NVRTC.
+            return _nvrtc_image(text,device,exact)
         cache.mkdir(parents=True,exist_ok=True)
         unit=cache/(filename+'.cu')
         unit.write_text(text)

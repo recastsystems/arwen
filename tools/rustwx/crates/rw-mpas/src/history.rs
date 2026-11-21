@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{MpasError, MpasResult};
 use crate::fieldmap::{
-    FIELD_MAP, FieldMapping, FieldSource, field_set_allows, field_set_is_known, native_history_name,
+    FIELD_MAP, FieldMapping, FieldSource, alternate_carriers, field_set_allows, field_set_is_known,
+    native_history_name,
 };
 use crate::weights::MeshCoordinates;
 use rw_store::netcdf_classic::{NcAttr, NcAttrValue};
@@ -653,6 +654,7 @@ fn open_diag_companion(
 fn carries_mapped(file: &netcrust::File, wrf_name: &str, mpas_name: &str) -> bool {
     file.variable(mpas_name).is_some()
         || native_history_name(wrf_name).is_some_and(|name| file.variable(name).is_some())
+        || alternate_carriers(wrf_name).iter().any(|(name, _)| file.variable(name).is_some())
 }
 
 /// [`read_history_with_init`] that also reads a split-stream history: one
@@ -821,7 +823,8 @@ fn read_history_body(
         History(&'static str),
         Diag(&'static str),
     }
-    let mut planned: Vec<(&'static str, Option<Carrier>)> = Vec::new();
+    // The third word is the factor to the row's unit (1 but for an alternate carrier, fieldmap::alternate_carriers).
+    let mut planned: Vec<(&'static str, Option<Carrier>, f32)> = Vec::new();
     for mapping in FIELD_MAP.iter() {
         if mapping.source != FieldSource::History || !field_set_allows(field_set, mapping) {
             continue;
@@ -836,7 +839,7 @@ fn read_history_body(
             .filter(|name| file.variable(name).is_some())
             .unwrap_or(mpas_name);
         if file.variable(name).is_some() {
-            planned.push((mapping.wrf_name, Some(Carrier::History(name))));
+            planned.push((mapping.wrf_name, Some(Carrier::History(name)), 1.0));
             continue;
         }
         // A split-stream run writes this field to its diag stream, under the
@@ -847,17 +850,31 @@ fn read_history_body(
                 .filter(|name| diag.variable(name).is_some())
                 .unwrap_or(mpas_name);
             if diag.variable(name).is_some() {
-                planned.push((mapping.wrf_name, Some(Carrier::Diag(name))));
+                planned.push((mapping.wrf_name, Some(Carrier::Diag(name)), 1.0));
                 continue;
             }
         }
-        planned.push((mapping.wrf_name, None));
+        // Another quantity's carrier in another unit (TEMPO's hail words in mm for the m rows), brought to the
+        // row's unit after the read.
+        let alternate = alternate_carriers(mapping.wrf_name).iter().find_map(|&(name, factor)| {
+            if file.variable(name).is_some() {
+                Some((Carrier::History(name), factor))
+            } else if diag.as_ref().is_some_and(|diag| diag.variable(name).is_some()) {
+                Some((Carrier::Diag(name), factor))
+            } else {
+                None
+            }
+        });
+        match alternate {
+            Some((carrier, factor)) => planned.push((mapping.wrf_name, Some(carrier), factor)),
+            None => planned.push((mapping.wrf_name, None, 1.0)),
+        }
     }
     let read: Vec<MpasResult<Option<(Vec<f32>, usize)>>> = {
         use rayon::prelude::*;
         planned
             .par_iter()
-            .map(|(_, carrier)| match carrier {
+            .map(|(_, carrier, _)| match carrier {
                 Some(Carrier::History(name)) => read_cell_field(&file, name, n_cells),
                 Some(Carrier::Diag(name)) => read_cell_field(
                     diag.as_ref().expect("a diag carrier is planned only with a diag file"),
@@ -868,8 +885,14 @@ fn read_history_body(
             })
             .collect()
     };
-    for ((wrf_name, carrier), value) in planned.iter().zip(read) {
-        match (carrier, value?) {
+    for ((wrf_name, carrier, factor), value) in planned.iter().zip(read) {
+        let value = value?.map(|(mut values, levels)| {
+            if *factor != 1.0 {
+                values.iter_mut().for_each(|v| *v *= *factor);
+            }
+            (values, levels)
+        });
+        match (carrier, value) {
             (Some(Carrier::Diag(_)), Some(value)) => {
                 fields.insert(wrf_name.to_string(), value);
                 if let Some(split) = split.as_mut() {
@@ -1484,6 +1507,68 @@ mod tests {
                 .unwrap_err()
                 .to_string();
         assert!(unknown.contains("unknown history field set"), "{unknown}");
+    }
+
+    /// THE BREAKAGE THIS FIXES: TEMPO's hail words (mm) were read as the m rows HAIL_MAXK1 / HAIL_MAX2D, so a
+    /// 25.4 mm stone drew as 25.4 m.  An MPAS run that carries only TEMPO's words reads them in m; a hex run that
+    /// writes HAIL_MAXK1 itself (m) reads its own words; HAILCAST stays mm.
+    #[test]
+    fn hail_words_read_in_the_rows_units() {
+        use rw_store::netcdf_classic::{NcClassicWriter, NcData, NcDim, NcFormat, NcType, NcVarDef};
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        struct CreatedFixture(PathBuf);
+        impl Drop for CreatedFixture {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let write = |names: &[(&str, [f32; 2])]| {
+            let fixture = CreatedFixture(std::env::temp_dir().join(format!(
+                "rw-mpas-hail-units-{}-{}.nc",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            )));
+            let mut vars = vec![
+                NcVarDef::new("latCell", NcType::Double, vec![0]),
+                NcVarDef::new("lonCell", NcType::Double, vec![0]),
+            ];
+            vars.extend(names.iter().map(|(name, _)| NcVarDef::new(*name, NcType::Float, vec![0])));
+            let mut writer = NcClassicWriter::create(
+                &fixture.0,
+                NcFormat::Offset64,
+                vec![NcDim::fixed("nCells", 2), NcDim::fixed("nVertLevels", 2)],
+                vec![],
+                vars,
+                0,
+            )
+            .unwrap();
+            writer.put("latCell", NcData::Doubles(&[0.0, 0.01])).unwrap();
+            writer.put("lonCell", NcData::Doubles(&[0.0, 0.01])).unwrap();
+            for (name, values) in names {
+                writer.put(name, NcData::Floats(values)).unwrap();
+            }
+            writer.finish().unwrap();
+            fixture
+        };
+        let time = Some(Timestamp::parse("2025-03-15_18:00:00").unwrap());
+        let tempo = write(&[
+            ("max_hail_diameter_sfc_acc", [25.4, 0.0]),
+            ("max_hail_diameter_column_acc", [50.8, 10.0]),
+            ("HAILCAST_DIAM_MAX", [31.0, 0.0]),
+        ]);
+        for set in ["surface", "full", "mpassit"] {
+            let frame = read_history_on_mesh_with_field_set(&tempo.0, None, time, None, None, set).unwrap();
+            let near = |got: &[f32], want: [f32; 2]| got.iter().zip(want).all(|(a, b)| (a - b).abs() < 1.0e-7);
+            assert!(near(&frame.fields["HAIL_MAXK1"].0, [0.0254, 0.0]), "{set}: TEMPO's 25.4 mm is 0.0254 m");
+            assert!(near(&frame.fields["HAIL_MAX2D"].0, [0.0508, 0.01]), "{set}");
+            assert_eq!(frame.fields["HAILCAST_DIAM_MAX"].0, [31.0, 0.0], "{set}: HAILCAST stays mm");
+        }
+        let hex = write(&[("HAIL_MAXK1", [0.019, 0.0]), ("max_hail_diameter_sfc_acc", [25.4, 0.0])]);
+        let frame = read_history_on_mesh_with_field_set(&hex.0, None, time, None, None, "surface").unwrap();
+        assert_eq!(frame.fields["HAIL_MAXK1"].0, [0.019, 0.0], "hex's own words (m) come first");
+        assert!(frame.absent.iter().any(|name| name == "HAIL_MAX2D"));
     }
 
     #[test]

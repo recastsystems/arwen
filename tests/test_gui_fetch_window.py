@@ -175,8 +175,15 @@ def test_every_start_hour_the_guidance_offers_is_one_the_fetchs_lead_resolver_ta
 
     now = datetime(2026, 9, 26, 20, 28)
     route = fetch_routes.table_route(source)
+    from route_fixture_windows import analysis_only
+    single_time = analysis_only(source)
     for hours in (1, 2, 3, 6, 9, 12, 24, 36, 48, 72, 120, 168, 240, 384):
         document = availability(source, hours, now=now)
+        if single_time:
+            # A route that publishes one time per cycle (the reforecast's
+            # surface donors) holds no window of any length: nothing is offered.
+            assert document["cycle_hours"] == []
+            continue
         assert document["last_hour"] % document["cadence_hours"] == 0
         for hour in document["cycle_hours"]:
             fetch_routes.resolve_leads(route, now.replace(hour=hour), document["last_hour"],
