@@ -3207,7 +3207,8 @@ def _staged_estate_check() -> Check:
         return Check(
             _STAGED_ESTATE_NAME, "info",
             f"no pinned artifact is staged at {staged_dir}; each one's own "
-            "line above names what it costs and how to get it",
+            "line above names what it costs and how to get it; "
+            + bridges.bridge_dir_override_note(),
             brief="nothing staged to compare", group=_GROUP_BRIDGES,
             blocking=False)
     return Check(

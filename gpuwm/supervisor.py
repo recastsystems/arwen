@@ -45,6 +45,7 @@ from gpuwm.certify.capsule import emit_run_capsule
 from gpuwm.explain import split as explain_split
 from gpuwm.explain import warn
 from gpuwm.filesystem_paths import publish_new
+from gpuwm.shared_files import open_shared
 # A killed run's only chance to say anything.  Both processes below are
 # front doors that own a whole run, and neither had a signal handler:
 # SIGTERM killed them at SIG_DFL with nothing printed.
@@ -1507,17 +1508,126 @@ def preflight_exclusive_gpu(gpu_uuid: str, *,
         gpu_uuid, conflicts, reservation_bytes, decide=decide)
 
 
+def machine_lock_root() -> Path:
+    """The card lock folder every account shares when none is configured."""
+
+    if os.name == "nt":
+        return (Path(os.environ.get("PROGRAMDATA", tempfile.gettempdir()))
+                / "gpuwm" / "locks")
+    return Path(tempfile.gettempdir()) / "gpuwm" / "locks"
+
+
 def default_lock_path(gpu_uuid: str) -> Path:
     digest = hashlib.sha256(gpu_uuid.encode("utf-8")).hexdigest()[:24]
     configured = os.environ.get(GPU_LOCK_ROOT_ENV)
     if configured:
         root = Path(configured).expanduser().resolve()
-    elif os.name == "nt":
-        root = (Path(os.environ.get("PROGRAMDATA", tempfile.gettempdir()))
-                / "gpuwm" / "locks")
     else:
-        root = Path(tempfile.gettempdir()) / "gpuwm" / "locks"
+        root = machine_lock_root()
     return root / f"gpu-{digest}.lock"
+
+
+class GPULockFolderRefused(RuntimeError):
+    """The machine-wide card lock folder cannot be used by this account.
+
+    The breakage it names: the card locks live in one folder for every
+    account on a host, because a card is shared by all of them.  Up to
+    3.0.5 the first account to make that folder (``<tmp>/gpuwm/locks``,
+    by a fetch or a run) made it with its own umask (755), and every other
+    account's run then stopped with a ``PermissionError`` traceback when
+    it took a card lock (reproduced with two accounts in Nov 2026).
+    """
+
+
+def ensure_shared_lock_folder(folder: Path) -> Path:
+    """Make the card lock folder one that every account can lock in.
+
+    On POSIX a folder this account makes, or owns, is set to mode 1777
+    (writable by all, sticky, as ``/tmp`` is), so another account can
+    create its lock files there and nobody can delete or replace another
+    account's.  A folder that another account made without write for all
+    is refused with the remedy.  Windows is left as it was.
+    """
+
+    folder = Path(folder)
+    if os.name == "nt":
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        info = folder.stat()
+        if info.st_uid == os.getuid() and (info.st_mode & 0o1777) != 0o1777:
+            folder.chmod(0o1777)
+    except PermissionError as error:
+        raise GPULockFolderRefused(_lock_folder_remedy(
+            folder, f"cannot be created by this account ({error.strerror})")
+        ) from None
+    if not os.access(folder, os.W_OK | os.X_OK):
+        raise GPULockFolderRefused(_lock_folder_remedy(
+            folder, f"belongs to another account (uid {folder.stat().st_uid}) "
+            "and is not writable by this one"))
+    return folder
+
+
+def _lock_folder_remedy(folder: Path, problem: str) -> str:
+    return (
+        f"the card lock folder {folder} {problem}, so this run cannot take "
+        "its card lock.\n"
+        f"  remedy: the folder's owner runs `chmod 1777 {folder}` once "
+        "(gpuwm 3.0.6 and later make it so themselves), or every account "
+        f"sets {GPU_LOCK_ROOT_ENV} to one folder all of them can write.\n"
+        "  why: a card lock keeps two runs, of any account, off one card, "
+        "so its folder is shared by every account on the machine.")
+
+
+def _in_machine_lock_root(path: Path) -> bool:
+    try:
+        return path.parent.resolve() == machine_lock_root().resolve()
+    except OSError:
+        return False
+
+
+def _open_shared_lock(path: Path):
+    """Open a card lock file; in a shared lock folder, one every account
+    can lock.
+
+    The machine card lock folder is made shared
+    (:func:`ensure_shared_lock_folder`).  In any shared folder (mode 1777,
+    as that one is) the lock file is made mode 666 by the account that
+    creates it, so another account's run can open it to take the lock,
+    and it is never followed through a link (a link planted in a shared
+    folder must not point the lock record at another file).  A lock in a
+    folder that is not shared (a configured GPUWM_GPU_LOCK_ROOT, an input
+    store's own locks) is opened as before: that folder's modes are its
+    owner's choice.
+    """
+
+    if os.name == "nt":
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path.open("a+b")
+    if _in_machine_lock_root(path):
+        ensure_shared_lock_folder(path.parent)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    if path.parent.stat().st_mode & 0o1002 != 0o1002:
+        return path.open("a+b")
+    flags = (os.O_RDWR | os.O_CREAT | os.O_APPEND
+             | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        # Opened without O_CREAT when another account made it: Linux refuses an O_CREAT open of
+        # another account's file in a sticky folder, whatever its mode (shared_files.open_shared).
+        fd = open_shared(path, flags, 0o666)
+    except PermissionError as error:
+        raise GPULockFolderRefused(_lock_folder_remedy(
+            path.parent, f"holds {path.name}, which this account cannot "
+            f"open for writing ({error.strerror}); its owner runs "
+            f"`chmod 666 {path}` once")) from None
+    try:
+        if os.fstat(fd).st_uid == os.getuid():
+            os.fchmod(fd, 0o666)
+    except OSError:
+        pass
+    return os.fdopen(fd, "a+b")
 
 
 class GPUFileLock:
@@ -1533,8 +1643,7 @@ class GPUFileLock:
     def acquire(self) -> "GPUFileLock":
         if self._stream is not None:
             raise RuntimeError("GPU lock is already held by this object")
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        stream = self.path.open("a+b")
+        stream = _open_shared_lock(self.path)
         try:
             stream.seek(0, os.SEEK_END)
             if stream.tell() == 0:
@@ -3131,6 +3240,7 @@ __all__ = [
     "FINALIZATION_FLOOR_BYTES_PER_SECOND",
     "finalization_stale_threshold_seconds",
     "GPUAlreadyLockedError", "GPUFileLock", "GPUIdentity",
+    "GPULockFolderRefused", "ensure_shared_lock_folder", "machine_lock_root",
     "GPU_LOCK_ROOT_ENV", "INPUT_AUTHORITIES_ENV",
     "GPUPreflightError", "GPUProcess", "HEARTBEAT_NAME",
     "HEARTBEAT_SCHEMA", "Heartbeat", "RollingStepWall", "RuntimeHeartbeat",

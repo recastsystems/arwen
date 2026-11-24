@@ -1609,9 +1609,9 @@ mod tests {
         assert!(capability.cooldown >= Duration::from_secs(60));
 
         let url = "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?file=x";
-        wx_core::download::pace_nomads_request(url);
+        wx_core::download::pace_nomads_request(url).expect("the governor's lock");
         let started = Instant::now();
-        wx_core::download::pace_nomads_request(url);
+        wx_core::download::pace_nomads_request(url).expect("the governor's lock");
         let spacing = started.elapsed();
         assert!(
             spacing >= Duration::from_millis(350),
@@ -1629,7 +1629,8 @@ mod tests {
         let started = Instant::now();
         wx_core::download::pace_nomads_request(
             "https://noaa-gfs-bdp-pds.s3.amazonaws.com/gfs.20260730/12/atmos/x",
-        );
+        )
+        .expect("a host the governor does not pace");
         assert!(started.elapsed() < Duration::from_millis(200));
 
         unsafe {
@@ -1637,5 +1638,92 @@ mod tests {
             std::env::remove_var("RUSTWX_NOMADS_MIN_INTERVAL_MS");
         }
         let _ = std::fs::remove_dir_all(&scratch);
+    }
+
+    fn governor_scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("rw_fetch_lock_{}_{}", name, std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("scratch");
+        dir
+    }
+
+    /// The breakage (3.0.6 user confirmation, 24 Nov 2026): every account's
+    /// NOMADS pacing state sat in the one shared temp folder, so another
+    /// account's sentinel, left by a process killed while holding it, hung
+    /// this account's NOMADS fetches at full CPU with no message.  The default
+    /// state is now the account's own folder.
+    #[cfg(unix)]
+    #[test]
+    fn the_nomads_pacing_state_is_the_accounts_own() {
+        use std::os::unix::fs::MetadataExt;
+        let probe = std::env::temp_dir().join(format!("rw_fetch_uid_{}", std::process::id()));
+        std::fs::write(&probe, b"x").expect("probe");
+        let uid = std::fs::metadata(&probe).expect("probe").uid();
+        let _ = std::fs::remove_file(&probe);
+        assert_eq!(
+            wx_core::download::default_nomads_rate_state(),
+            std::env::temp_dir()
+                .join(format!("rustwx-nomads-{uid}"))
+                .join("rustwx_nomads_rate_limit.state")
+        );
+    }
+
+    /// A stale sentinel this account cannot remove (another account's in a
+    /// sticky folder; here, a folder it may not write) is one error line naming
+    /// the file, answered at once.  The take used to retry the removal for ever.
+    #[cfg(unix)]
+    #[test]
+    fn a_nomads_lock_this_account_cannot_remove_is_an_error_not_a_spin() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::Duration;
+        let dir = governor_scratch("unremovable");
+        let state = dir.join("rustwx_nomads_rate_limit.state");
+        std::fs::write(state.with_extension("lock"), b"999999999 0\n").expect("lock");
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).expect("chmod");
+        if std::fs::OpenOptions::new().write(true).create_new(true).open(dir.join("probe")).is_ok() {
+            // root writes anyway: the refusal cannot be staged on this host
+            std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+            let _ = std::fs::remove_dir_all(&dir);
+            return;
+        }
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let taken = state.clone();
+        std::thread::spawn(move || {
+            let _ = sender.send(wx_core::download::probe_nomads_rate_lock(&taken, Duration::from_secs(300)));
+        });
+        let outcome = receiver.recv_timeout(Duration::from_secs(20));
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let _ = std::fs::remove_dir_all(&dir);
+        let why = outcome
+            .expect("the governor spun on a stale lock it cannot remove")
+            .expect_err("a stale lock this account cannot remove was reported as taken");
+        assert!(why.contains("rustwx_nomads_rate_limit.lock") && why.contains("cannot remove it"), "{why}");
+        assert!(!why.contains('\n'), "{why}");
+    }
+
+    /// A sentinel held past the bound ends the wait with an error naming it;
+    /// a free one is taken and released as before.
+    #[test]
+    fn a_nomads_lock_held_past_the_bound_is_an_error_and_a_free_one_is_taken() {
+        use std::time::{Duration, Instant};
+        let dir = governor_scratch("held");
+        let state = dir.join("rustwx_nomads_rate_limit.state");
+        wx_core::download::probe_nomads_rate_lock(&state, Duration::from_secs(5)).expect("a free lock");
+        assert!(!state.with_extension("lock").exists(), "the probe left its sentinel");
+        let held = format!(
+            "{} {}\n",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|value| value.as_millis())
+                .unwrap_or(0)
+        );
+        std::fs::write(state.with_extension("lock"), held).expect("lock");
+        let started = Instant::now();
+        let why = wx_core::download::probe_nomads_rate_lock(&state, Duration::from_millis(300))
+            .expect_err("a held lock was reported as taken");
+        assert!(started.elapsed() < Duration::from_secs(10));
+        assert!(why.contains("still held after"), "{why}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -673,9 +673,10 @@ on a 700 MB object:
 - **A cross-process NOMADS rate governor.** A lock file and shared
   state enforce a 2.5-second minimum gap between NOMADS requests and a
   node-wide cooldown when NOMADS' over-rate-limit response is
-  recognised -- shared across *every* process on the machine that uses
-  it, so two concurrent fetches cooperate instead of racing each other
-  into an IP block.
+  recognised -- shared across *every* process of one account on the
+  machine that uses it, so two concurrent fetches cooperate instead of
+  racing each other into an IP block (several accounts: see "A host
+  shared by several accounts").
 - **A disk cache** keyed by URL and byte range, so a re-run or an
   overlapping window re-reads bytes instead of re-downloading them
   (`--cache-dir`).
@@ -898,9 +899,10 @@ attribution* below). One command downloads and stages all of it:
 gpuwm fetch-geog
 ```
 
-- Stages into `$GPUWM_CASE_DATA_ROOT/WPS_GEOG` (exactly the tree
-  `gpuwm doctor` checks and wizard configs reference); `--root DIR`
-  overrides. With the variable unset, the root defaults to
+- Stages into `$GPUWM_WPS_GEOG` when it is set, otherwise
+  `$GPUWM_CASE_DATA_ROOT/WPS_GEOG` (exactly the tree `gpuwm doctor`
+  checks and wizard configs reference); `--root DIR` overrides. With
+  neither variable set, the root defaults to
   `~/Downloads` on Windows and to the XDG data directory
   (`$XDG_DATA_HOME/gpuwm`, usually `~/.local/share/gpuwm`) everywhere
   else.
@@ -1100,6 +1102,81 @@ $GPUWM_CASE_DATA_ROOT/
 ```
 
 `gpuwm doctor` checks this layout and says exactly what is missing.
+
+## A host shared by several accounts
+
+Each account that runs gpuwm on one host keeps its own fetch locks; the
+bridges, the case data and the card locks can be shared.
+
+- **Fetch locks.** A fetch takes a lock on its output folder before it
+  writes. The lock files live in a folder of the account's own,
+  `<tmp>/gpuwm-<uid>/locks` (`%LOCALAPPDATA%\gpuwm\locks` on Windows),
+  so each account fetching into its own folders needs nothing set.
+  `GPUWM_FETCH_LOCK_ROOT` moves that folder.
+- **One output folder for several accounts** (Linux). The accounts must
+  be able to write each other's files there, and their fetches must take
+  their locks in one folder, so that each waits for the other. Give them
+  one group, make the folders group-owned and setgid, and fetch with
+  `umask 002`:
+
+  ```bash
+  # once, as an administrator (here for the accounts alice and bob)
+  sudo groupadd weather
+  sudo usermod -aG weather alice
+  sudo usermod -aG weather bob       # each account logs in again after this
+  sudo install -d -g weather -m 2775 /srv/shared /srv/shared/locks
+  # every account, in the shell it fetches from
+  umask 002
+  export GPUWM_FETCH_LOCK_ROOT=/srv/shared/locks
+  gpuwm fetch --source gfs --cycle latest --hours 3 --area 25,-110,45,-85 --out /srv/shared/gfs-latest
+  ```
+
+  A lock file gpuwm creates in a folder named by `GPUWM_FETCH_LOCK_ROOT`
+  can be written by every account. A fetch into a folder the account
+  cannot write is refused, with this remedy, before anything downloads.
+- **Bridges.** `gpuwm fetch-bridges` stages into `~/.gpuwm/bridges`.
+  `GPUWM_BRIDGE_DIR` moves that folder, so one account stages the bridges
+  once and every account reads them:
+
+  ```bash
+  GPUWM_BRIDGE_DIR=/srv/gpuwm/bridges gpuwm fetch-bridges   # one account, once
+  export GPUWM_BRIDGE_DIR=/srv/gpuwm/bridges                # every account
+  gpuwm doctor --explain        # the staged bridge estate line names the folder in use
+  ```
+
+  The folder must be readable by every account (`chmod -R a+rX`).
+- **Case data.** `GPUWM_CASE_DATA_ROOT` (above) points every account at
+  one geography and data tree.
+- **Geography.** `GPUWM_WPS_GEOG` points every account at one WPS_GEOG
+  archive (about 34 GB on disk), for `gpuwm fetch-geog` and every command
+  that reads it. One account stages it once; the others then find it
+  complete and fetch nothing:
+
+  ```bash
+  GPUWM_WPS_GEOG=/srv/gpuwm/WPS_GEOG gpuwm fetch-geog   # one account, once
+  export GPUWM_WPS_GEOG=/srv/gpuwm/WPS_GEOG             # every account
+  gpuwm fetch-geog --list       # every dataset reads as staged; nothing to download
+  ```
+
+  The folder must be readable by every account (`chmod -R a+rX`). An
+  account that cannot write it is told which datasets are missing and
+  who can stage them, before anything downloads.
+- **Card locks.** `gpuwm run`, `gpuwm multi-run` and `gpuwm stream` take
+  a card lock, which keeps their runs, of any account, off one card. Card
+  locks share one folder per machine, `<tmp>/gpuwm/locks`, which gpuwm
+  makes writable by every account (mode 1777). `GPUWM_GPU_LOCK_ROOT`
+  moves it; every account must then name the same folder.
+  `gpuwm go` with a forecast config takes no card lock: it checks the
+  card's free memory when it starts, so two large runs started together
+  on one card can both pass that check and then run out of card memory.
+  Start the second once the first has finished, or give each run its own
+  card (`CUDA_VISIBLE_DEVICES`).
+- **NOMADS pacing.** The NOMADS rate governor (above) keeps its state in
+  a folder of the account's own, `<tmp>/rustwx-nomads-<uid>`, and paces
+  the fetches of one account. It is not shared between accounts: on a
+  host shared by several accounts, the gap between one account's NOMADS
+  requests and another's is not enforced, and one account's lock cannot
+  stop another account's fetch.
 
 ## Disk budget summary
 

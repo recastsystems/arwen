@@ -244,3 +244,5 @@ tests/test_version_byte_proof.py  needs the built Rust history writer (gpuwm.io.
 tests/test_shinhong480_replay_gpu.py  needs GPUWM_WRF_EXACT=1 set before import: it grades the WRF 4.8.0 Shin-Hong replay under the opt-in strict arithmetic only, which a default process never installs; the strict GPU leg runs it (0e7c9c9310).
 tests/test_seal_check.py  needs the release cut tooling (tools/release/cut/drivers/seal_check.py) and RELEASE-EXCLUDE.txt, which the public snapshot does not carry; every leg on the private tree runs it.
 tests/test_build_drops_release_excluded.py  needs RELEASE-EXCLUDE.txt, which the public snapshot does not carry (and with it nothing to drop); every leg on the private tree runs it.
+# 3.0.6 shared-host card lock folder (fix/306-shared-host-global-hints).
+tests/test_card_lock_folder_shared.py  needs POSIX folder modes and an account that is not root: on Windows there are no such modes, and root writes any folder, so the refusal it checks cannot happen; the Linux CPU leg (a non-root runner) runs it.

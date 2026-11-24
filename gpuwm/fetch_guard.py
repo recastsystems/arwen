@@ -51,6 +51,8 @@ import secrets
 import tempfile
 import threading
 import time
+
+from gpuwm.shared_files import open_shared
 from typing import Any, Callable
 
 from gpuwm.explain import layered
@@ -64,8 +66,10 @@ DEFAULT_LOCK_TIMEOUT_S = 600.0
 #: that would rather fail fast than queue sets this.
 LOCK_TIMEOUT_ENV = "GPUWM_FETCH_LOCK_TIMEOUT_S"
 
-#: Override for the lock root, for tests and for sandboxes where the
-#: default per-user root is not writable.
+#: Override for the lock root: a folder this account can write.  Set it
+#: to one folder that every account writing the same output folders can
+#: write (a group folder) when two accounts fetch into one shared folder
+#: at once; the default is a folder of this account's own.
 LOCK_ROOT_ENV = "GPUWM_FETCH_LOCK_ROOT"
 
 _POLL_S = 0.25
@@ -117,6 +121,22 @@ class FetchLockBusy(RuntimeError):
         self.waited_s = waited_s
         self.idle_s = idle_s
         self.holder = holder
+
+
+class FetchLockRootRefused(RuntimeError):
+    """The lock folder cannot be used by this account; the fetch refuses.
+
+    A refusal with its remedy rather than a ``PermissionError``
+    traceback.  The breakage it names: on a Linux host shared by two
+    accounts, every ``gpuwm fetch`` of the second account stopped with
+    ``PermissionError`` on ``/tmp/gpuwm/locks/...``, a folder the first
+    account had created mode 755 (gpuwm 3.0.5, seen twice in Nov 2026).
+    ``root`` is the folder that was refused.
+    """
+
+    def __init__(self, message: str = "", *, root: Path | None = None) -> None:
+        super().__init__(message)
+        self.root = root
 
 
 class _Patience:
@@ -175,16 +195,206 @@ def _key_lock(key: str) -> threading.RLock:
 
 
 def lock_root() -> Path:
-    """Where lock files live: outside every fetched output tree."""
+    """Where lock files live: outside every fetched output tree.
+
+    One folder per account.  ``GPUWM_FETCH_LOCK_ROOT`` wins when set.
+    Otherwise POSIX uses ``<tmp>/gpuwm-<uid>/locks`` and Windows
+    ``%LOCALAPPDATA%\\gpuwm\\locks``.  Until 3.0.5 every account on a
+    host shared ``<tmp>/gpuwm/locks`` (``%PROGRAMDATA%`` on Windows).
+    The first account created it with its own umask (755), and every
+    other account's fetch then stopped with ``PermissionError``.  A
+    folder per account cannot be taken by another one, and
+    :func:`ensure_lock_root` refuses by name a folder that another
+    account made first.
+
+    The lock keeps two writers of ONE account out of one output folder.
+    Two accounts writing the same shared folder at the same moment
+    exclude each other only when they set ``GPUWM_FETCH_LOCK_ROOT`` to
+    one folder that both can write.
+    """
 
     override = os.environ.get(LOCK_ROOT_ENV)
     if override:
-        return Path(override)
+        return Path(override).expanduser()
     if os.name == "nt":
-        base = Path(os.environ.get("PROGRAMDATA", tempfile.gettempdir()))
-    else:
-        base = Path(tempfile.gettempdir())
-    return base / "gpuwm" / "locks"
+        base = os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()
+        return Path(base) / "gpuwm" / "locks"
+    return Path(tempfile.gettempdir()) / f"gpuwm-{os.getuid()}" / "locks"
+
+
+def _lock_root_remedy(root: Path, problem: str) -> str:
+    example = ("%LOCALAPPDATA%\\gpuwm\\locks" if os.name == "nt"
+               else "~/.cache/gpuwm/locks")
+    setter = (f"set {LOCK_ROOT_ENV}={example}" if os.name == "nt"
+              else f"export {LOCK_ROOT_ENV}={example}")
+    return layered(
+        f"the fetch lock folder {root} {problem}, so this fetch cannot "
+        "take its lock.\n"
+        f"  remedy: point {LOCK_ROOT_ENV} at a folder this account can "
+        f"write, then run the same command again:\n"
+        f"    {setter}",
+        "  why: a fetch takes a lock on its output folder before it "
+        "writes, so two runs cannot interleave their files and their "
+        "receipt.  The lock file lives outside the fetched folder, in "
+        f"this account's lock folder.  {LOCK_ROOT_ENV} moves it; set it "
+        "to one folder that every account can write when two accounts "
+        "fetch into the same shared folder at the same time.")
+
+
+def ensure_lock_root(root: Path | None = None) -> Path:
+    """Make the lock folder (owner only, on POSIX) or refuse by name.
+
+    Returns the folder.  Raises :class:`FetchLockRootRefused` when the
+    folder cannot be made or written, and, for the default per-account
+    folder on POSIX, when it is a link or belongs to another account
+    (a folder of that name made first by someone else would let them
+    hold or swap this account's lock files).  An override folder is the
+    user's choice and only has to be writable.
+    """
+
+    root = lock_root() if root is None else Path(root)
+    default = not os.environ.get(LOCK_ROOT_ENV)
+    try:
+        if default and os.name != "nt":
+            # The per-account parent (<tmp>/gpuwm-<uid>) is made mode 700
+            # so only this account can create or replace files in it.
+            parent = root.parent
+            parent.mkdir(mode=0o700, exist_ok=True)
+            info = os.lstat(parent)
+            import stat as _stat
+            if _stat.S_ISLNK(info.st_mode) or not _stat.S_ISDIR(info.st_mode):
+                raise FetchLockRootRefused(_lock_root_remedy(
+                    parent, "is not a plain folder (a link or a file "
+                    "stands there)"), root=parent)
+            if info.st_uid != os.getuid():
+                raise FetchLockRootRefused(_lock_root_remedy(
+                    parent, f"belongs to another account (uid "
+                    f"{info.st_uid}, this one is {os.getuid()})"),
+                    root=parent)
+            root.mkdir(mode=0o700, exist_ok=True)
+        else:
+            root.mkdir(parents=True, exist_ok=True)
+    except FetchLockRootRefused:
+        raise
+    except PermissionError as error:
+        raise FetchLockRootRefused(_lock_root_remedy(
+            root, f"cannot be created by this account ({error.strerror})"),
+            root=root) from None
+    except FileExistsError:
+        raise FetchLockRootRefused(_lock_root_remedy(
+            root, "is a file, not a folder"), root=root) from None
+    if not os.access(root, os.W_OK | os.X_OK):
+        raise FetchLockRootRefused(_lock_root_remedy(
+            root, "is not writable by this account"), root=root)
+    return root
+
+
+def _open_lock_file(path: Path):
+    """Open, creating it if needed, the lock file at ``path``.
+
+    In a lock folder named by ``GPUWM_FETCH_LOCK_ROOT`` on POSIX, a lock
+    file this account creates is made writable by every account (0666),
+    whatever the umask.  The breakage: with the variable set to one folder
+    for two accounts, as the shared-host section of DATA.md says, the
+    first account's fetch left its lock file at 0644, and every later
+    fetch of the other account into the same output folder was refused
+    at once instead of waiting (3.0.6 candidate, two accounts on one
+    host, 23 Nov 2026).  The exclusion is the lock taken on the open
+    file, not the file's mode, so the mode gives nothing away but the
+    holder record (process id, folder, time) the file carries.
+    """
+
+    flags = os.O_RDWR | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)
+    # Another account's lock file in a sticky shared folder is opened without O_CREAT, which Linux
+    # would refuse whatever the file's mode (shared_files.open_shared).
+    descriptor = open_shared(path, flags, 0o666)
+    try:
+        if os.name != "nt" and os.environ.get(LOCK_ROOT_ENV):
+            info = os.fstat(descriptor)
+            if (info.st_uid == os.getuid()
+                    and info.st_mode & 0o666 != 0o666):
+                try:
+                    os.fchmod(descriptor, 0o666)
+                except OSError:
+                    pass  # the lock still works for this account
+        return os.fdopen(descriptor, "a+b")
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _lock_file_remedy(path: Path, error: OSError) -> str:
+    try:
+        owner = f"account uid {path.stat().st_uid}"
+    except (OSError, AttributeError):
+        owner = "another account"
+    change = (f"chmod a+rw {path}" if os.name != "nt"
+              else f'icacls "{path}" /grant Users:M')
+    return layered(
+        f"the fetch lock folder {path.parent} holds {path.name}, which "
+        f"this account cannot open for writing ({error.strerror}), so this "
+        f"fetch cannot take its lock.  {owner.capitalize()} made it without "
+        "write for others (gpuwm before 3.0.6 made lock files so).\n"
+        "  remedy: the account that made it runs, once:\n"
+        f"    {change}\n"
+        "  or removes the file while no fetch is running; then run the "
+        f"same command again.  Keep {LOCK_ROOT_ENV} as it is: one lock "
+        "folder for both accounts is what makes each wait for the other.",
+        "  why: a fetch takes a lock on its output folder before it writes, "
+        "so two runs cannot interleave their files and their receipt.  "
+        "This gpuwm makes every lock file it creates in a folder named by "
+        f"{LOCK_ROOT_ENV} writable by every account.")
+
+
+class OutputFolderRefused(RuntimeError):
+    """The fetch's output folder cannot be written by this account.
+
+    A refusal with its remedy, taken before the lock and before any
+    download.  The breakage: a second account's ``gpuwm fetch --out``
+    into a folder the first account had made (mode 755) downloaded, then
+    ended in a ``PermissionError`` traceback from
+    :func:`atomic_write_bytes` (3.0.5, and the 3.0.6 candidate, two
+    accounts on one host, 23 Nov 2026).
+    """
+
+    def __init__(self, message: str = "", *, folder: Path | None = None) -> None:
+        super().__init__(message)
+        self.folder = folder
+
+
+def refuse_unwritable_output(out: str | Path) -> None:
+    """Raise :class:`OutputFolderRefused` when this account cannot write
+    ``out`` (or, when it does not exist yet, the folder it would be made
+    in).  POSIX only: on Windows a folder's read-only flag does not stop
+    writes into it, and its access lists are left to the write itself.
+    """
+
+    if os.name == "nt":
+        return
+    folder = Path(out).expanduser()
+    probe = folder
+    while not probe.exists():
+        if probe.parent == probe:
+            return
+        probe = probe.parent
+    if not probe.is_dir() or os.access(probe, os.W_OK | os.X_OK):
+        return
+    try:
+        owner = f"account uid {probe.stat().st_uid}"
+    except OSError:
+        owner = "another account"
+    raise OutputFolderRefused(layered(
+        f"this account cannot write {probe} (it belongs to {owner}), so "
+        f"this fetch cannot write {folder}; nothing was downloaded.\n"
+        "  remedy: fetch into a folder of this account's own (--out), or "
+        "let the accounts share the folder through one group: the owner "
+        "runs `chgrp -R GROUP FOLDER && chmod -R g+rwX FOLDER && "
+        "find FOLDER -type d -exec chmod g+s {} +`, and every account "
+        "fetches with `umask 002` (DATA.md, \"A host shared by several "
+        "accounts\").",
+        "  why: a fetch writes its files and its receipt into the output "
+        "folder; a folder this account cannot write would fail only after "
+        "the download."), folder=probe)
 
 
 def lock_path(kind: str, target: str | Path) -> Path:
@@ -396,8 +606,14 @@ class OutputLock:
         return self
 
     def _take_os_lock(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        stream = self.path.open("a+b")
+        ensure_lock_root(self.path.parent)
+        try:
+            stream = _open_lock_file(self.path)
+        except PermissionError as error:
+            # A shared GPUWM_FETCH_LOCK_ROOT whose lock file another
+            # account left without write for others.
+            raise FetchLockRootRefused(_lock_file_remedy(self.path, error),
+                                       root=self.path.parent) from None
         try:
             stream.seek(0, os.SEEK_END)
             if stream.tell() == 0:
@@ -792,6 +1008,8 @@ __all__ = [
     "DEFAULT_LOCK_TIMEOUT_S",
     "DirectoryProgress",
     "FetchLockBusy",
+    "FetchLockRootRefused",
+    "OutputFolderRefused",
     "LOCK_ROOT_ENV",
     "LOCK_TIMEOUT_ENV",
     "LocalWriteFailed",
@@ -803,9 +1021,11 @@ __all__ = [
     "atomic_write_bytes",
     "atomic_write_text",
     "describe_holder",
+    "ensure_lock_root",
     "hold",
     "local_write_refusal",
     "lock_path",
+    "refuse_unwritable_output",
     "lock_root",
     "quarantine",
     "receive",

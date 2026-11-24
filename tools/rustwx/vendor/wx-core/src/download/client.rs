@@ -118,6 +118,13 @@ const NOMADS_DEFAULT_COOLDOWN: Duration = Duration::from_secs(15 * 60);
 
 const NOMADS_LOCK_STALE_AFTER: Duration = Duration::from_secs(120);
 
+/// The longest one process waits for the governor's sentinel before it stops
+/// with an error.  A live holder keeps the sentinel for the milliseconds it
+/// takes to read and write the state, and an abandoned one turns stale after
+/// [`NOMADS_LOCK_STALE_AFTER`], so a wait this long means the sentinel cannot
+/// be taken at all.
+const NOMADS_LOCK_WAIT_LIMIT: Duration = Duration::from_secs(300);
+
 /// Configuration for creating a DownloadClient.
 ///
 /// There is deliberately no limit on how long a whole request may take:
@@ -466,10 +473,76 @@ fn env_duration_ms(name: &str, fallback: Duration) -> Duration {
         .unwrap_or(fallback)
 }
 
+/// The governor's state file: `RUSTWX_NOMADS_RATE_STATE` when set, else one
+/// per account, `<temp>/rustwx-nomads-<uid>/rustwx_nomads_rate_limit.state`
+/// on POSIX (the folder owner-only) and `<temp>/rustwx_nomads_rate_limit.state`
+/// on Windows, whose temp folder is the account's own.
+///
+/// Until 3.0.6 the default was one file in the shared temp folder for every
+/// account.  In a sticky `/tmp` an account cannot remove or replace another
+/// account's file, so a sentinel another account left behind (its process
+/// killed while holding it) made every NOMADS fetch of every other account
+/// spin at full CPU, with no message and no end.  The same layout as the fetch
+/// locks (`<tmp>/gpuwm-<uid>/locks`): the governor paces the processes of one
+/// account, as DATA.md says.
 fn nomads_state_path() -> PathBuf {
-    std::env::var("RUSTWX_NOMADS_RATE_STATE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir().join("rustwx_nomads_rate_limit.state"))
+    if let Ok(path) = std::env::var("RUSTWX_NOMADS_RATE_STATE") {
+        return PathBuf::from(path);
+    }
+    default_nomads_state_path()
+}
+
+fn default_nomads_state_path() -> PathBuf {
+    let temp = std::env::temp_dir();
+    match account_uid() {
+        Some(uid) => temp
+            .join(format!("rustwx-nomads-{uid}"))
+            .join("rustwx_nomads_rate_limit.state"),
+        None => temp.join("rustwx_nomads_rate_limit.state"),
+    }
+}
+
+/// This process's effective uid on POSIX, read from the owner of a file it
+/// creates (std has no getuid); `None` on Windows.  Cached per process.
+fn account_uid() -> Option<u32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        static UID: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+        *UID.get_or_init(|| {
+            let probe = std::env::temp_dir().join(format!(
+                ".rustwx-uid-{}-{}",
+                std::process::id(),
+                now_millis()
+            ));
+            let uid = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&probe)
+                .and_then(|file| file.metadata())
+                .map(|meta| meta.uid())
+                .ok();
+            let _ = fs::remove_file(&probe);
+            uid
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
+/// Make the state file's folder; the per-account default is owner-only.
+fn make_state_folder(folder: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        if folder.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with("rustwx-nomads-")) {
+            let _ = fs::DirBuilder::new().recursive(true).mode(0o700).create(folder);
+            return;
+        }
+    }
+    let _ = fs::create_dir_all(folder);
 }
 
 fn now_millis() -> u128 {
@@ -523,7 +596,7 @@ fn read_nomads_state(path: &Path) -> (u128, u128, bool) {
 /// gate instead of closing it. Callers now absorb the gap locally instead.
 fn write_nomads_state(path: &Path, last_request_ms: u128, cooldown_until_ms: u128) -> bool {
     if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+        make_state_folder(parent);
     }
     let tmp = path.with_extension("tmp");
     let body = format!(
@@ -567,11 +640,23 @@ fn nomads_lock_is_stale(lock_path: &Path) -> bool {
     false
 }
 
-fn acquire_nomads_rate_lock(state_path: &Path) -> Option<NomadsRateLock> {
+/// Take the governor's sentinel, waiting at most [`NOMADS_LOCK_WAIT_LIMIT`].
+///
+/// A stale sentinel is removed and the take retried; one this account cannot
+/// remove (another account's, in a sticky folder) is an error, never a retry:
+/// the loop used to ignore the failed removal and spin on the still-stale file
+/// for ever.  Every error names the sentinel and the remedy in one line.
+fn acquire_nomads_rate_lock(state_path: &Path) -> Result<NomadsRateLock, String> {
+    acquire_nomads_rate_lock_within(state_path, NOMADS_LOCK_WAIT_LIMIT)
+}
+
+fn acquire_nomads_rate_lock_within(state_path: &Path, limit: Duration) -> Result<NomadsRateLock, String> {
     let lock_path = state_path.with_extension("lock");
     if let Some(parent) = lock_path.parent() {
-        let _ = fs::create_dir_all(parent);
+        make_state_folder(parent);
     }
+    let remedy = "remove it, or set RUSTWX_NOMADS_RATE_STATE to a file this account can write";
+    let started = Instant::now();
     loop {
         match OpenOptions::new()
             .write(true)
@@ -580,16 +665,38 @@ fn acquire_nomads_rate_lock(state_path: &Path) -> Option<NomadsRateLock> {
         {
             Ok(mut file) => {
                 let _ = writeln!(file, "{} {}", std::process::id(), now_millis());
-                return Some(NomadsRateLock { path: lock_path });
+                return Ok(NomadsRateLock { path: lock_path });
             }
             Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
                 if nomads_lock_is_stale(&lock_path) {
-                    let _ = fs::remove_file(&lock_path);
-                    continue;
+                    match fs::remove_file(&lock_path) {
+                        Ok(()) => continue,
+                        Err(gone) if gone.kind() == std::io::ErrorKind::NotFound => continue,
+                        Err(why) => {
+                            return Err(format!(
+                                "the NOMADS rate lock {} was left by a process that is gone, and this account \
+                                 cannot remove it ({why}); {remedy}",
+                                lock_path.display()
+                            ))
+                        }
+                    }
+                }
+                if started.elapsed() >= limit {
+                    return Err(format!(
+                        "the NOMADS rate lock {} is still held after {} s; {remedy}",
+                        lock_path.display(),
+                        limit.as_secs()
+                    ));
                 }
                 std::thread::sleep(Duration::from_millis(50));
             }
-            Err(_) => return None,
+            Err(why) => {
+                return Err(format!(
+                    "the NOMADS rate lock {} cannot be created ({why}); set RUSTWX_NOMADS_RATE_STATE to a \
+                     file this account can write",
+                    lock_path.display()
+                ))
+            }
         }
     }
 }
@@ -622,7 +729,15 @@ fn mark_nomads_rate_limited(url: &str, reason: &str) {
     }
     let cooldown = env_duration_ms("RUSTWX_NOMADS_COOLDOWN_MS", NOMADS_DEFAULT_COOLDOWN);
     let state_path = nomads_state_path();
-    let _lock = acquire_nomads_rate_lock(&state_path);
+    let _lock = match acquire_nomads_rate_lock(&state_path) {
+        Ok(lock) => lock,
+        Err(why) => {
+            // The cooldown cannot be recorded; the request that met the
+            // limit has already failed and is retried with its own backoff.
+            log_nomads_event(url, "cooldown_unrecorded", &why, None);
+            return;
+        }
+    };
     let (last_request_ms, existing_cooldown_until_ms, _sound) = read_nomads_state(&state_path);
     let now = now_millis();
     if existing_cooldown_until_ms > now {
@@ -634,9 +749,9 @@ fn mark_nomads_rate_limited(url: &str, reason: &str) {
     log_nomads_event(url, "cooldown", reason, None);
 }
 
-fn pace_request(url: &str) {
+fn pace_request(url: &str) -> crate::error::Result<()> {
     if !is_nomads_url(url) {
-        return;
+        return Ok(());
     }
 
     let min_gap = env_duration_ms(
@@ -650,10 +765,8 @@ fn pace_request(url: &str) {
     // refusing to finish.
     let mut corruption_paid = false;
     loop {
-        let Some(_lock) = acquire_nomads_rate_lock(&state_path) else {
-            std::thread::sleep(min_gap);
-            continue;
-        };
+        let _lock = acquire_nomads_rate_lock(&state_path)
+            .map_err(|why| crate::RustmetError::Io(std::io::Error::other(why)))?;
 
         let (mut last_request_ms, cooldown_until_ms, sound) = read_nomads_state(&state_path);
         if !sound {
@@ -681,7 +794,7 @@ fn pace_request(url: &str) {
             drop(_lock);
             std::thread::sleep(min_gap);
         }
-        return;
+        return Ok(());
     }
 }
 
@@ -732,9 +845,25 @@ pub fn nomads_governor() -> NomadsGovernor {
 /// Public so a consumer can PROVE the governor runs -- issue two paced calls
 /// for a NOMADS URL and observe the spacing and the state file -- instead of
 /// trusting that the crate it linked is the one with the governor in it. A
-/// no-op for every host but NOMADS, and it makes no network request.
-pub fn pace_nomads_request(url: &str) {
-    pace_request(url);
+/// no-op for every host but NOMADS, and it makes no network request.  An
+/// error is the governor's sentinel that cannot be taken, named in one line.
+pub fn pace_nomads_request(url: &str) -> crate::error::Result<()> {
+    pace_request(url)
+}
+
+/// Take the governor's sentinel beside `state_path` and let it go again,
+/// waiting at most `limit`: the same take the HTTP path makes before every
+/// NOMADS request.  Public so a consumer can PROVE that a stale sentinel it
+/// cannot remove, or one held past the bound, ends in one error line naming
+/// the file instead of a wait without end.  Makes no network request.
+pub fn probe_nomads_rate_lock(state_path: &Path, limit: Duration) -> Result<(), String> {
+    acquire_nomads_rate_lock_within(state_path, limit).map(|_lock| ())
+}
+
+/// The state file the governor paces against when `RUSTWX_NOMADS_RATE_STATE`
+/// is not set: the account's own (see `nomads_state_path`).
+pub fn default_nomads_rate_state() -> PathBuf {
+    default_nomads_state_path()
 }
 
 /// What a HEAD request learned about an object (see
@@ -907,7 +1036,9 @@ impl DownloadClient {
             let mut current_url = url.to_string();
             let mut redirects = 0u32;
             why = loop {
-                pace_request(&current_url);
+                if let Err(err) = pace_request(&current_url) {
+                    return HeadOutcome::Unreachable(err.to_string());
+                }
                 match self.perform_get(&current_url, Some("bytes=0-0"), attempt > 0) {
                     Ok(response) => {
                         let status = response.status();
@@ -1058,7 +1189,7 @@ impl DownloadClient {
         let mut last_retryable = false;
 
         for attempt in 0..=self.max_retries {
-            pace_request(url);
+            pace_request(url)?;
             match attempt_fn(attempt > 0) {
                 Ok(val) => return Ok(val),
                 Err(e) => {
@@ -1597,11 +1728,12 @@ mod tests {
         full_file_ranges, now_millis, parse_content_range_last, parse_content_range_total,
         read_nomads_state, write_nomads_state, DownloadClient, DownloadConfig, HeadOutcome,
         StallLimit, TransferProgress,
+        acquire_nomads_rate_lock, acquire_nomads_rate_lock_within, default_nomads_state_path,
     };
     use std::fs;
     use std::io::{Read, Write};
     use std::net::{TcpListener, TcpStream};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use std::thread;
@@ -2296,6 +2428,111 @@ mod tests {
         let _ = fs::remove_file(&path);
         let _ = fs::create_dir_all(&path);
         assert!(!write_nomads_state(&path, 1, 2));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    fn lock_scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("rustwx_lock_{}_{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// A sentinel whose process is gone: a pid no process has.
+    fn abandoned_lock_in(dir: &Path) -> PathBuf {
+        let state = dir.join("rustwx_nomads_rate_limit.state");
+        fs::write(state.with_extension("lock"), b"999999999 0\n").unwrap();
+        state
+    }
+
+    /// The breakage (3.0.6 user confirmation, 24 Nov 2026): the default state
+    /// sat in the shared temp folder, so a sentinel another account left there
+    /// hung every other account's NOMADS fetch.  The default is the account's own.
+    #[cfg(unix)]
+    #[test]
+    fn the_default_state_is_the_accounts_own() {
+        use std::os::unix::fs::MetadataExt;
+        let probe = std::env::temp_dir().join(format!("rustwx_uid_check_{}", std::process::id()));
+        fs::write(&probe, b"x").unwrap();
+        let uid = fs::metadata(&probe).unwrap().uid();
+        let _ = fs::remove_file(&probe);
+        let path = default_nomads_state_path();
+        assert_eq!(
+            path,
+            std::env::temp_dir()
+                .join(format!("rustwx-nomads-{uid}"))
+                .join("rustwx_nomads_rate_limit.state")
+        );
+    }
+
+    /// A stale sentinel this account cannot remove (another account's, in a
+    /// sticky folder; here a folder it may not write) is one error line naming
+    /// the file.  The take used to ignore the failed removal and spin for ever.
+    #[cfg(unix)]
+    #[test]
+    fn a_stale_lock_this_account_cannot_remove_is_an_error_not_a_spin() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = lock_scratch("unremovable");
+        let state = abandoned_lock_in(&dir);
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
+        let probe = fs::OpenOptions::new().write(true).create_new(true).open(dir.join("probe"));
+        if probe.is_ok() {
+            // root writes anyway: the refusal cannot be staged on this host
+            fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+            let _ = fs::remove_dir_all(&dir);
+            return;
+        }
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let taken = state.clone();
+        std::thread::spawn(move || {
+            let _ = sender.send(acquire_nomads_rate_lock(&taken).map(|_lock| ()));
+        });
+        let outcome = receiver.recv_timeout(Duration::from_secs(20));
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        let why = outcome
+            .expect("the take spun on a stale lock it cannot remove instead of answering")
+            .expect_err("a stale lock this account cannot remove was reported as taken");
+        assert!(why.contains("rustwx_nomads_rate_limit.lock"), "{why}");
+        assert!(why.contains("cannot remove it"), "{why}");
+        assert!(why.contains("RUSTWX_NOMADS_RATE_STATE"), "{why}");
+        assert!(!why.contains('\n'), "{why}");
+    }
+
+    /// A sentinel held past the wait bound ends the wait with an error naming it.
+    #[test]
+    fn a_lock_still_held_past_the_limit_is_an_error() {
+        let dir = lock_scratch("held");
+        let state = dir.join("rustwx_nomads_rate_limit.state");
+        fs::write(state.with_extension("lock"), format!("{} {}\n", std::process::id(), now_millis())).unwrap();
+        let started = Instant::now();
+        let why = acquire_nomads_rate_lock_within(&state, Duration::from_millis(300))
+            .map(|_lock| ())
+            .expect_err("a held lock was reported as taken");
+        assert!(started.elapsed() < Duration::from_secs(10));
+        assert!(why.contains("still held after"), "{why}");
+        assert!(why.contains("rustwx_nomads_rate_limit.lock"), "{why}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The normal path is unchanged: a free sentinel is taken and removed on
+    /// drop, and an abandoned one this account can remove is taken over.
+    #[test]
+    fn a_free_or_abandoned_lock_is_taken_as_before() {
+        let dir = lock_scratch("normal");
+        let state = dir.join("rustwx_nomads_rate_limit.state");
+        let lock = acquire_nomads_rate_lock(&state).expect("a free lock");
+        assert!(state.with_extension("lock").is_file());
+        drop(lock);
+        assert!(!state.with_extension("lock").exists());
+        #[cfg(unix)]
+        {
+            let state = abandoned_lock_in(&dir);
+            let lock = acquire_nomads_rate_lock(&state).expect("an abandoned lock this account can remove");
+            let text = fs::read_to_string(state.with_extension("lock")).unwrap();
+            assert!(text.starts_with(&format!("{} ", std::process::id())), "{text}");
+            drop(lock);
+        }
         let _ = fs::remove_dir_all(&dir);
     }
 }

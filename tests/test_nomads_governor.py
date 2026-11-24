@@ -60,15 +60,24 @@ class _Clock:
 # ---------------------------------------------------------------------------
 
 def test_state_and_lock_paths_match_the_rust_client(tmp_path, monkeypatch):
-    """Same file, or the two governors pace nothing in common."""
+    """Same file, or the two governors pace nothing in common.
+
+    The default is the account's own (wx-core's ``default_nomads_state_path``:
+    ``<temp>/rustwx-nomads-<uid>/`` on POSIX, the account's own temp folder on
+    Windows).
+    """
 
     monkeypatch.delenv(governor.STATE_PATH_ENV, raising=False)
     import tempfile
-    assert governor.state_path() == (
-        Path(tempfile.gettempdir()) / "rustwx_nomads_rate_limit.state")
+    temp = Path(tempfile.gettempdir())
+    if os.name == "posix":
+        expected = temp / f"rustwx-nomads-{os.geteuid()}" / "rustwx_nomads_rate_limit.state"
+    else:
+        expected = temp / "rustwx_nomads_rate_limit.state"
+    assert governor.state_path() == expected
     # `Path::with_extension("lock")` / `with_extension("tmp")` on the
     # Rust side; the same two names have to come out here.
-    state = Path(tempfile.gettempdir()) / "rustwx_nomads_rate_limit.state"
+    state = expected
     assert governor._lock_path(state).name == "rustwx_nomads_rate_limit.lock"
     assert governor._tmp_path(state).name == "rustwx_nomads_rate_limit.tmp"
 
@@ -216,6 +225,125 @@ def test_an_unusable_lock_directory_still_spaces_the_request(monkeypatch):
                         lambda lock, sleeper=None: None)
     governor.pace(NOMADS, sleeper=clock)
     assert sum(clock.slept) == pytest.approx(2.5, abs=0.01)
+
+
+def _pace_in_a_thread(seconds: float, **kwargs) -> bool:
+    """Run :func:`governor.pace` on NOMADS; True when it returned in time.
+
+    The breakage these gates hold off spun for ever, so the call runs where
+    a hang becomes a failed assertion instead of a hung test session.
+    """
+
+    import threading
+    done = threading.Event()
+
+    def run():
+        governor.pace(NOMADS, **kwargs)
+        done.set()
+
+    threading.Thread(target=run, daemon=True).start()
+    return done.wait(seconds)
+
+
+def _abandoned_lock(folder: Path) -> Path:
+    """A sentinel whose process is gone (no process has this pid)."""
+
+    state = folder / "rustwx_nomads_rate_limit.state"
+    governor._lock_path(state).write_text("999999999 0\n", encoding="ascii")
+    return state
+
+
+def _cannot_write(folder: Path) -> bool:
+    try:
+        (folder / "probe").touch()
+    except OSError:
+        return True
+    (folder / "probe").unlink()
+    return False
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX folder modes")
+def test_another_accounts_abandoned_lock_in_the_shared_temp_is_not_this_accounts(
+        tmp_path, monkeypatch, capsys):
+    """The breakage (3.0.6 user confirmation, 24 Nov 2026): another account's
+    sentinel left in the sticky ``/tmp`` made every NOMADS fetch of this
+    account spin at full CPU with no message, because the default state was
+    one file for every account.  The default is now the account's own folder,
+    so the other account's file is never read."""
+
+    import tempfile
+    shared = tmp_path / "tmp"
+    shared.mkdir()
+    _abandoned_lock(shared)              # where 3.0.5 and the sealed 3.0.6 looked
+    shared.chmod(0o555)                  # this account cannot remove it there
+    try:
+        if not _cannot_write(shared):
+            pytest.skip("this account writes anyway (root)")
+        monkeypatch.delenv(governor.STATE_PATH_ENV, raising=False)
+        monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path / "own"))
+        clock = _Clock(monkeypatch)
+        assert _pace_in_a_thread(10.0, sleeper=clock), "pace spun on another account's lock"
+        assert clock.slept == []         # the first request of this account goes at once
+        assert governor.state_path().parent == tmp_path / "own" / f"rustwx-nomads-{os.geteuid()}"
+        assert (governor.state_path().parent.stat().st_mode & 0o777) == 0o700
+        assert capsys.readouterr().err == ""
+    finally:
+        shared.chmod(0o755)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX folder modes")
+def test_an_abandoned_lock_this_account_cannot_remove_fails_closed_in_one_line(
+        tmp_path, monkeypatch, capsys):
+    """A named state whose abandoned sentinel this account cannot remove is
+    unusable: the request is spaced locally (fail closed) and one line names
+    the file, instead of retrying the removal for ever."""
+
+    folder = tmp_path / "shared"
+    folder.mkdir()
+    state = _abandoned_lock(folder)
+    folder.chmod(0o555)
+    try:
+        if not _cannot_write(folder):
+            pytest.skip("this account writes anyway (root)")
+        monkeypatch.setenv(governor.STATE_PATH_ENV, str(state))
+        monkeypatch.setattr(governor, "_warned", set())
+        clock = _Clock(monkeypatch)
+        assert _pace_in_a_thread(10.0, sleeper=clock), "pace spun on a lock it cannot remove"
+        assert sum(clock.slept) == pytest.approx(2.5, abs=0.01)
+        assert _pace_in_a_thread(10.0, sleeper=clock)
+        err = capsys.readouterr().err.strip().splitlines()
+        assert len(err) == 1, err        # once per process, one line
+        assert str(governor._lock_path(state)) in err[0]
+        assert "cannot remove it" in err[0] and governor.STATE_PATH_ENV in err[0]
+    finally:
+        folder.chmod(0o755)
+
+
+def test_a_lock_held_past_the_limit_is_given_up_in_one_line(monkeypatch,
+                                                           isolated_state,
+                                                           capsys):
+    """A live holder that never lets go ends the wait at the bound."""
+
+    lock = governor._lock_path(isolated_state)
+    lock.write_text(f"{os.getpid()} 0\n", encoding="ascii")   # a live pid
+    monkeypatch.setattr(governor, "_warned", set())
+    monkeypatch.setattr(governor, "_lock_is_stale", lambda path: False)
+    clock = _Clock(monkeypatch)
+    assert _pace_in_a_thread(10.0, sleeper=clock), "pace waited past its bound"
+    waited = sum(s for s in clock.slept if s == governor._LOCK_POLL_S)
+    assert waited == pytest.approx(governor.LOCK_WAIT_LIMIT_S, rel=0.01)
+    err = capsys.readouterr().err
+    assert "still held after 300 s" in err and str(lock) in err
+    lock.unlink()
+
+
+def test_a_free_lock_is_taken_and_released_as_before(isolated_state):
+    lock = governor._lock_path(isolated_state)
+    sentinel = governor._acquire(lock)
+    assert sentinel is not None and lock.is_file()
+    assert lock.read_text(encoding="ascii").split()[0] == str(os.getpid())
+    sentinel.release()
+    assert not lock.exists()
 
 
 # ---------------------------------------------------------------------------

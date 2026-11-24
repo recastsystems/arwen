@@ -294,6 +294,144 @@ fn ramp(stops: &[[u8; 3]], fraction: f64) -> Color {
     )
 }
 
+
+/// Zero-centred diverging palettes for signed differences and anomalies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DivergingPalette {
+    /// ColorBrewer RdBu (10 bands, neutral off-white straddling zero):
+    /// temperature, wind and pressure differences.
+    BlueWhiteRed,
+    /// ColorBrewer BrBG (10 bands, neutral off-white straddling zero):
+    /// humidity and moisture differences (brown dry, teal moist).
+    BrownWhiteGreen,
+}
+
+/// 10-band ColorBrewer RdBu with two neutral off-white bands straddling zero.
+const DIVERGING_BWR_COLORS: [[u8; 3]; 10] = [
+    [5, 48, 97],
+    [33, 102, 172],
+    [67, 147, 195],
+    [146, 197, 222],
+    [247, 247, 247],
+    [247, 247, 247],
+    [244, 165, 130],
+    [214, 96, 77],
+    [178, 24, 43],
+    [103, 0, 31],
+];
+
+/// 10-band ColorBrewer BrBG with two neutral off-white bands straddling zero.
+const DIVERGING_BRBG_COLORS: [[u8; 3]; 10] = [
+    [84, 48, 5],
+    [140, 81, 10],
+    [191, 129, 45],
+    [223, 194, 125],
+    [247, 247, 247],
+    [247, 247, 247],
+    [128, 205, 193],
+    [53, 151, 143],
+    [1, 102, 94],
+    [0, 60, 48],
+];
+
+/// Symmetric zero-centred diverging ladder `-half_range .. +half_range` in 10
+/// equal bands, with the two inner neutral bands meeting at exact `0.0`.
+pub fn diverging_scale(palette: DivergingPalette, half_range: f64) -> ColorScale {
+    let half = if half_range.is_finite() && half_range > 0.0 {
+        half_range
+    } else {
+        1.0
+    };
+    let palette_rgb = match palette {
+        DivergingPalette::BlueWhiteRed => &DIVERGING_BWR_COLORS,
+        DivergingPalette::BrownWhiteGreen => &DIVERGING_BRBG_COLORS,
+    };
+    let n = palette_rgb.len(); // 10
+    let half_bands = (n / 2) as i32; // 5
+    let levels: Vec<f64> = (-half_bands..=half_bands)
+        .map(|k| if k == 0 { 0.0 } else { half * (k as f64) / (half_bands as f64) })
+        .collect();
+    let colors = palette_rgb
+        .iter()
+        .map(|[r, g, b]| Color::rgba(*r, *g, *b, 255))
+        .collect();
+    ColorScale::Discrete(DiscreteColorScale {
+        levels,
+        colors,
+        extend: ExtendMode::Both,
+        mask_below: None,
+    })
+}
+
+/// Round a positive band step up to a clean `1, 2, 2.5, 5 x 10^k` tick value.
+fn nice_band_step(raw_step: f64) -> f64 {
+    if !raw_step.is_finite() || raw_step <= 0.0 {
+        return 0.2;
+    }
+    let exp = raw_step.log10().floor();
+    let base = 10.0_f64.powf(exp);
+    let norm = raw_step / base;
+    let nice = if norm <= 1.0 {
+        1.0
+    } else if norm <= 2.0 {
+        2.0
+    } else if norm <= 2.5 {
+        2.5
+    } else if norm <= 5.0 {
+        5.0
+    } else {
+        10.0
+    };
+    nice * base
+}
+
+/// Choose a clean symmetric `half_range` for a signed field's finite values so
+/// zero stays centred and each of the five half-bands has a readable 1/2/2.5/5
+/// step. Uses the 99.5th percentile of `|v|` (falling back to max `|v|` if zero)
+/// so isolated outliers do not wash out the map.
+pub fn diverging_half_range(values: &[f32], fallback: f64) -> f64 {
+    let mut abs_vals: Vec<f64> = values
+        .iter()
+        .copied()
+        .filter(|v| v.is_finite())
+        .map(|v| f64::from(v).abs())
+        .collect();
+    if abs_vals.is_empty() {
+        return if fallback.is_finite() && fallback > 0.0 { fallback } else { 1.0 };
+    }
+    abs_vals.sort_by(|a, b| a.total_cmp(b));
+    let idx = (((abs_vals.len() - 1) as f64) * 0.995).round() as usize;
+    let p = abs_vals[idx.min(abs_vals.len() - 1)];
+    let target = if p > 0.0 {
+        p
+    } else {
+        *abs_vals.last().unwrap_or(&0.0)
+    };
+    if target <= 0.0 || !target.is_finite() {
+        return if fallback.is_finite() && fallback > 0.0 { fallback } else { 1.0 };
+    }
+    let step = nice_band_step(target / 5.0);
+    step * 5.0
+}
+
+/// Resolve a named diverging recipe slug to `(palette, default_half_range)`.
+pub fn diverging_recipe(slug: &str) -> Option<(DivergingPalette, f64)> {
+    match slug.trim().to_ascii_lowercase().as_str() {
+        "div_bwr" | "diverging_bwr" | "difference" => Some((DivergingPalette::BlueWhiteRed, 1.0)),
+        "temperature_difference"
+        | "2m_temperature_difference"
+        | "temperature_change"
+        | "anomaly" => Some((DivergingPalette::BlueWhiteRed, 2.0)),
+        "wind_difference" => Some((DivergingPalette::BlueWhiteRed, 5.0)),
+        "pressure_difference" => Some((DivergingPalette::BlueWhiteRed, 2.0)),
+        "div_brbg" | "diverging_brbg" => Some((DivergingPalette::BrownWhiteGreen, 1.0)),
+        "humidity_difference"
+        | "moisture_difference"
+        | "dewpoint_difference" => Some((DivergingPalette::BrownWhiteGreen, 1.0)),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -414,5 +552,52 @@ mod tests {
         // A request for more bins than the ladder has is clamped, never
         // silently truncated into a mismatched pair.
         levels_and_colors_agree(&count_scale(50), "count");
+    }
+
+    #[test]
+    fn diverging_scales_are_symmetric_about_exact_zero_with_neutral_center() {
+        for (slug, expected_palette) in [
+            ("div_bwr", DivergingPalette::BlueWhiteRed),
+            ("temperature_difference", DivergingPalette::BlueWhiteRed),
+            ("wind_difference", DivergingPalette::BlueWhiteRed),
+            ("pressure_difference", DivergingPalette::BlueWhiteRed),
+            ("div_brbg", DivergingPalette::BrownWhiteGreen),
+            ("humidity_difference", DivergingPalette::BrownWhiteGreen),
+            ("dewpoint_difference", DivergingPalette::BrownWhiteGreen),
+        ] {
+            let (pal, hr) = diverging_recipe(slug).expect(slug);
+            assert_eq!(pal, expected_palette, "{slug}");
+            let scale = diverging_scale(pal, hr);
+            levels_and_colors_agree(&scale, slug);
+            let d = discrete(&scale);
+            assert_eq!(d.levels.len(), 11);
+            assert_eq!(d.colors.len(), 10);
+            assert_eq!(d.levels[5], 0.0, "{slug} midpoint must be exact 0.0");
+            assert!((d.levels[0] + d.levels[10]).abs() < 1e-12, "{slug} must be symmetric");
+            // Neutral center bands straddling zero are off-white
+            assert_eq!(d.colors[4], d.colors[5]);
+            assert!(d.colors[4].r >= 240 && d.colors[4].g >= 240 && d.colors[4].b >= 240);
+            // Ends have opposite dominant hues
+            match pal {
+                DivergingPalette::BlueWhiteRed => {
+                    assert!(d.colors[0].b > d.colors[0].r, "negative end must be blue");
+                    assert!(d.colors[9].r > d.colors[9].b, "positive end must be red");
+                }
+                DivergingPalette::BrownWhiteGreen => {
+                    assert!(d.colors[0].r > d.colors[0].b, "negative end must be brown");
+                    assert!(d.colors[9].g > d.colors[9].r, "positive end must be teal/green");
+                }
+            }
+        }
+        assert!(diverging_recipe("2m_temperature").is_none());
+        // Auto half-range picks clean symmetric limits for small differences
+        let hr = diverging_half_range(&[-0.65_f32, -0.2, 0.0, 0.3, 0.62], 2.0);
+        assert!((hr - 1.0).abs() < 1e-9, "got {hr}");
+        let hr_small = diverging_half_range(&[-0.35_f32, 0.0, 0.32], 1.0);
+        assert!((hr_small - 0.5).abs() < 1e-9, "got {hr_small}");
+        // Degenerate half-range stays well formed
+        for bad in [0.0, -2.0, f64::NAN, f64::INFINITY] {
+            levels_and_colors_agree(&diverging_scale(DivergingPalette::BlueWhiteRed, bad), "bad-div");
+        }
     }
 }

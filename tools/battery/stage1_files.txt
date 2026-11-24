@@ -3055,3 +3055,14 @@ tests/test_static_highres_international.py
 tests/test_release_bump_version.py
 tests/test_build_drops_release_excluded.py
 tests/test_seal_check.py
+# The 3.0.6 shared-host and next-step fixes (fix/306-shared-host-global-hints):
+# their eight test files were in no battery list, so neither public CI nor the
+# release battery ran them (3.0.6 gate run, 23 Nov 2026).
+tests/test_bridge_dir_override.py
+tests/test_card_lock_folder_shared.py
+tests/test_fetch_geog_global_config.py
+tests/test_fetch_geog_wps_geog_env.py
+tests/test_fetch_lock_root_per_account.py
+tests/test_fetch_next_doors.py
+tests/test_fetch_posting_note.py
+tests/test_render_source_label_from_file.py

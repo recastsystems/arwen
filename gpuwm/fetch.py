@@ -2793,6 +2793,9 @@ def _fetch_out(out, **options):
     file and stays.
     """
     global _FETCH_OUT_HOLDS
+    # A folder this account cannot write is refused before the lock and
+    # the download (fetch_guard.OutputFolderRefused names the breakage).
+    fetch_guard.refuse_unwritable_output(out)
     # A second writer of this folder waits as long as the holder's bytes
     # keep arriving and refuses only a holder that stalls for the budget
     # (fetch_guard.DirectoryProgress names the breakage).

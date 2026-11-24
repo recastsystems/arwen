@@ -3477,12 +3477,18 @@ def prep_handoff_lines(label: str, out: Path) -> tuple[str, ...]:
     manifest flag it had left out.
     """
 
+    from gpuwm import next_doors
+
     out = Path(out)
     document = json.loads(
         _io_path(out / PREP_ARGUMENTS_NAME).read_text(encoding="utf-8"))
-    lines = [
-        f"fetch {label}: next: feed the mapped front door, source already "
-        "bound:",
+    # Another installed model that starts from this folder (ArWen Global
+    # from a whole-globe analysis) leads; the regional block follows,
+    # headed by the model it is for.
+    lines = list(next_doors.model_lines(label, label, out))
+    lines += [
+        f"fetch {label}: next, for {next_doors.REGIONAL_MODEL}: feed the "
+        "mapped front door, source already bound:",
         "  " + render_prep_command(document["argv"]),
         f"  # {named_flags(document['caller_supplies'])} are yours.",
     ]

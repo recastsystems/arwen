@@ -1297,6 +1297,37 @@ struct GridIdentity {
     /// (`GPUWM_GRID_NAME`, `nest`: `nest 3 km`, not `d01 3 km`); the
     /// filename's domain slot keeps the nest token.
     name: Option<String>,
+    /// The latitude-longitude spacing, in degrees, of a tape a producer
+    /// resampled a model onto ([`resampled_latlon_degrees`]); `None` for a
+    /// file that is the model's own grid.
+    drawn_deg: Option<f64>,
+}
+
+/// WRF's Earth radius (m), by which a `MAP_PROJ = 6` file's `DX` is its
+/// longitude step: `DX = dlon (rad) x 6,370 km`.
+const WRF_EARTH_RADIUS_M: f64 = 6_370_000.0;
+
+/// The degrees a `MAP_PROJ = 6` tape is drawn at, when a producer names the
+/// model it resampled onto it (`GPUWM_MODEL_LABEL` or `GPUWM_GRID_LABEL`).
+///
+/// THE BREAKAGE THIS PREVENTS, SEEN (ArWen Global 0.3.0 and the 0.4.0
+/// branch, 22 Nov 2026): a T255 forecast written on the 0.5 degree tape
+/// was headlined `(d01 55.589 km)` with `Δx 55.589 km` in the subtitle, and
+/// the T63 maps said the same; 55.589 km is the tape's longitude step at
+/// the equator, not a spacing the model runs at.  A stock WRF global run
+/// (`MAP_PROJ = 6`, no producer label) IS its grid and keeps `Δx`.
+fn resampled_latlon_degrees(map_proj: Option<i32>, spacing_m: Option<f64>, names_a_model: bool) -> Option<f64> {
+    if map_proj != Some(6) || !names_a_model {
+        return None;
+    }
+    let degrees = spacing_m? / (WRF_EARTH_RADIUS_M * std::f64::consts::PI / 180.0);
+    let rounded = (degrees * 10_000.0).round() / 10_000.0;
+    (rounded.is_finite() && rounded > 0.0).then_some(rounded)
+}
+
+/// `0.5°`, `0.25°`, `1°`: degrees as the subtitle and headline spell them.
+fn degrees_text(degrees: f64) -> String {
+    format!("{}\u{00b0}", rw_wrfbatch::domain_naming::trimmed_number(degrees))
 }
 
 /// The global attribute a wrfout-shaped file names its grid in, for the
@@ -1405,7 +1436,15 @@ fn file_grid_identity(path: &std::path::Path) -> GridIdentity {
         .as_ref()
         .and_then(|file| file.global_attr_str(GRID_NAME_ATTRIBUTE).ok())
         .and_then(|raw| checked_grid_label(&raw));
-    GridIdentity { domain, spacing_m, label, name }
+    let map_proj = file.as_ref().and_then(|file| file.global_attr_i32("MAP_PROJ").ok());
+    let names_a_model = label.is_some()
+        || file
+            .as_ref()
+            .and_then(|file| file.global_attr_str(rustwx_products::shared_context::MODEL_LABEL_ATTRIBUTE).ok())
+            .and_then(|raw| checked_grid_label(&raw))
+            .is_some();
+    let drawn_deg = resampled_latlon_degrees(map_proj, spacing_m, names_a_model);
+    GridIdentity { domain, spacing_m, label, name, drawn_deg }
 }
 
 /// The note any input states about its `REFC` (`GPUWM_REFC_NOTE`), checked
@@ -1482,6 +1521,9 @@ fn spacing_subtitle(spacing_m: f64) -> Option<String> {
 /// `Δx 22 km` beside a headline that said `30 km`, so one picture stated
 /// two model spacings and the subtitle's was the resample grid's.
 fn subtitle_spacing(identity: &GridIdentity) -> Option<String> {
+    if let Some(degrees) = identity.drawn_deg {
+        return Some(format!("render grid {}", degrees_text(degrees)));
+    }
     let spacing_m = identity.spacing_m?;
     if identity.label.is_some() {
         let (value, unit) = spacing_parts(spacing_m)?;
@@ -1517,6 +1559,13 @@ fn native_domain_slug(identity: &GridIdentity) -> Option<String> {
 fn domain_title_label(identity: &GridIdentity) -> Option<String> {
     if let Some(label) = &identity.label {
         return Some(label.clone());
+    }
+    if let Some(degrees) = identity.drawn_deg {
+        // A resampled tape's nest token is the writer's, not the model's.
+        return Some(match &identity.name {
+            Some(name) => format!("{name} {}", degrees_text(degrees)),
+            None => format!("{} grid", degrees_text(degrees)),
+        });
     }
     let domain = identity.name.as_ref().or(identity.domain.as_ref())?;
     match identity.spacing_m.and_then(spacing_parts) {
@@ -1963,6 +2012,7 @@ fn run_grid_identity(args: &Args) -> GridIdentity {
                     spacing_m: grid.get("spacing_m").and_then(serde_json::Value::as_f64),
                     label: text("label"),
                     name: text("name"),
+                    drawn_deg: grid.get("drawn_deg").and_then(serde_json::Value::as_f64),
                 };
             }
         }
@@ -1999,7 +2049,7 @@ fn save_import(
         "frame_sources": sources,
         "run_context": imported.run_context.to_json(),
         "grid": {"domain": identity.domain, "spacing_m": identity.spacing_m, "label": identity.label,
-                 "name": identity.name},
+                 "name": identity.name, "drawn_deg": identity.drawn_deg},
         "refc_note": refc_note,
     });
     let bytes = serde_json::to_vec_pretty(&document).map_err(|err| format!("encode {}: {err}", path.display()))?;
@@ -3495,16 +3545,17 @@ mod tests {
 
     #[test]
     fn a_resampled_mesh_names_its_dx_the_render_grid() {
-        let wrf = GridIdentity { domain: Some("d01".into()), spacing_m: Some(3_000.0), label: None, name: None };
+        let wrf = GridIdentity { domain: Some("d01".into()), spacing_m: Some(3_000.0), label: None, name: None, drawn_deg: None };
         assert_eq!(subtitle_spacing(&wrf).as_deref(), Some("\u{0394}x 3 km"));
         let hex = GridIdentity {
             domain: Some("d01".into()),
             spacing_m: Some(22_000.0),
             label: checked_grid_label("p655-8c 30 km"),
             name: None,
+            drawn_deg: None,
         };
         assert_eq!(subtitle_spacing(&hex).as_deref(), Some("render grid 22 km"));
-        let none = GridIdentity { domain: None, spacing_m: None, label: checked_grid_label("hex 15 km"), name: None };
+        let none = GridIdentity { domain: None, spacing_m: None, label: checked_grid_label("hex 15 km"), name: None, drawn_deg: None };
         assert_eq!(subtitle_spacing(&none), None);
     }
 
@@ -3530,6 +3581,7 @@ mod tests {
             spacing_m: Some(3_000.0),
             label: None,
             name: None,
+            drawn_deg: None,
         };
         assert_eq!(native_domain_slug(&full).as_deref(), Some("d02-3km"));
 
@@ -3540,6 +3592,7 @@ mod tests {
             spacing_m: None,
             label: None,
             name: None,
+            drawn_deg: None,
         };
         assert_eq!(native_domain_slug(&no_spacing).as_deref(), Some("d02"));
 
@@ -3550,6 +3603,7 @@ mod tests {
             spacing_m: Some(3_000.0),
             label: None,
             name: None,
+            drawn_deg: None,
         };
         assert_eq!(native_domain_slug(&no_domain), None);
     }
@@ -3563,6 +3617,7 @@ mod tests {
             spacing_m: Some(14_900.0),
             label: checked_grid_label("hex  15 km"),
             name: None,
+            drawn_deg: None,
         };
         assert_eq!(domain_title_label(&hex).as_deref(), Some("hex 15 km"));
         assert_eq!(native_domain_slug(&hex).as_deref(), Some("hex15km"));
@@ -3573,7 +3628,7 @@ mod tests {
         assert_eq!(native_domain_slug(&graded).as_deref(), Some("hex60-3km"));
         assert_eq!(checked_grid_label("a|b"), None);
         // --annotate grid_label: a label replaces the file's, an empty one drops the parenthetical, absent keeps it.
-        let file = GridIdentity { domain: Some("d01".into()), spacing_m: Some(2000.0), label: None, name: None };
+        let file = GridIdentity { domain: Some("d01".into()), spacing_m: Some(2000.0), label: None, name: None, drawn_deg: None };
         let with = |label: Option<&str>| rustwx_products::geographic_overlays::PanelAnnotations {
             grid_label: label.map(str::to_string),
             ..Default::default()
@@ -3590,6 +3645,7 @@ mod tests {
             spacing_m: Some(3_000.0),
             label: None,
             name: None,
+            drawn_deg: None,
         };
         assert_eq!(domain_title_label(&wrf).as_deref(), Some("d02 3 km"));
         assert_eq!(native_domain_slug(&wrf).as_deref(), Some("d02-3km"));
@@ -3607,6 +3663,7 @@ mod tests {
             spacing_m: Some(3_000.0),
             label: None,
             name: checked_grid_label("nest"),
+            drawn_deg: None,
         };
         assert_eq!(domain_title_label(&nest).as_deref(), Some("nest 3 km"));
         assert_eq!(native_domain_slug(&nest).as_deref(), Some("d01-3km"));
@@ -3614,6 +3671,44 @@ mod tests {
         // A producer's grid label still outranks it.
         let labelled = GridIdentity { label: checked_grid_label("hex 15 km"), ..nest };
         assert_eq!(domain_title_label(&labelled).as_deref(), Some("hex 15 km"));
+    }
+
+    /// A model resampled onto a latitude-longitude tape is drawn at the
+    /// tape's degrees, and the tape's equatorial step is not offered as the
+    /// model's spacing (ArWen Global's 0.5 degree tape said `Δx 55.589 km`
+    /// in the subtitle and `(d01 55.589 km)` in the headline).
+    #[test]
+    fn a_resampled_latlon_tape_names_its_degrees_not_a_model_spacing() {
+        let tape_dx = 0.5 * WRF_EARTH_RADIUS_M * std::f64::consts::PI / 180.0;
+        assert!((tape_dx - 55_589.0).abs() < 1.0);
+        let drawn = resampled_latlon_degrees(Some(6), Some(tape_dx), true);
+        assert_eq!(drawn, Some(0.5));
+        let tape = GridIdentity {
+            domain: Some("d01".into()),
+            spacing_m: Some(tape_dx),
+            label: None,
+            name: None,
+            drawn_deg: drawn,
+        };
+        assert_eq!(subtitle_spacing(&tape).as_deref(), Some("render grid 0.5\u{00b0}"));
+        assert_eq!(domain_title_label(&tape).as_deref(), Some("0.5\u{00b0} grid"));
+        // The output folder is unchanged, so every caller's paths hold.
+        assert_eq!(native_domain_slug(&tape).as_deref(), Some("d01-55.589km"));
+        // A quarter and a whole degree.
+        let quarter = 0.25 * WRF_EARTH_RADIUS_M * std::f64::consts::PI / 180.0;
+        assert_eq!(resampled_latlon_degrees(Some(6), Some(quarter), true), Some(0.25));
+        let globe = GridIdentity {
+            label: checked_grid_label("hex 120 km"),
+            drawn_deg: resampled_latlon_degrees(Some(6), Some(4.0 * quarter), true),
+            ..GridIdentity::default()
+        };
+        assert_eq!(subtitle_spacing(&globe).as_deref(), Some("render grid 1\u{00b0}"));
+        assert_eq!(domain_title_label(&globe).as_deref(), Some("hex 120 km"));
+        // A stock WRF global run is its own grid; a projected file is untouched.
+        assert_eq!(resampled_latlon_degrees(Some(6), Some(tape_dx), false), None);
+        assert_eq!(resampled_latlon_degrees(Some(1), Some(3_000.0), true), None);
+        let wrf = GridIdentity { domain: Some("d01".into()), spacing_m: Some(tape_dx), ..GridIdentity::default() };
+        assert_eq!(subtitle_spacing(&wrf).as_deref(), Some("\u{0394}x 55.589 km"));
     }
 
     /// The REFC note goes on the REFC recipes' titles only, beside whatever

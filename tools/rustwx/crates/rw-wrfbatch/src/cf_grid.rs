@@ -21,6 +21,11 @@ pub struct ProductRow {
     pub contour_level: Option<f64>,
     pub observation_product: Option<String>,
     pub scale: Option<CfScale>,
+    /// Optional symmetric half-range for diverging recipes (`-half_range .. +half_range`).
+    /// When omitted on a diverging recipe, `scale_for_values` fits a clean symmetric range
+    /// around zero from the field's finite values.
+    #[serde(default)]
+    pub half_range: Option<f64>,
 }
 /// Optional physical-unit ladder supplied by a CF product row.
 #[derive(Clone, Debug, Deserialize)]
@@ -62,7 +67,21 @@ impl ProductRow {
             )
         })
     }
+    pub fn is_diverging(&self) -> bool {
+        self.scale.is_none()
+            && self.levels.is_empty()
+            && self
+                .recipe
+                .as_deref()
+                .and_then(crate::scales::diverging_recipe)
+                .is_some()
+    }
+
     pub fn scale(&self) -> Result<ColorScale, String> {
+        self.scale_for_values(&[])
+    }
+
+    pub fn scale_for_values(&self, values: &[f32]) -> Result<ColorScale, String> {
         if let Some(scale) = &self.scale { return scale.color_scale(); }
         if !self.levels.is_empty() {
             if self.levels.len() != 10 || self.levels.iter().any(|v| !v.is_finite())
@@ -79,6 +98,22 @@ impl ProductRow {
         }
         match self.recipe.as_deref() {
             Some(slug) => {
+                if let Some((palette, default_hr)) = crate::scales::diverging_recipe(slug) {
+                    let hr = match self.half_range {
+                        Some(h) if h.is_finite() && h > 0.0 => h,
+                        Some(h) => {
+                            return Err(format!(
+                                "CF diverging row {:?} half_range must be positive and finite, got {h}",
+                                self.product
+                            ));
+                        }
+                        None if !values.is_empty() => {
+                            crate::scales::diverging_half_range(values, default_hr)
+                        }
+                        None => default_hr,
+                    };
+                    return Ok(crate::scales::diverging_scale(palette, hr));
+                }
                 let recipe = rustwx_models::plot_recipe(slug)
                     .ok_or_else(|| format!("unknown production recipe {slug}"))?;
                 let selector = recipe
@@ -741,5 +776,31 @@ mod cf_physical_scale_tests {
             ColorScale::Discrete(scale) => assert_eq!(scale.mask_below, None),
             _ => panic!("a CF row scale is discrete"),
         }
+    }
+
+    #[test]
+    fn builtin_cf_table_carries_zero_centred_diverging_difference_rows() {
+        let rows = product_rows(None).unwrap();
+        for (name, unit) in [
+            ("temperature_difference", "K"),
+            ("humidity_difference", "g kg-1"),
+            ("wind_difference", "m s-1"),
+            ("pressure_difference", "hPa"),
+        ] {
+            let row = resolve(&rows, name, "").expect(name);
+            assert!(row.is_diverging(), "{name} should resolve as diverging");
+            assert_eq!(row.display_units, unit);
+            let scale = row.scale_for_values(&[-0.6_f32, 0.0, 0.7]).unwrap();
+            let d = scale.resolved_discrete();
+            assert_eq!(d.levels[5], 0.0);
+            assert!((d.levels[0] + d.levels[10]).abs() < 1e-12);
+        }
+        // Custom table row with explicit half_range pins exact symmetric bounds
+        let custom: ProductRow = serde_json::from_str(
+            r#"{"names":["f"],"standard_names":[],"product":"dt","title":"dT","recipe":"temperature_difference","default_units":"K","display_units":"K","unit_factors":{"K":1.0},"half_range":1.5}"#
+        ).unwrap();
+        let d = custom.scale_for_values(&[-0.2_f32, 0.2]).unwrap().resolved_discrete();
+        assert!((d.levels[0] - (-1.5)).abs() < 1e-12);
+        assert!((d.levels[10] - 1.5).abs() < 1e-12);
     }
 }

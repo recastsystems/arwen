@@ -146,3 +146,4 @@ tests/test_analysis_boundary.py # rw_netcdf and netcdf-writer read and patch the
 tests/test_analysis_door.py # rw_netcdf and netcdf-writer read the bundle and write the door's derived files.
 tests/test_wrf_options_page.py # rw-wind-table decodes the turbine table the windfarm_opt = 2 (MAV) probe imports; the 2.9.12 R7b CPU route refused it without the decoder.
 tests/test_static_highres_dateline.py # static-fields warps two real GLO-30 clips moved either side of 180 degrees (1 of 5 fails with no bridge reachable).
+tests/test_static_highres_international.py # static-fields must load for the dateline, pole and coverage refusals to be reached; without it 7 tests see geography-stack-missing (public CI cpu windows-2025, runs 44984203950 and 45263074184).

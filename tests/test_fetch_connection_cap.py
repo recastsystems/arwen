@@ -182,13 +182,13 @@ def test_bridge_reserves_active_and_possible_idle_sockets(tmp_path, monkeypatch,
     assert not reserved
 
 
-@pytest.mark.parametrize("host,configured,reported", [
-    ("noaa-hrrr-bdp-pds.s3.amazonaws.com", 3, 3),
-    ("noaa-hrrr-bdp-pds.s3.amazonaws.com", 3, 1),
-    ("nomads.ncep.noaa.gov", 1, 1),
+@pytest.mark.parametrize("host,reported", [
+    ("noaa-hrrr-bdp-pds.s3.amazonaws.com", "all"),
+    ("noaa-hrrr-bdp-pds.s3.amazonaws.com", 1),
+    ("nomads.ncep.noaa.gov", "all"),
 ])
 def test_promoted_mirror_sets_native_width_and_actual_receipt(
-        tmp_path, monkeypatch, host, configured, reported):
+        tmp_path, monkeypatch, host, reported):
     from datetime import datetime
     from types import SimpleNamespace
     from gpuwm import fetch, rustwx_fetch
@@ -201,8 +201,17 @@ def test_promoted_mirror_sets_native_width_and_actual_receipt(
     monkeypatch.setattr(rustwx_fetch, "_idle_capable", lambda *a: True)
     monkeypatch.setattr(fetch, "_stream_capable", lambda *a: True)
     monkeypatch.setattr(fetch, "_remember_stream_facts", lambda *a: None)
-    plan = fetch_routes.resolve_request("hrrr-prs", cycle=datetime(2026, 10, 18, 12), hours=24)
+    # The clock is the cycle's own afternoon: an 18 Oct cycle read on a later
+    # day resolves to the S3 archive, and this row is about the NOMADS route.
+    plan = fetch_routes.resolve_request("hrrr-prs", cycle=datetime(2026, 10, 18, 12), hours=24,
+                                        now=datetime(2026, 10, 18, 14))
     assert fetch_pool.host_key(plan.objects[0].url) == "nomads.ncep.noaa.gov"
+    # The promoted host's own width (the box cap less its reserve, over the file pool), not NOMADS' one stream.
+    # It was written here as 3 (30 slots over 10 files) before the reserve for other processes; computing it keeps
+    # the row about which host sizes the transfer.
+    configured = fetch_pool.chunk_streams_per_file(None, files=len(plan.objects), host=host)
+    assert (configured == 1) == (host == "nomads.ncep.noaa.gov")
+    reported = configured if reported == "all" else reported
     download = fetch._route_stream_downloader(plan, SimpleNamespace(fetch_workers=None))
     def process(command, *, env, **kwargs):
         assert int(env[rustwx_fetch.STREAMS_ENV]) == configured

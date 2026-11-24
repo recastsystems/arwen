@@ -868,16 +868,57 @@ class PostingLoop:
         self._mark(lead, state="ready", fetched_at=marker["fetched_at"],
                    endpoint=endpoint)
         size = sum(int(item.get("bytes") or 0) for item in objects)
-        expected = readiness.parse_instant(row.get("expected_at"))
-        seen = readiness.parse_instant(row.get("first_seen_at"))
-        after = ("" if expected is None or seen is None else
-                 f" ({(seen - expected).total_seconds() / 60.0:.1f} min after "
-                 "its scheduled time"
-                 + ("; it was already up when first asked"
-                    if row.get("posted_when_first_asked") else "") + ")")
-        self.progress(f"{self.label}: f{lead:03d} posted {row['first_seen_at']}"
-                      f"{after}; {size / 1e6:.0f} MB verified")
+        self.progress(f"{self.label}: f{lead:03d} "
+                      + posting_note(row.get("expected_at"),
+                                     row.get("first_seen_at"),
+                                     bool(row.get("posted_when_first_asked")))
+                      + f"; {size / 1e6:.0f} MB verified")
         return path
+
+
+def span_words(seconds: float) -> str:
+    """A length of time in the unit a reader takes in at a glance.
+
+    Minutes up to two hours, hours up to two days, days beyond.  The
+    breakage it prevents: a past cycle fetched 82 days late printed
+    "118958.1 min after its scheduled time".
+    """
+
+    seconds = abs(float(seconds))
+    if seconds < 2 * 3600:
+        return f"{seconds / 60.0:.1f} min"
+    if seconds < 2 * 86400:
+        return f"{seconds / 3600.0:.1f} h"
+    return f"{seconds / 86400.0:.1f} days"
+
+
+def posting_note(expected_at, first_seen_at, already_up: bool) -> str:
+    """The posted-time words of one lead's ``... MB verified`` line.
+
+    A lead watched as it posted is dated when a host first held it, and
+    the line says how long after its scheduled time that was.  A lead
+    that was already up when the fetch first asked (a past cycle, a late
+    launch) has no posting time this fetch saw: the time it carries is
+    when the fetch asked, so the line says that, and says how old the
+    cycle was then, instead of presenting the gap as lateness.
+    """
+
+    expected = readiness.parse_instant(expected_at)
+    seen = readiness.parse_instant(first_seen_at)
+    if already_up:
+        when = f"was already up when first asked at {first_seen_at}"
+        if expected is None or seen is None:
+            return when
+        gap = (seen - expected).total_seconds()
+        side = "after" if gap >= 0 else "before"
+        return (f"{when}, {span_words(gap)} {side} its scheduled time "
+                "(when the host posted it is not known)")
+    if expected is None or seen is None:
+        return f"posted {first_seen_at}"
+    gap = (seen - expected).total_seconds()
+    side = "after" if gap >= 0 else "before"
+    return (f"posted {first_seen_at} ({span_words(gap)} {side} its "
+            "scheduled time)")
 
 
 def route_objects(entries: Sequence[Mapping[str, object]]) -> list[dict]:
@@ -1020,4 +1061,4 @@ __all__ = ["LEGACY_TRANSFER_FAULTS", "MARKER_SCHEMA", "OBJECT_ABSENT_REASON",
            "SOURCE_BEHIND_EXIT",
            "SourceBehind", "composed_objects", "fetch_legacy_as_posted",
            "fetch_route_as_posted", "legacy_objects", "marker_files",
-           "marker_name", "route_objects"]
+           "marker_name", "posting_note", "route_objects", "span_words"]

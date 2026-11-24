@@ -338,6 +338,13 @@ def test_the_windows_partition_emulation_never_removes_a_directory_it_did_not_ma
     assert kept.read_text(encoding="utf-8") == "not the emulation's\n"
 
 
+def test_the_windows_partition_emulation_installs_what_the_cpu_job_installs(ci):
+    from tools.battery import emulate_windows_cpu_partition as emulation
+    step = next(step for step in ci["jobs"]["cpu"]["steps"]
+                if step.get("name") == "install matching editable packages from this checkout")
+    assert tuple(re.findall(r'-e\s+"?([^\s"]+)"?', step["run"])) == emulation.EDITABLE_PACKAGES
+
+
 def test_the_windows_partition_emulation_selects_what_the_cpu_job_selects(ci):
     from tools.battery import emulate_windows_cpu_partition as emulation
     assert emulation.cpu_leg(ROOT, "windows")["os"] == "windows-2025"

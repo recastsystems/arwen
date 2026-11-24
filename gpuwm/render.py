@@ -203,6 +203,60 @@ def default_source_label() -> str:
     return f"{DEFAULT_SOURCE_LABEL} {version}"
 
 
+#: The global attribute in which a history file names the model that made
+#: it (the renderer's ``MODEL_LABEL_ATTRIBUTE``; ArWen Global's export
+#: tapes and ``rw_mpas_convert --model-label`` write it).
+MODEL_LABEL_ATTRIBUTE = "GPUWM_MODEL_LABEL"
+#: Optional beside it: that model's release, appended to the label.
+MODEL_VERSION_ATTRIBUTE = "GPUWM_MODEL_VERSION"
+#: The renderer prints at most this many characters of a model label.
+_MODEL_LABEL_MAX_CHARS = 32
+
+
+def _file_model_label(path) -> str | None:
+    """The producing model a file names, as a map's source line, or None.
+
+    ``GPUWM_MODEL_LABEL``, plus ``GPUWM_MODEL_VERSION`` when the file
+    carries one.  A label the metadata row could not print (blank, longer
+    than 32 characters, holding a control character or ``|``) counts as
+    none.
+    """
+
+    try:
+        with _netcdf_read(path) as ds:
+            names = ds.ncattrs()
+            label = (str(ds.getncattr(MODEL_LABEL_ATTRIBUTE))
+                     if MODEL_LABEL_ATTRIBUTE in names else "")
+            version = (str(ds.getncattr(MODEL_VERSION_ATTRIBUTE))
+                       if MODEL_VERSION_ATTRIBUTE in names else "")
+    except Exception:                                   # noqa: BLE001
+        return None
+    label = " ".join(label.split())
+    if (not label or len(label) > _MODEL_LABEL_MAX_CHARS
+            or any(ch == "|" or not ch.isprintable() for ch in label)):
+        return None
+    version = " ".join(version.split())
+    if version and "|" not in version and version.isprintable():
+        return f"{label} {version}"
+    return label
+
+
+def source_label_for(path) -> str:
+    """The source line of the maps drawn from ``path``.
+
+    The model the file names when it names one (:func:`_file_model_label`),
+    otherwise :func:`default_source_label`.  The breakage it prevents:
+    ``gpuwm render`` on an ArWen Global tape labelled every map "source:
+    WOOF 3.0.5", the renderer's brand and version, while the tape says
+    ArWen Global made it (gpuwm 3.0.5; ``gpuwm-global render`` passed its
+    own label and was right).  A file that names no model (the engine's
+    own regional output, stock WRF) keeps exactly the label it had.
+    """
+
+    named = _file_model_label(path) if path is not None else None
+    return named if named is not None else default_source_label()
+
+
 def _import_wrf():
     try:
         import wrf
@@ -748,11 +802,11 @@ def render_wrfouts(paths, *, products: tuple[str, ...],
     Nothing is silent either way: both lists come back for the CLI to
     print.
     """
-    # Resolved here rather than in the signature: a default argument is
-    # evaluated at import, and this one resolves provenance (a git
-    # subprocess).  `gpuwm --help` must not pay for it.
-    if source_label is None:
-        source_label = default_source_label()
+    # Resolved per file below rather than in the signature: a default
+    # argument is evaluated at import, and this one resolves provenance (a
+    # git subprocess).  `gpuwm --help` must not pay for it.  A label the
+    # caller gave wins; otherwise each file's own model names its maps.
+    explicit_label = source_label
     wrf = _import_wrf()
     plt = _pyplot()
     written: list[Path] = []
@@ -768,6 +822,8 @@ def render_wrfouts(paths, *, products: tuple[str, ...],
             failures.append(f"{path}: unreadable wrfout ({exc})")
             continue
         present = _file_variables(path)
+        source_label = (explicit_label if explicit_label is not None
+                        else source_label_for(path))
         domain = _domain_tag(path)
         spacing_m = _grid_spacing_m(path)
         token = domain_token(domain, spacing_m)
@@ -1241,10 +1297,11 @@ def render_series_rust(paths, *, products: str, timeidx: int | None,
     if not series:
         raise ValueError("a render series needs at least one wrfout file")
     renderer = require_renderer()
-    if source_label is None:
-        source_label = default_source_label()
-    outdir.mkdir(parents=True, exist_ok=True)
     subject = series[-1]
+    if source_label is None:
+        # One store, one label: the model the frame the panels show names.
+        source_label = source_label_for(subject)
+    outdir.mkdir(parents=True, exist_ok=True)
     token = domain_token(_domain_tag(subject), _grid_spacing_m(subject))
     episode = history_episode(subject)
     width, height = size if size is not None else (None, None)
@@ -1871,8 +1928,9 @@ def render_wrfouts_rust(paths, *, products: str, timeidx: int | None,
             skipped.extend(batch[2])
         return written, failures, skipped
     renderer = require_renderer()
-    if source_label is None:
-        source_label = default_source_label()
+    # A label the caller gave wins; otherwise each file's own model names
+    # its maps (source_label_for).
+    explicit_label = source_label
     outdir.mkdir(parents=True, exist_ok=True)
     frames = "all" if timeidx is None else str(timeidx)
     width, height = size if size is not None else (None, None)
@@ -1893,6 +1951,8 @@ def render_wrfouts_rust(paths, *, products: str, timeidx: int | None,
         # identically, so without this the second delivery replaces the
         # first.
         episode = history_episode(path)
+        source_label = (explicit_label if explicit_label is not None
+                        else source_label_for(path))
         prior_georef = render_georef.read(
             outdir / render_georef.GEOREF_FILENAME)
         with scratch_store(outdir) as store:
@@ -3999,7 +4059,8 @@ def register_cli(subparsers) -> None:
         # is executing.  Computing it here would put a git subprocess in
         # `gpuwm --help`.
         "--source-label", default=None, metavar="TEXT",
-        help="model/provenance label stamped on every plot (default "
+        help="model/provenance label stamped on every plot (default: the "
+             "model a file names in its GPUWM_MODEL_LABEL attribute, else "
              f"'{DEFAULT_SOURCE_LABEL} <the executing version>'); set it "
              "when rendering wrfout files this model did not produce, so "
              "the sheet does not claim them")
@@ -4139,7 +4200,7 @@ def register_cli(subparsers) -> None:
 
 
 __all__ = ["DEFAULT_SOURCE_LABEL", "PRODUCTS", "RUST_PRODUCT_ALIASES",
-           "WRF_PACKAGE_REQUIREMENT", "default_source_label",
+           "WRF_PACKAGE_REQUIREMENT", "default_source_label", "source_label_for",
            "domain_token", "list_products_main",
            "matplotlib_workaround_notice",
            "parse_products", "parse_products_rust", "parse_size",

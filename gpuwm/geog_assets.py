@@ -89,8 +89,10 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import errno
 from pathlib import Path
 import shutil
+import sys
 import tarfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -793,19 +795,46 @@ def add_geog_root_argument(parser, *, help: str = GEOG_ROOT_HELP):
                                metavar="DIR", help=help)
 
 
+#: The variable that names one WPS_GEOG archive for every command.
+WPS_GEOG_ENV = "GPUWM_WPS_GEOG"
+
+
 def default_geog_root() -> Path:
     """The root fetch-geog stages into when ``--root`` is not given.
 
-    Exactly the tree the rest of gpuwm already reads:
+    ``$GPUWM_WPS_GEOG`` when it is set, otherwise
     ``$GPUWM_CASE_DATA_ROOT/WPS_GEOG`` -- the default ``geog_root`` in
     wizard-emitted configs and the path ``gpuwm doctor`` checks -- with
     the same unset-variable fallback as every other case-data path
     (:func:`gpuwm.case_data.case_data_root`).
+
+    THE BREAKAGE THE VARIABLE PREVENTS (ArWen Global 0.4.0 second-account
+    walk, 22 Nov 2026): on a shared host the second account exported
+    ``GPUWM_WPS_GEOG`` at the archive the first account staged, which
+    ``gpuwm mesh``, gpuwm-global's statics and the static door already
+    read, and ``gpuwm fetch-geog`` ignored it and staged a second copy
+    into that account's home: 2.7 GB fetched, 32 GB on disk.  The one
+    variable now moves the default every reader and the stager share.
     """
+
+    override = (os.environ.get(WPS_GEOG_ENV) or "").strip()
+    if override:
+        return Path(override).expanduser()
 
     from gpuwm.case_data import case_data_root
 
     return case_data_root() / "WPS_GEOG"
+
+
+def default_geog_root_reason() -> str:
+    """Which setting chose :func:`default_geog_root`, for the line that
+    names the root."""
+
+    if (os.environ.get(WPS_GEOG_ENV) or "").strip():
+        return f"${WPS_GEOG_ENV} chose it"
+    return (f"the $GPUWM_CASE_DATA_ROOT/WPS_GEOG default every other command "
+            f"reads; set ${WPS_GEOG_ENV} to use an archive that is already "
+            "on this host")
 
 
 def geog_root_from_tables(raw, *, base_dir: Path) -> Path:
@@ -1731,6 +1760,31 @@ def _bytes_label(n: int) -> str:
     return exact if n < 1024 else f"{exact} (~{_human_size(n)})"
 
 
+def _share_with_root_group(folder: Path, root: Path) -> None:
+    """Give ``folder`` the group write and setgid bits a shared ``root`` has.
+
+    A geography root shared through a group (DATA.md, "A host shared by
+    several accounts") is group-writable; the download folder fetch-geog
+    makes inside it under umask 022 was not, so the next account of the
+    group could not stage a dataset there.  Only the folder's owner can
+    change its mode, and a folder of another account is left as it is (the
+    check before any download names it).  No-op on Windows.
+    """
+
+    if os.name != "posix":
+        return
+    try:
+        root_mode = root.stat().st_mode
+        info = folder.stat()
+        if not root_mode & 0o020 or info.st_uid != os.geteuid():
+            return
+        wanted = info.st_mode | 0o070 | (root_mode & 0o2000)
+        if wanted != info.st_mode:
+            folder.chmod(wanted & 0o7777)
+    except OSError:
+        return
+
+
 def fetch_geog(*, root: Path, datasets: tuple[str, ...], source: str,
                bundle: bool = False, keep_archives: bool = False,
                allow_drift: bool = False, progress=print,
@@ -1849,10 +1903,41 @@ def _fetch_geog_locked(*, root: Path, datasets: tuple[str, ...], source: str,
             needed.append(name)
     if not needed:
         if GMTED_DATASET in datasets:
-            repair_gmted_east_of_180(root, progress=progress)
+            try:
+                repair_gmted_east_of_180(root, progress=progress)
+            except OSError as error:
+                # A shared archive another account staged and this one
+                # may only read (its modes, or a read-only mount): the
+                # readers still read it as it is.
+                if error.errno not in (errno.EACCES, errno.EPERM, errno.EROFS):
+                    raise
+                progress(f"fetch-geog {GMTED_DATASET}: the east-of-180 repair "
+                         f"is not written, because this account cannot write "
+                         f"{root}; the next fetch-geog by its owner writes it")
         progress(f"fetch-geog: all {len(datasets)} requested datasets "
                  f"already staged and valid at {root}")
         return 0
+    if not os.access(root, os.W_OK):
+        # A refusal with its remedy, before any download, rather than a
+        # PermissionError traceback after one.
+        raise ValueError(
+            f"{root} lacks {', '.join(needed)} (missing or not verified), and "
+            f"this account cannot write there.  Ask the folder's owner to run "
+            f"gpuwm fetch-geog with {WPS_GEOG_ENV} (or --root) naming it, or "
+            f"set {WPS_GEOG_ENV} or --root to a folder this account can write")
+    archive_dir = root / ARCHIVE_SUBDIR
+    if archive_dir.is_dir() and not os.access(archive_dir, os.W_OK | os.X_OK):
+        # The breakage (3.0.6 user confirmation, 24 Nov 2026): an account in
+        # the group that may write a shared archive passed the check above,
+        # then stopped with a raw "Permission denied" creating its download
+        # in the download folder another account had made under umask 022.
+        raise ValueError(
+            f"{root} lacks {', '.join(needed)} (missing or not verified), and "
+            f"this account cannot write its download folder {archive_dir}, "
+            f"which another account made.  Ask the folder's owner to run "
+            f"gpuwm fetch-geog with {WPS_GEOG_ENV} (or --root) naming {root}, "
+            f"or to let the group write {archive_dir} (chmod g+w), or set "
+            f"{WPS_GEOG_ENV} or --root to a folder this account can write")
 
     for name in needed:
         if archive_for(name).licence_hold:
@@ -1886,8 +1971,8 @@ def _fetch_geog_locked(*, root: Path, datasets: tuple[str, ...], source: str,
              f"datasets need staging: {_bytes_label(download)} download, "
              f"~{_human_size(unpacked)} unpacked")
 
-    archive_dir = root / ARCHIVE_SUBDIR
     archive_dir.mkdir(parents=True, exist_ok=True)
+    _share_with_root_group(archive_dir, root)
     staged = 0
 
     def run_archive(filename: str, expected_bytes: int,
@@ -2118,6 +2203,107 @@ def geography_for_run(config_path: Path) -> dict:
             "static_bytes": sum(static_source_row(name).bytes for name in statics)}
 
 
+#: The table that marks an ArWen Global experiment (gpuwm-global).
+GLOBAL_CONFIG_TABLE = "arwen_global"
+
+
+def resolve_run_config(value) -> Path:
+    """The configuration ``--config`` names: a path, or a shipped name.
+
+    A path that exists always wins.  Otherwise, when gpuwm-global is
+    installed, a bare name of one of its shipped experiments resolves to
+    that file, as every ``gpuwm-global`` command resolves it
+    (:func:`gpuwm.next_doors.resolve_shipped_config`, which reads the
+    package's shipped folder as data and imports none of its code).  The
+    breakage it prevents: ``gpuwm fetch-geog --config
+    arwen_global_gdas_t255_native_sl_si_24h`` exited 2 with "no such file
+    or folder" (gpuwm 3.0.5).  A name nothing resolves comes back as
+    given, so the read names the missing file as before.
+    """
+
+    path = Path(value).expanduser()
+    if path.exists():
+        return path
+    from gpuwm.next_doors import resolve_shipped_config
+
+    shipped = resolve_shipped_config(value)
+    return path if shipped is None else shipped
+
+
+def is_global_config(raw: dict) -> bool:
+    """Whether a parsed TOML is an ArWen Global experiment."""
+
+    return isinstance(raw.get(GLOBAL_CONFIG_TABLE), dict)
+
+
+def _names_orographic_drag(table) -> bool:
+    """Whether any ``orographic_drag`` in the config is switched on."""
+
+    if isinstance(table, dict):
+        for key, value in table.items():
+            if key == "orographic_drag" and str(value).strip().lower() not in (
+                    "", "none", "off", "false"):
+                return True
+            if _names_orographic_drag(value):
+                return True
+    elif isinstance(table, list):
+        return any(_names_orographic_drag(item) for item in table)
+    return False
+
+
+def geography_for_global_run(config_path: Path, raw: dict) -> dict:
+    """The WPS_GEOG datasets an ArWen Global experiment's statics read.
+
+    The same selection ``gpuwm-global statics`` makes: the nine land
+    roles of :class:`gpuwm.static.build.GeogSelection` at the config's
+    ``[statics] geog_data_res`` (``default`` when unset), plus
+    ``orogwd_10m`` when the config runs orographic drag, which reads the
+    sub-grid orography cache built from it.  A config whose statics are
+    synthetic reads no archive and needs nothing.  Real statics are the
+    default for an analysis start, as in gpuwm-global.
+    """
+
+    from gpuwm.static.build import GeogSelection, _DEFAULT_GEOG_DIRS
+
+    statics = raw.get("statics") if isinstance(raw.get("statics"), dict) else {}
+    initial = raw.get("initial") if isinstance(raw.get("initial"), dict) else {}
+    default_source = "real" if initial.get("mode") == "analysis" else "synthetic"
+    source = str(statics.get("source", default_source)).strip().lower()
+    datasets: list[str] = []
+    if source == "real":
+        # The nine land roles of GeogSelection, the same nine gpuwm-global's
+        # statics read (its GEOG_ROLES, 0.3.0 and 0.4.0).
+        roles = tuple(_DEFAULT_GEOG_DIRS)
+        tokens = str(statics.get("geog_data_res", "default")).strip() or "default"
+        selection = GeogSelection.from_tokens(Path("."), tokens)
+        required = {getattr(selection, role) for role in roles}
+        if _names_orographic_drag(raw):
+            required.add("orogwd_10m")
+        required = archive_names_for_paths(required)
+        datasets = [a.dataset for a in GEOG_ARCHIVES if a.dataset in required]
+    return {"model": "ArWen Global", "statics_source": source,
+            "datasets": datasets, "static_sources": [],
+            "archive_bytes": sum(archive_for(name).archive_bytes
+                                 for name in datasets),
+            "static_bytes": 0}
+
+
+def global_config_geog_root(raw: dict) -> Path:
+    """Where an ArWen Global config's statics look for WPS_GEOG.
+
+    ``[statics] geog_root`` when the config names one (read from the
+    folder the command runs in, as gpuwm-global reads it), otherwise
+    :func:`default_geog_root`, the first place gpuwm-global looks after
+    ``$GPUWM_WPS_GEOG``.
+    """
+
+    statics = raw.get("statics") if isinstance(raw.get("statics"), dict) else {}
+    named = statics.get("geog_root")
+    if named:
+        return Path(str(named)).expanduser()
+    return default_geog_root()
+
+
 def _print_only(args) -> bool:
     """``--list`` and ``--explain`` print the plan and touch nothing.
 
@@ -2138,8 +2324,27 @@ def fetch_geog_main(args) -> int:
     print_only = _print_only(args)
     config_path = getattr(args, "config", None)
     if config_path is not None:
-        plan = geography_for_run(Path(config_path))
-        root = Path(args.root) if args.root is not None else config_geog_root(Path(config_path))
+        import tomllib
+
+        config_path = resolve_run_config(config_path)
+        raw = tomllib.loads(Path(config_path).read_text(encoding="utf-8-sig"))
+        if is_global_config(raw):
+            plan = geography_for_global_run(Path(config_path), raw)
+            root = (Path(args.root) if args.root is not None
+                    else global_config_geog_root(raw))
+            print(f"fetch-geog: {config_path} is an ArWen Global experiment; "
+                  f"its statics read {len(plan['datasets'])} dataset(s) "
+                  f"under {root}", file=sys.stderr)
+            if not plan["datasets"]:
+                print("fetch-geog: its statics are synthetic, so it reads no "
+                      "geography and there is nothing to stage",
+                      file=sys.stderr)
+                if print_only:
+                    print(json.dumps(plan, indent=2))
+                return 0
+        else:
+            plan = geography_for_run(Path(config_path))
+            root = Path(args.root) if args.root is not None else config_geog_root(Path(config_path))
         if print_only:
             print(json.dumps(plan, indent=2))
             return 0
@@ -2175,8 +2380,7 @@ def fetch_geog_main(args) -> int:
     else:
         root = default_geog_root()
         print(f"fetch-geog: --root not given; staging into {root} "
-              "(the $GPUWM_CASE_DATA_ROOT/WPS_GEOG default every other "
-              "command reads)")
+              f"({default_geog_root_reason()})")
     if print_only:
         _print_listing(datasets, source, root, explain=explain_enabled(args))
         if explain_enabled(args):
@@ -2207,16 +2411,22 @@ def register_cli(subparsers) -> None:
              "already staged")
     parser.add_argument(
         "--config", type=Path, default=None, metavar="FILE",
-        help="resolve only the geography this experiment's domains read; includes selected published static sources")
+        help="resolve only the geography this experiment's domains read; includes selected published static sources. "
+             "An ArWen Global experiment works too, by path or, with gpuwm-global installed, by its shipped name")
     parser.add_argument(
         "--root", type=Path, default=None, metavar="DIR",
-        help="geog root to stage into (default: "
-             "$GPUWM_CASE_DATA_ROOT/WPS_GEOG, exactly what gpuwm doctor "
+        help="geog root to stage into (default: $GPUWM_WPS_GEOG when set, "
+             "else $GPUWM_CASE_DATA_ROOT/WPS_GEOG, exactly what gpuwm doctor "
              "checks and wizard configs reference)")
     wrf_count = len(datasets_required_by(GEOG_CONSUMER_WRF))
-    mesh_gib = sum(archive_for(name).extracted_bytes
-                   for name in datasets_required_by(GEOG_CONSUMER_MESH)
-                   if GEOG_CONSUMER_WRF not in archive_for(name).required_by)
+    # What '--datasets wrf' leaves out of the default set, unpacked: the
+    # same sums `fetch-geog --list` prints for the two selections.  It
+    # said "~1.7 GiB", the mesh-only land-use pins alone, while `--list`
+    # showed 5.3 GiB less unpacked (3.0.6 two-account walk, 23 Nov 2026).
+    skipped_gib = sum(archive.extracted_bytes for archive in GEOG_ARCHIVES
+                      if archive.fetch_by_default
+                      and GEOG_CONSUMER_WRF not in archive.required_by
+                      ) / (1024 ** 3)
     parser.add_argument(
         "--datasets", default="default", metavar="default|all|CONSUMER|NAME,NAME",
         help="which datasets to stage (default keeps the WRF and mesh set; "
@@ -2224,9 +2434,9 @@ def register_cli(subparsers) -> None:
              f"door's whole set: '{GEOG_CONSUMER_WRF}' is the {wrf_count} "
              f"the WRF static builder opens, '{GEOG_CONSUMER_MESH}' is what "
              "gpuwm mesh needs for the static half of its pair.  Use "
-             f"'--datasets {GEOG_CONSUMER_WRF}' to skip the "
-             f"~{mesh_gib / (1024 ** 3):.1f} GiB of land-use pins that "
-             "only gpuwm mesh reads")
+             f"'--datasets {GEOG_CONSUMER_WRF}' to stage only those "
+             f"{wrf_count} and skip the rest of the default set, about "
+             f"{skipped_gib:.1f} GiB unpacked (--list prints both totals)")
     parser.add_argument(
         "--source", default=None, choices=GEOG_SOURCES,
         help="download host: 'hf' (default) is the ArWen mirror on "
@@ -2267,6 +2477,8 @@ def register_cli(subparsers) -> None:
 
 
 __all__ = [
+    "GLOBAL_CONFIG_TABLE", "geography_for_global_run", "global_config_geog_root",
+    "is_global_config", "resolve_run_config",
     "ARCHIVE_SUBDIR", "DRIFT_SIZE_BAND", "GEOG_ARCHIVES",
     "GEOG_CONSUMERS", "GEOG_CONSUMER_MESH", "GEOG_CONSUMER_WRF", "GEOG_CONSUMER_CHEM_DUST",
     "GEOG_FETCH_MANIFEST_NAME", "GEOG_FETCH_MANIFEST_SCHEMA",

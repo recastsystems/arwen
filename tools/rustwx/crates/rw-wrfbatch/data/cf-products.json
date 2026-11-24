@@ -30,5 +30,9 @@
   {"names":["lake_temperature_f"],"standard_names":[],"product":"lake_temperature","title":"Lake water surface temperature","recipe":"2m_temperature","default_units":"degF","display_units":"degF","unit_factors":{"degF":1.0}},
   {"names":["lake_ice_fraction"],"standard_names":[],"product":"lake_ice_fraction","title":"Lake ice area fraction","default_units":"1","display_units":"1","unit_factors":{"1":1.0}},
   {"names":["snowfall_water_equivalent_in"],"standard_names":[],"product":"snowfall_water_equivalent","title":"Accumulated snowfall water equivalent","recipe":"total_qpf","default_units":"in","display_units":"in","unit_factors":{"in":1.0}},
-  {"names":["snow_depth_in"],"standard_names":[],"product":"snow_depth","title":"Snow depth on ground","recipe":"snowfall_window","default_units":"in","display_units":"in","unit_factors":{"in":1.0}}
+  {"names":["snow_depth_in"],"standard_names":[],"product":"snow_depth","title":"Snow depth on ground","recipe":"snowfall_window","default_units":"in","display_units":"in","unit_factors":{"in":1.0}},
+  {"names":["temperature_difference"],"standard_names":[],"product":"temperature_difference","title":"Temperature difference","recipe":"temperature_difference","default_units":"K","display_units":"K","unit_factors":{"K":1.0,"degC":1.0,"C":1.0}},
+  {"names":["humidity_difference"],"standard_names":[],"product":"humidity_difference","title":"Specific humidity difference","recipe":"humidity_difference","default_units":"g kg-1","display_units":"g kg-1","unit_factors":{"g kg-1":1.0,"g/kg":1.0,"kg kg-1":1000.0,"kg/kg":1000.0}},
+  {"names":["wind_difference"],"standard_names":[],"product":"wind_difference","title":"Wind speed difference","recipe":"wind_difference","default_units":"m s-1","display_units":"m s-1","unit_factors":{"m s-1":1.0,"m/s":1.0,"kt":0.5144444}},
+  {"names":["pressure_difference"],"standard_names":[],"product":"pressure_difference","title":"Surface pressure difference","recipe":"pressure_difference","default_units":"hPa","display_units":"hPa","unit_factors":{"hPa":1.0,"mb":1.0,"Pa":0.01}}
 ]

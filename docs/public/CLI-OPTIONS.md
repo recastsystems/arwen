@@ -980,7 +980,7 @@ Takes no options of its own.
 | `--artifact NAME` | with --partial, select this artifact (repeatable); renderer launchers also fetch their shared rw_wrfbatch executable |
 | `--dest DIR` | stage into DIR instead of this release's own ~/.gpuwm/bridges/<release>-<digest> (gpuwm finds the default on its own; anywhere else needs the per-artifact environment variables) |
 | `--explain` | print the full reasoning, alternate routes and per-item evidence behind this command's output, instead of the default one-line-per-item summary |
-| `--from DIR` | stage from a local directory instead of downloading (offline installs): either the bundle archive or the artifacts loose in it; verification is identical |
+| `--from DIR` | stage from a local directory instead of downloading (offline installs): either the bundle archive or the artifacts loose in it, or the bundle archive's own path; verification is identical |
 | `--keep-bundle` | keep the verified archive under <dest>/.fetch-bridges after staging (default: remove it) |
 | `--list` | print the platform, bundle and per-artifact staged state, then exit without touching the network |
 | `--partial` | fetch only missing or stale pinned binaries with HTTP byte ranges; map assets require a full fetch and servers must support ranges |
@@ -991,12 +991,12 @@ Takes no options of its own.
 |---|---|
 | `--allow-upstream-drift` | legacy spelling; refused by the native production route because unpinned geography changes prepared fields under the same dataset version |
 | `--bundle` | fetch NCAR's single geog_high_res_mandatory.tar.gz (2.6 GiB) instead of the per-dataset tarballs and extract the requested datasets from it (fallback; NCAR only) |
-| `--config FILE` | resolve only the geography this experiment's domains read; includes selected published static sources |
-| `--datasets default\|all\|CONSUMER\|NAME,NAME` | which datasets to stage (default keeps the WRF and mesh set; chem-dust opts into the three upstream dust datasets; all selects every pin). A consumer name stands for one door's whole set: 'wrf' is the 8 the WRF static builder opens, 'mesh' is what gpuwm mesh needs for the static half of its pair. Use '--datasets wrf' to skip the ~1.7 GiB of land-use pins that only gpuwm mesh reads |
+| `--config FILE` | resolve only the geography this experiment's domains read; includes selected published static sources. An ArWen Global experiment works too, by path or, with gpuwm-global installed, by its shipped name |
+| `--datasets default\|all\|CONSUMER\|NAME,NAME` | which datasets to stage (default keeps the WRF and mesh set; chem-dust opts into the three upstream dust datasets; all selects every pin). A consumer name stands for one door's whole set: 'wrf' is the 8 the WRF static builder opens, 'mesh' is what gpuwm mesh needs for the static half of its pair. Use '--datasets wrf' to stage only those 8 and skip the rest of the default set, about 5.4 GiB unpacked (--list prints both totals) |
 | `--explain` | print the full reasoning, alternate routes and per-item evidence behind this command's output, instead of the default one-line-per-item summary |
 | `--keep-archives` | keep the verified tarballs under <root>/.fetch-geog after extraction (default: remove each one after its datasets validate) |
 | `--list` | print the dataset/size/source table and per-dataset staged state, then exit without touching the network (--explain does the same and adds which door needs each dataset and its URL) |
-| `--root DIR` | geog root to stage into (default: $GPUWM_CASE_DATA_ROOT/WPS_GEOG, exactly what gpuwm doctor checks and wizard configs reference) |
+| `--root DIR` | geog root to stage into (default: $GPUWM_WPS_GEOG when set, else $GPUWM_CASE_DATA_ROOT/WPS_GEOG, exactly what gpuwm doctor checks and wizard configs reference) |
 | `--source {hf,ncar}` | download host: 'hf' (default) is the ArWen mirror on Hugging Face (CDN bandwidth, pinned bytes); 'ncar' is the upstream NCAR server (single host, can be slow, no upstream checksums -- the same pins are enforced) |
 | `--static-source ID` | stage only the published static file of this static-source row (gpuwm/data/static_sources/static-sources.v1.toml), the file a configuration names with [static] source; verified against the row's size and SHA-256 and staged under <root>/static_sources/<ID>/ |
 
@@ -2610,7 +2610,7 @@ Takes no options of its own.
 | `--section-top-km N` | rust engine: the ceiling of a section's height axis, 1-40 km; absent, the engine fits up to 14 km, which draws a shallow feature in the bottom fourteenth of the frame -- give it 3 for a boundary-layer cut |
 | `--series` | render compatible files from each run/domain/episode as one timeline, including multi-hour products |
 | `--size WxH\|auto` | output pixels, rust engine; 'auto' (the default) sizes each canvas from its domain's shape, WxH draws a fixed canvas |
-| `--source-label TEXT` | model/provenance label stamped on every plot (default 'WOOF <the executing version>'); set it when rendering wrfout files this model did not produce, so the sheet does not claim them |
+| `--source-label TEXT` | model/provenance label stamped on every plot (default: the model a file names in its GPUWM_MODEL_LABEL attribute, else 'WOOF <the executing version>'); set it when rendering wrfout files this model did not produce, so the sheet does not claim them |
 | `--streamlines` | rust engine: draw the wind as STREAMLINES instead of barbs on every product that carries a wind layer. Without either flag the engine keeps its automatic choice (streamlines on curvilinear and projected grids, barbs on plain lat/lon), and the RUSTWX_WIND_STREAMLINES environment variable still works; this flag and --barbs outrank it |
 | `--theme NAME\|FILE.json` | rust engine: the render theme -- a built-in name (default, dark) or a JSON theme file naming the surface, the inks, the basemap linework, the colorbar chrome, the fonts and the colormap overrides (schema in tools/rustwx/crates/rustwx-render/src/theme.rs; RUSTWX_THEME is the environment spelling). Omitted, the engine draws its own look and the PNGs are byte-identical |
 | `--timeidx N\|all` | frame index within each file (within each timeline with --series), or 'all' (default) |

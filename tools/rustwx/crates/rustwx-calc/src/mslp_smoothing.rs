@@ -53,6 +53,32 @@
 //!   is unchanged (993.29 hPa).  At 25 km more small closed rings stayed
 //!   over the Uintas and the Wasatch (12.8 crossings).
 //!
+//! COARSE AND LATITUDE-LONGITUDE GRIDS (ArWen Global, 22 Nov 2026).  The
+//! same tangle covered Tibet and the Himalaya, the Andes, the Rockies,
+//! Greenland and Antarctica on the global 0.5 degree maps, already at F000.
+//! Two causes, both here: 40 km on a 55.6 km grid is `n = 1` pass, which
+//! leaves grid-scale noise standing; and the spacing was read at the grid
+//! centre, the equator, so the rows near the poles, a few km apart east to
+//! west, were smoothed over far less ground than the rows near the equator,
+//! and the box stopped at the 180 degree seam.  Now:
+//!
+//! * the smoothing length is never less than [`MIN_LENGTH_IN_SPACINGS`]
+//!   grid lengths ([`effective_length_m`]);
+//! * a regular latitude-longitude grid ([`latlon_rows`]) is smoothed north
+//!   to south on its latitude step and, row by row, east to west on that
+//!   row's own spacing, and a grid that goes round the Earth wraps across
+//!   its seam ([`smooth_latlon_over_high_terrain`]);
+//! * measured on the T255 2026-09-01 00Z frame by
+//!   `rw-wrfbatch/examples/mslp_terrain_check.rs`: crossings above 1,500 m
+//!   outside the polar caps 298.6 -> about 98 per 1,000 edges (low ground
+//!   88.5), poleward of 60 degrees 112 -> about 63, and 0 points changed at
+//!   or below 500 m.
+//!
+//! Every renderer that draws sea-level pressure through this function takes
+//! the same treatment: ArWen and stock WRF frames, ArWen Global tapes, and
+//! hex frames converted from the mesh (the hex package draws its maps with
+//! this renderer).
+//!
 //! `RUSTWX_MSLP_TERRAIN_SMOOTH_KM` sets `L` in km; `0` draws the unsmoothed
 //! reduction (for a before/after with one binary).
 //!
@@ -70,6 +96,13 @@ pub const SMOOTH_FULL_M: f32 = 1_500.0;
 pub const DEFAULT_LENGTH_KM: f64 = 40.0;
 /// The most nine-point passes one frame is given.
 pub const MAX_PASSES: usize = 400;
+/// The shortest smoothing length, in grid lengths, any grid is given.
+/// Measured on the ArWen Global T255 2026-09-01 00Z frame (0.5 degree
+/// tape, 4 hPa isobar crossings per 1,000 edges above 1,500 m outside the
+/// polar caps, raw reduction 298.6): 116.5 at 2.5 grid lengths, 97.4 at 3.6
+/// (low ground 88.5), 83.1 at 5; 3.5 is where the high ground reaches the
+/// density of the low ground.
+pub const MIN_LENGTH_IN_SPACINGS: f64 = 3.5;
 
 /// The smoothing length the environment asks for, in metres (0 = off).
 pub fn smoothing_length_m() -> f64 {
@@ -226,9 +259,217 @@ fn one_two_one_y(src: &[f64], dst: &mut [f64], bx: usize, by: usize) {
     });
 }
 
+/// The smoothing length a grid of spacing `dx_m` is given: the asked
+/// length, but never less than [`MIN_LENGTH_IN_SPACINGS`] grid lengths
+/// (`0` stays off).  At or below 11.4 km spacing this is the default 40 km
+/// itself, so 3 km and 9 km maps are drawn exactly as before; a 13 km grid
+/// is smoothed over 45.5 km instead of 40.
+pub fn effective_length_m(length_m: f64, dx_m: f64) -> f64 {
+    if !(length_m > 0.0) || !length_m.is_finite() {
+        return 0.0;
+    }
+    if !(dx_m > 0.0) || !dx_m.is_finite() {
+        return length_m;
+    }
+    length_m.max(MIN_LENGTH_IN_SPACINGS * dx_m)
+}
+
+/// The most east-west passes one row of a latitude-longitude grid is
+/// given.  Rows near a pole are a few km long per point, so they need many
+/// more passes than [`MAX_PASSES`] for the same length in km.
+pub const MAX_ROW_PASSES: usize = 4_000;
+
+/// Earth radius (m) the latitude-longitude spacings are measured with.
+const EARTH_RADIUS_M: f64 = 6_371_000.0;
+
+/// A regular latitude-longitude grid: one latitude per row, one longitude
+/// per column, even steps.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LatLonRows {
+    /// Each row's latitude (degrees).
+    pub row_lat_deg: Vec<f64>,
+    /// The longitude step (degrees, positive).
+    pub dlon_deg: f64,
+    /// The latitude step (degrees, positive).
+    pub dlat_deg: f64,
+    /// The rows go once round the Earth, so the first and last columns are
+    /// neighbours.
+    pub periodic: bool,
+}
+
+fn wrap180(degrees: f64) -> f64 {
+    let wrapped = (degrees + 180.0).rem_euclid(360.0) - 180.0;
+    if wrapped == -180.0 { 180.0 } else { wrapped }
+}
+
+/// The rows of a regular latitude-longitude grid, or `None` for any other
+/// grid (a projected grid keeps the centre-spacing smoother).
+pub fn latlon_rows(lat_deg: &[f32], lon_deg: &[f32], nx: usize, ny: usize) -> Option<LatLonRows> {
+    if nx < 3 || ny < 3 || lat_deg.len() != nx * ny || lon_deg.len() != nx * ny {
+        return None;
+    }
+    let step = wrap180(lon_deg[1] as f64 - lon_deg[0] as f64);
+    if !(step.abs() > 1e-6) || !step.is_finite() {
+        return None;
+    }
+    let tolerance = 1e-3_f64.max(1e-3 * step.abs());
+    for i in 1..nx {
+        let d = wrap180(lon_deg[i] as f64 - lon_deg[i - 1] as f64);
+        if (d - step).abs() > tolerance {
+            return None;
+        }
+    }
+    let mut row_lat_deg = Vec::with_capacity(ny);
+    for j in 0..ny {
+        let row_lat = lat_deg[j * nx] as f64;
+        for i in 0..nx {
+            let k = j * nx + i;
+            if (lat_deg[k] as f64 - row_lat).abs() > tolerance
+                || wrap180(lon_deg[k] as f64 - lon_deg[i] as f64).abs() > tolerance
+            {
+                return None;
+            }
+        }
+        row_lat_deg.push(row_lat);
+    }
+    let dlat = (row_lat_deg[1] - row_lat_deg[0]).abs();
+    if !(dlat > 1e-6) {
+        return None;
+    }
+    for j in 1..ny {
+        if ((row_lat_deg[j] - row_lat_deg[j - 1]).abs() - dlat).abs() > tolerance.max(1e-3 * dlat) {
+            return None;
+        }
+    }
+    let dlon = step.abs();
+    let periodic = (nx as f64 * dlon - 360.0).abs() < 0.5 * dlon;
+    Some(LatLonRows { row_lat_deg, dlon_deg: dlon, dlat_deg: dlat, periodic })
+}
+
+/// Smooth a regular latitude-longitude plane over high terrain by the
+/// physical length `length_m` ([`effective_length_m`] of the north-south
+/// spacing): `n = 2 (L / dy)^2` north-south passes, and on each row
+/// `2 (L / dx_row)^2` east-west passes with `dx_row` the row's own spacing,
+/// `dy cos(latitude)`, so a row near a pole is smoothed over the same km as
+/// one at the equator.  A grid that goes round the Earth wraps east-west, so
+/// the column at the seam is smoothed with its neighbours across it.  The
+/// blend and the terrain weight are [`smooth_over_high_terrain`]'s: ground
+/// at or below [`SMOOTH_FLOOR_M`] keeps its value word for word.  Returns the
+/// number of grid points changed.
+pub fn smooth_latlon_over_high_terrain(
+    values: &mut [f32],
+    terrain: &[f32],
+    nx: usize,
+    ny: usize,
+    rows: &LatLonRows,
+    length_m: f64,
+) -> usize {
+    let cells = nx.saturating_mul(ny);
+    if !(length_m > 0.0) || nx < 3 || ny < 3 || values.len() != cells || terrain.len() != cells
+        || rows.row_lat_deg.len() != ny
+    {
+        return 0;
+    }
+    let (mut j0, mut j1) = (usize::MAX, 0usize);
+    for j in 0..ny {
+        if terrain[j * nx..(j + 1) * nx].iter().any(|&z| terrain_weight(z) > 0.0) {
+            j0 = j0.min(j);
+            j1 = j1.max(j);
+        }
+    }
+    if j0 == usize::MAX {
+        return 0;
+    }
+    let dy = EARTH_RADIUS_M * rows.dlat_deg.to_radians();
+    let dlon_m = EARTH_RADIUS_M * rows.dlon_deg.to_radians();
+    let length = effective_length_m(length_m, dy);
+    let passes_y = passes_for(length, dy);
+    let reach = passes_y + 1;
+    let (j0, j1) = (j0.saturating_sub(reach), (j1 + reach).min(ny - 1));
+    let by = j1 - j0 + 1;
+
+    let mut sum: Vec<f64> = vec![0.0; nx * by];
+    let mut mass: Vec<f64> = vec![0.0; nx * by];
+    let periodic = rows.periodic;
+    sum.par_chunks_mut(nx)
+        .zip(mass.par_chunks_mut(nx))
+        .enumerate()
+        .for_each(|(jj, (srow, mrow))| {
+            let j = j0 + jj;
+            for (k, &v) in values[j * nx..(j + 1) * nx].iter().enumerate() {
+                if v.is_finite() {
+                    srow[k] = v as f64;
+                    mrow[k] = 1.0;
+                }
+            }
+            let dx = dlon_m * rows.row_lat_deg[j].to_radians().cos().abs();
+            let passes_x = if dx > 0.0 && dx.is_finite() {
+                let ratio = length / dx;
+                ((2.0 * ratio * ratio).round() as usize).clamp(1, MAX_ROW_PASSES)
+            } else {
+                MAX_ROW_PASSES
+            };
+            let mut scratch = vec![0.0f64; nx];
+            for _ in 0..passes_x {
+                one_two_one_row(srow, &mut scratch, periodic);
+                srow.copy_from_slice(&scratch);
+                one_two_one_row(mrow, &mut scratch, periodic);
+                mrow.copy_from_slice(&scratch);
+            }
+        });
+    let mut scratch_s = vec![0.0f64; nx * by];
+    let mut scratch_m = vec![0.0f64; nx * by];
+    for _ in 0..passes_y {
+        one_two_one_y(&sum, &mut scratch_s, nx, by);
+        one_two_one_y(&mass, &mut scratch_m, nx, by);
+        std::mem::swap(&mut sum, &mut scratch_s);
+        std::mem::swap(&mut mass, &mut scratch_m);
+    }
+
+    let changed = std::sync::atomic::AtomicUsize::new(0);
+    values
+        .par_chunks_mut(nx)
+        .enumerate()
+        .skip(j0)
+        .take(by)
+        .for_each(|(j, row)| {
+            let jj = j - j0;
+            let mut n = 0usize;
+            for (i, value) in row.iter_mut().enumerate() {
+                let w = terrain_weight(terrain[j * nx + i]);
+                let m = mass[jj * nx + i];
+                if w > 0.0 && value.is_finite() && m > 0.0 {
+                    let smooth = sum[jj * nx + i] / m;
+                    let blended = (*value as f64 + w as f64 * (smooth - *value as f64)) as f32;
+                    if blended != *value {
+                        *value = blended;
+                        n += 1;
+                    }
+                }
+            }
+            changed.fetch_add(n, std::sync::atomic::Ordering::Relaxed);
+        });
+    changed.into_inner()
+}
+
+/// One 1-2-1 pass along one row; the ends wrap when `periodic`, otherwise
+/// points beyond them count as missing.
+fn one_two_one_row(src: &[f64], dst: &mut [f64], periodic: bool) {
+    let n = src.len();
+    for i in 0..n {
+        let left = if i > 0 { src[i - 1] } else if periodic { src[n - 1] } else { 0.0 };
+        let right = if i + 1 < n { src[i + 1] } else if periodic { src[0] } else { 0.0 };
+        dst[i] = 0.25 * left + 0.5 * src[i] + 0.25 * right;
+    }
+}
+
 /// The map's sea-level pressure from a reduced plane: smoothed over high
-/// terrain by the environment's (or the default) smoothing length on the
-/// grid's own spacing.  Returns the number of grid points changed.
+/// terrain by the environment's (or the default) smoothing length, never
+/// less than [`MIN_LENGTH_IN_SPACINGS`] grid lengths.  A regular
+/// latitude-longitude grid is smoothed row by row at each row's own spacing
+/// and, when it goes round the Earth, across its seam
+/// ([`smooth_latlon_over_high_terrain`]); any other grid on its centre
+/// spacing.  Returns the number of grid points changed.
 pub fn display_mslp(
     values: &mut [f32],
     terrain: &[f32],
@@ -237,10 +478,19 @@ pub fn display_mslp(
     nx: usize,
     ny: usize,
 ) -> usize {
+    if let Some(rows) = latlon_rows(lat_deg, lon_deg, nx, ny) {
+        return smooth_latlon_over_high_terrain(values, terrain, nx, ny, &rows, smoothing_length_m());
+    }
     let Some(dx) = centre_spacing_m(lat_deg, lon_deg, nx, ny) else {
         return 0;
     };
-    smooth_over_high_terrain(values, terrain, nx, ny, passes_for(smoothing_length_m(), dx))
+    smooth_over_high_terrain(
+        values,
+        terrain,
+        nx,
+        ny,
+        passes_for(effective_length_m(smoothing_length_m(), dx), dx),
+    )
 }
 
 #[cfg(test)]
@@ -351,5 +601,145 @@ mod tests {
         assert_eq!(terrain_weight(1_000.0), 0.5);
         assert_eq!(terrain_weight(2_000.0), 1.0);
         assert_eq!(terrain_weight(f32::NAN), 0.0);
+    }
+
+    /// A global 0.5 degree plane: rows from -89.75 to 89.75, columns from
+    /// -180 by 0.5, as the ArWen Global tape writes it.
+    fn global_half_degree() -> (Vec<f32>, Vec<f32>, usize, usize) {
+        let (nx, ny) = (720usize, 360usize);
+        let mut lat = Vec::with_capacity(nx * ny);
+        let mut lon = Vec::with_capacity(nx * ny);
+        for j in 0..ny {
+            for i in 0..nx {
+                lat.push(-89.75 + 0.5 * j as f32);
+                lon.push(-180.0 + 0.5 * i as f32);
+            }
+        }
+        (lat, lon, nx, ny)
+    }
+
+    /// Noise of a six-point wavelength in both directions, the scale of the
+    /// rings the 0.5 degree maps showed (one 1-2-1 pass leaves 56 % of it).
+    fn ring_noise(i: usize, j: usize) -> f32 {
+        let phase = std::f32::consts::TAU / 6.0;
+        300.0 * ((i as f32 * phase).sin() + (j as f32 * phase).sin())
+    }
+
+    fn amplitude(values: &[f32], nx: usize, rows: std::ops::Range<usize>, cols: &[usize]) -> f32 {
+        let mut most = 0f32;
+        for j in rows {
+            for &i in cols {
+                most = most.max((values[j * nx + i] - 101_000.0).abs());
+            }
+        }
+        most
+    }
+
+    #[test]
+    fn coarse_grids_are_smoothed_over_several_grid_lengths() {
+        // 40 km on the 0.5 degree tape was one pass; fine grids keep 40 km.
+        assert_eq!(effective_length_m(40_000.0, 3_000.0), 40_000.0);
+        assert_eq!(effective_length_m(40_000.0, 9_000.0), 40_000.0);
+        assert_eq!(effective_length_m(40_000.0, 55_600.0), 3.5 * 55_600.0);
+        assert!(passes_for(effective_length_m(40_000.0, 55_600.0), 55_600.0) >= 24);
+        assert_eq!(effective_length_m(0.0, 55_600.0), 0.0);
+    }
+
+    #[test]
+    fn a_global_latlon_grid_is_recognised_and_a_projected_one_is_not() {
+        let (lat, lon, nx, ny) = global_half_degree();
+        let rows = latlon_rows(&lat, &lon, nx, ny).expect("a latitude-longitude grid");
+        assert!(rows.periodic);
+        assert!((rows.dlon_deg - 0.5).abs() < 1e-9 && (rows.dlat_deg - 0.5).abs() < 1e-9);
+        // A window over the Americas, and one across the date line, are not periodic.
+        let window = |lon0: f32| {
+            let (nx, ny) = (40usize, 20usize);
+            let lat: Vec<f32> = (0..nx * ny).map(|k| 20.0 + 0.5 * (k / nx) as f32).collect();
+            let lon: Vec<f32> = (0..nx * ny)
+                .map(|k| {
+                    let l = lon0 + 0.5 * (k % nx) as f32;
+                    if l >= 180.0 { l - 360.0 } else { l }
+                })
+                .collect();
+            latlon_rows(&lat, &lon, nx, ny)
+        };
+        assert_eq!(window(-130.0).map(|r| r.periodic), Some(false));
+        assert_eq!(window(170.0).map(|r| r.periodic), Some(false));
+        // A projected grid: latitude changes along a row.
+        let (nx, ny) = (10usize, 10usize);
+        let lat: Vec<f32> = (0..nx * ny).map(|k| 30.0 + 0.1 * (k / nx) as f32 + 0.01 * (k % nx) as f32).collect();
+        let lon: Vec<f32> = (0..nx * ny).map(|k| -100.0 + 0.1 * (k % nx) as f32).collect();
+        assert_eq!(latlon_rows(&lat, &lon, nx, ny), None);
+    }
+
+    /// THE DEFECT: on the global 0.5 degree maps the noise of the reduction
+    /// stood over high ground at every latitude.  High ground at the
+    /// equator, at 70 S, and astride the 180 degree seam must each lose
+    /// almost all of it; low ground keeps its pressure word for word.
+    #[test]
+    fn a_global_plane_is_smoothed_at_every_latitude_and_across_the_seam() {
+        let (lat, lon, nx, ny) = global_half_degree();
+        let mut values = Vec::with_capacity(nx * ny);
+        let mut terrain = Vec::with_capacity(nx * ny);
+        for j in 0..ny {
+            for i in 0..nx {
+                values.push(101_000.0 + ring_noise(i, j));
+                let (la, lo) = (lat[j * nx + i], lon[j * nx + i]);
+                let plateau = (la.abs() < 10.0 && (60.0..100.0).contains(&lo))
+                    || la < -65.0
+                    || (la.abs() < 10.0 && lo.abs() > 165.0);
+                terrain.push(if plateau { 3_000.0 } else { 0.0 });
+            }
+        }
+        let before = values.clone();
+        let changed = display_mslp(&mut values, &terrain, &lat, &lon, nx, ny);
+        assert!(changed > 0);
+        for k in 0..nx * ny {
+            if terrain[k] == 0.0 {
+                assert_eq!(values[k].to_bits(), before[k].to_bits(), "low ground moved at {k}");
+            }
+        }
+        let raw = 600.0;
+        // the equatorial plateau (70-90 E, 4 S-4 N, away from its edges)
+        let cols: Vec<usize> = (500..540).collect();
+        assert!(amplitude(&values, nx, 172..188, &cols) < 0.05 * raw);
+        // 70-80 S, all the way round
+        let cols: Vec<usize> = (0..nx).collect();
+        assert!(amplitude(&values, nx, 20..40, &cols) < 0.05 * raw);
+        // astride the seam: the last and first columns, 4 S-4 N
+        let cols: Vec<usize> = (0..12).chain(nx - 12..nx).collect();
+        assert!(amplitude(&values, nx, 172..188, &cols) < 0.05 * raw);
+    }
+
+    /// Smoothing a global plane does not care where its seam is: rolling the
+    /// columns and smoothing gives the smoothed plane rolled.
+    #[test]
+    fn the_seam_is_not_an_edge() {
+        let (lat, lon, nx, ny) = global_half_degree();
+        let mut values = Vec::with_capacity(nx * ny);
+        let mut terrain = Vec::with_capacity(nx * ny);
+        for j in 0..ny {
+            for i in 0..nx {
+                values.push(101_000.0 + ring_noise(i, j) + 40.0 * (i as f32 * 0.37).cos());
+                terrain.push(if (j / 7 + i / 11) % 3 == 0 { 2_000.0 } else { 0.0 });
+            }
+        }
+        let roll = |plane: &[f32], by: usize| -> Vec<f32> {
+            let mut out = vec![0f32; plane.len()];
+            for j in 0..ny {
+                for i in 0..nx {
+                    out[j * nx + (i + by) % nx] = plane[j * nx + i];
+                }
+            }
+            out
+        };
+        let mut a = values.clone();
+        display_mslp(&mut a, &terrain, &lat, &lon, nx, ny);
+        let mut b = roll(&values, 300);
+        display_mslp(&mut b, &roll(&terrain, 300), &lat, &lon, nx, ny);
+        let a = roll(&a, 300);
+        for k in 0..nx * ny {
+            assert!((a[k] - b[k]).abs() < 0.01, "{k}: {} {}", a[k], b[k]);
+        }
     }
 }

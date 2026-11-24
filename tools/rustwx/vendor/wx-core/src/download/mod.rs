@@ -11,8 +11,8 @@ pub use catalog::{
     expand_var_group, expand_vars, get_group, group_names, variable_groups, VariableGroup,
 };
 pub use client::{
-    nomads_governor, pace_nomads_request, DownloadClient, DownloadConfig, HeadOutcome,
-    NomadsGovernor, StallLimit, TransferProgress,
+    default_nomads_rate_state, nomads_governor, pace_nomads_request, probe_nomads_rate_lock,
+    DownloadClient, DownloadConfig, HeadOutcome, NomadsGovernor, StallLimit, TransferProgress,
 };
 pub use fallback::{fetch_with_fallback, probe_sources, FetchResult};
 #[cfg(feature = "network")]

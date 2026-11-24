@@ -16,11 +16,14 @@ side paced only half the traffic.
 
 This module is the same governor, in Python, over the *same files*:
 
-* the same state path (``RUSTWX_NOMADS_RATE_STATE``, else
-  ``<temp>/rustwx_nomads_rate_limit.state``);
+* the same state path (``RUSTWX_NOMADS_RATE_STATE``, else one per
+  account: ``<temp>/rustwx-nomads-<uid>/rustwx_nomads_rate_limit.state`` on
+  POSIX, ``<temp>/rustwx_nomads_rate_limit.state`` on Windows, whose temp
+  folder is the account's own);
 * the same ``key=value`` body (``last_request_ms``, ``cooldown_until_ms``);
 * the same sentinel lock beside it, the same 120 s staleness rule, the
-  same dead-PID recovery where the platform can prove death;
+  same dead-PID recovery where the platform can prove death, and the same
+  300 s bound on waiting for it;
 * the same defaults -- 2.5 s between requests, a 15 minute cooldown once
   an over-rate-limit answer is seen -- and the same
   ``RUSTWX_NOMADS_MIN_INTERVAL_MS`` / ``RUSTWX_NOMADS_COOLDOWN_MS``
@@ -49,6 +52,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import sys
 import tempfile
 import time
 from urllib.error import HTTPError, URLError
@@ -67,6 +71,9 @@ REQUEST_LOG_ENV = "RUSTWX_NOMADS_REQUEST_LOG"
 DEFAULT_MIN_INTERVAL_MS = 2500
 DEFAULT_COOLDOWN_MS = 15 * 60 * 1000
 LOCK_STALE_AFTER_MS = 120 * 1000
+#: The longest one process waits for the sentinel (the Rust client's
+#: ``NOMADS_LOCK_WAIT_LIMIT``).
+LOCK_WAIT_LIMIT_S = 300.0
 
 _LOCK_POLL_S = 0.05
 
@@ -80,10 +87,33 @@ def is_nomads_url(url: str) -> bool:
 
 
 def state_path() -> Path:
+    """The state file: ``RUSTWX_NOMADS_RATE_STATE``, else one per account.
+
+    Until 3.0.6 the default was one file in the shared temp folder for every
+    account.  In a sticky ``/tmp`` an account cannot remove another
+    account's file, so a sentinel another account left behind made every
+    NOMADS fetch of the other accounts spin for ever.  Now each account
+    paces against its own folder, as the fetch locks do
+    (``<tmp>/gpuwm-<uid>/locks``), and the Rust client computes the same
+    path.
+    """
+
     override = os.environ.get(STATE_PATH_ENV)
     if override:
         return Path(override)
-    return Path(tempfile.gettempdir()) / "rustwx_nomads_rate_limit.state"
+    temp = Path(tempfile.gettempdir())
+    if os.name == "posix":
+        return temp / f"rustwx-nomads-{os.geteuid()}" / "rustwx_nomads_rate_limit.state"
+    return temp / "rustwx_nomads_rate_limit.state"
+
+
+def _make_state_folder(folder: Path) -> None:
+    """Make the state file's folder; the per-account default is owner-only."""
+
+    if folder.name.startswith("rustwx-nomads-"):
+        folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+    else:
+        folder.mkdir(parents=True, exist_ok=True)
 
 
 def _lock_path(state: Path) -> Path:
@@ -171,7 +201,7 @@ def write_state(path: Path, last_request_ms: int,
     """Publish the shared state; False when the bytes did not land."""
 
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
+        _make_state_folder(path.parent)
         tmp = _tmp_path(path)
         tmp.write_text(
             f"last_request_ms={last_request_ms}\n"
@@ -223,12 +253,38 @@ class _Sentinel:
                 pass
 
 
+_warned: set[str] = set()
+
+
+def _unusable(lock: Path, why: str) -> None:
+    """Say once per process, in one line, why the sentinel cannot be taken.
+
+    The caller then fails closed (:func:`pace` spaces the request locally),
+    so nothing is sent sooner than the governor would allow.
+    """
+
+    if why in _warned:
+        return
+    _warned.add(why)
+    print(f"gpuwm: the NOMADS rate lock {lock} {why}; this process spaces its NOMADS requests "
+          f"on its own. Remove it, or set {STATE_PATH_ENV} to a file this account can write.",
+          file=sys.stderr, flush=True)
+
+
 def _acquire(lock: Path, *, sleeper=time.sleep) -> _Sentinel | None:
+    """Take the sentinel, or ``None`` when it cannot be taken.
+
+    A stale sentinel is removed and the take retried.  One this account
+    cannot remove, or one still held after :data:`LOCK_WAIT_LIMIT_S`, is
+    unusable: it used to be retried for ever, at full CPU, with no message.
+    """
+
     sentinel = _Sentinel(lock)
     try:
-        lock.parent.mkdir(parents=True, exist_ok=True)
+        _make_state_folder(lock.parent)
     except OSError:
         return None
+    waited_s = 0.0
     while True:
         try:
             handle = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -236,10 +292,18 @@ def _acquire(lock: Path, *, sleeper=time.sleep) -> _Sentinel | None:
             if _lock_is_stale(lock):
                 try:
                     lock.unlink()
-                except OSError:
+                except FileNotFoundError:
                     pass
+                except OSError as error:
+                    _unusable(lock, f"was left by a process that is gone, and this account cannot "
+                                    f"remove it ({error.strerror or error})")
+                    return None
                 continue
+            if waited_s >= LOCK_WAIT_LIMIT_S:
+                _unusable(lock, f"is still held after {LOCK_WAIT_LIMIT_S:.0f} s")
+                return None
             sleeper(_LOCK_POLL_S)
+            waited_s += _LOCK_POLL_S
             continue
         except OSError:
             return None

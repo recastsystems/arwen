@@ -2330,9 +2330,14 @@ def stage_from_loose_files(source_dir: Path, bundle: BundlePin, dest: Path,
 
 def stage_from_dir(source_dir: Path, bundle: BundlePin, dest: Path,
                    *, progress) -> list[Path]:
-    """``--from DIR``: the bundle archive if it is there, else the files."""
+    """``--from DIR``: the bundle archive if it is there, else the files.
 
-    archive = source_dir / bundle.filename
+    ``DIR`` may also be the bundle archive's own path: the path a user has
+    after downloading the zip used to be refused with every pinned name
+    listed as missing, because it was read as a folder.
+    """
+
+    archive = source_dir if source_dir.is_file() else source_dir / bundle.filename
     if archive.is_file():
         verify_pinned_file(archive, expected_bytes=bundle.bytes,
                            expected_sha256=bundle.sha256,
@@ -2855,7 +2860,8 @@ def register_cli(subparsers) -> None:
         "--from", dest="from_dir", metavar="DIR", default=None,
         help="stage from a local directory instead of downloading "
              "(offline installs): either the bundle archive or the "
-             "artifacts loose in it; verification is identical")
+             "artifacts loose in it, or the bundle archive's own path; "
+             "verification is identical")
     parser.add_argument(
         "--dest", metavar="DIR", default=None,
         help="stage into DIR instead of this release's own "

@@ -60,4 +60,6 @@ def staged_case_data_env(root: Path, base=None) -> dict:
     staged_geog_tree(Path(root) / "WPS_GEOG")
     env = dict(os.environ if base is None else base)
     env["GPUWM_CASE_DATA_ROOT"] = str(root)
+    # GPUWM_WPS_GEOG, when the host sets it, moves the default root.
+    env.pop("GPUWM_WPS_GEOG", None)
     return env

@@ -118,12 +118,28 @@ def add_arguments(parser):
                              "domain and member paths are appended (default RUN/icechunk)")
 
 
+def _config_payload(config):
+    """The bytes of ``config`` that this process is bound to.
+
+    A multi-run child is bound to a captured copy of its config: the original
+    may be edited after capture, and every other loader reads the capture
+    (``gpuwm.config_authority``).  This one read the original, so an edited
+    ``[output]`` block reached a run that had captured another.
+    """
+    from gpuwm.config_authority import CONFIG_SOURCE_ENV, read_config_authority
+    bound = os.environ.get(CONFIG_SOURCE_ENV)
+    if bound and Path(bound).expanduser().resolve() == Path(config).expanduser().resolve():
+        return read_config_authority(config).payload
+    path = Path(config)
+    return path.read_bytes() if path.is_file() else None
+
+
 def options(arguments):
     config = (getattr(arguments, "output_config", None) or getattr(arguments, "config", None) or getattr(arguments, "experiment_config", None))
     block = {}
-    if config and Path(config).is_file() and Path(config).suffix == ".toml":
-        with Path(config).open("rb") as stream:
-            block = tomllib.load(stream).get("output", {})
+    payload = _config_payload(config) if config and Path(config).suffix == ".toml" else None
+    if payload is not None:
+        block = tomllib.loads(payload.decode("utf-8")).get("output", {})
     formats = getattr(arguments, "output_format", None)
     if formats is None:
         formats = block.get("formats")

@@ -353,6 +353,7 @@ impl Plane {
 fn render(
     plane: Plane,
     row: &ProductRow,
+    scale: rustwx_render::ColorScale,
     source: &str,
     subtitle: &str,
     contours: Vec<ContourLayer>,
@@ -360,6 +361,13 @@ fn render(
     args: &Args,
     path: PathBuf,
 ) -> Result<(PathBuf, Option<rustwx_render::PanelGeoReference>), String> {
+    let (legend_mode, cbar_tick_step) = if row.is_diverging() {
+        let discrete = scale.resolved_discrete();
+        let step = discrete.levels.last().copied().filter(|v| v.is_finite() && *v > 0.0).map(|h| h / 5.0);
+        (LegendMode::Stepped, step)
+    } else {
+        (LegendMode::SmoothRamp, None)
+    };
     render_panel_bounds(
         PanelRequest {
             lat_deg: &plane.lat,
@@ -371,10 +379,10 @@ fn render(
             product_slug: row.product.clone(),
             title: format!("{} | {}", source, row.title),
             display_units: row.display_units.clone(),
-            scale: row.scale()?,
-            cbar_tick_step: None,
+            scale,
+            cbar_tick_step,
             legend: LegendControls {
-                mode: LegendMode::SmoothRamp,
+                mode: legend_mode,
                 ..LegendControls::default()
             },
             render_density: RenderDensity::default(),
@@ -490,9 +498,11 @@ fn run(mut args: Args) -> Result<(), String> {
         &day,
         &format!("cf_{}_{}", args.variable, stamp),
     );
+    let scale = row.scale_for_values(&plane.values)?;
     let (model, model_geo) = render(
         plane,
         &row,
+        scale.clone(),
         &grid.source,
         &subtitle,
         contours,
@@ -562,7 +572,7 @@ fn run(mut args: Args) -> Result<(), String> {
             &format!("observed_{}_{}", row.product, stamp),
         );
         let (observed, observed_geo) =
-            render(obs, &row, &source, &subtitle, Vec::new(), None, &args, path)?;
+            render(obs, &row, scale.clone(), &source, &subtitle, Vec::new(), None, &args, path)?;
         if observation_info.is_null() {
             observation_info = serde_json::json!({"path":file});
         }

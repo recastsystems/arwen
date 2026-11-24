@@ -12,6 +12,8 @@ from pathlib import Path
 import tempfile
 import time
 
+from gpuwm.shared_files import open_shared
+
 DEFAULT_MAX_CONNECTIONS = 30
 MAX_CONNECTIONS_ENV = "GPUWM_FETCH_MAX_CONNECTIONS"
 DIRECTORY_ENV = "GPUWM_FETCH_CONNECTION_DIR"
@@ -47,8 +49,12 @@ def _try_lock(handle) -> bool:
 
 
 def _open_slot(path):
-    """Open one box slot so every user of the machine can open it after us (mode 0666)."""
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o666)
+    """Open one box slot so every user of the machine can open it after us (mode 0666).
+
+    A slot another account made is opened without O_CREAT (shared_files.open_shared): Linux refuses an
+    O_CREAT open of another account's file in the sticky slot folder, whatever its mode.
+    """
+    fd = open_shared(path, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o666)
     try:
         os.chmod(path, 0o666)
     except OSError:
@@ -71,8 +77,10 @@ def _usable_slot_directory(directory):
             os.chmod(directory, 0o1777)
         except OSError:
             pass
-        probe = directory / "slot-0"
-        _open_slot(probe).close()
+        # Every slot, not only the first: a fetch opens them all, and one another account left closed
+        # (an older install) must send this process to its own slots here, not end it in a traceback.
+        for index in range(max_connections()):
+            _open_slot(directory / f"slot-{index}").close()
         return directory
     except OSError:
         uid = os.getuid() if hasattr(os, "getuid") else os.getpid()

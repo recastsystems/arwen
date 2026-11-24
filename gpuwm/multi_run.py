@@ -849,7 +849,15 @@ def _validate_lock_root_isolation(
                 f"{GPU_LOCK_ROOT_ENV} to a stable machine-wide directory "
                 "outside every plan, input, summary, output, scratch, and "
                 "cache path")
-    root.mkdir(parents=True, exist_ok=True)
+    from gpuwm.supervisor import ensure_shared_lock_folder, machine_lock_root
+
+    if root == machine_lock_root().expanduser().resolve():
+        # The folder every account's card locks share: made so another
+        # account's run can take its locks there (supervisor.
+        # ensure_shared_lock_folder).
+        ensure_shared_lock_folder(root)
+    else:
+        root.mkdir(parents=True, exist_ok=True)
     return root
 
 

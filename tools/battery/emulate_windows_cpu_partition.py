@@ -193,10 +193,15 @@ def clone_checkout(root: pathlib.Path, destination: pathlib.Path) -> list[str]:
     return changed
 
 
+#: The cpu job's editable installs, in ci.yml's order. gpuwm-kernels-startup was missing here, so the
+#: emulated leg ran without a package the hosted leg installs.
+EDITABLE_PACKAGES = ("./gpuwm-data", "./gpuwm-kernels", "./gpuwm-kernels-startup", ".[dev]")
+
+
 def make_environment(clone: pathlib.Path, venv: pathlib.Path, python: str,
                      numpy: str, uv: str | None) -> pathlib.Path:
     """A fresh environment holding the clone exactly as the cpu job installs it."""
-    packages = ["-e", "./gpuwm-data", "-e", "./gpuwm-kernels", "-e", ".[dev]", f"numpy=={numpy}"]
+    packages = [arg for path in EDITABLE_PACKAGES for arg in ("-e", path)] + [f"numpy=={numpy}"]
     if uv:
         _run([uv, "venv", "-q", "--seed", "--python", python, venv], cwd=clone)
         interpreter = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")

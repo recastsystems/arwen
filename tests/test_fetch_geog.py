@@ -546,6 +546,7 @@ def test_archive_url_per_source_and_env_override(monkeypatch):
 
 
 def test_default_geog_root_is_the_case_data_layout(monkeypatch, tmp_path):
+    monkeypatch.delenv("GPUWM_WPS_GEOG", raising=False)
     monkeypatch.setenv("GPUWM_CASE_DATA_ROOT", str(tmp_path))
     assert default_geog_root() == tmp_path / "WPS_GEOG"
 

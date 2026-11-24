@@ -38,6 +38,13 @@ default input units and optional contour threshold and observation product.
 A row may carry its own `scale` (`levels`, one RGB `colors` entry per interval,
 and optional `mask_below` in display units: values under it are left blank
 instead of drawn in the first colour, so a dry precipitation window is a blank map).
+A signed difference field takes a zero-centred diverging recipe: `div_bwr` (blue,
+white, red) and `div_brbg` (brown, white, teal), and the named rows
+`temperature_difference`, `humidity_difference`, `wind_difference` and
+`pressure_difference`. Ten bands run from `-half_range` to `+half_range` with zero
+exactly between the two white bands; a row may set `half_range`, and without it the
+range is fitted to the field (the 99.5th percentile of its magnitude, rounded to a
+1, 2, 2.5 or 5 step).
 Defaults apply only when the file omits units. Explicit unknown units fail rather
 than painting numbers against the wrong ladder. Gust uses the production wind
 ladder in knots; QPF and precipitable water use their production inch ladders.

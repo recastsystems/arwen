@@ -664,6 +664,7 @@ def test_doctor_reports_absent_geography_even_with_the_root_unset(
     from gpuwm.geog_assets import default_geog_root
 
     monkeypatch.delenv("GPUWM_CASE_DATA_ROOT", raising=False)
+    monkeypatch.delenv("GPUWM_WPS_GEOG", raising=False)
     monkeypatch.setattr(doctor_module, "default_case_data_root",
                         lambda: tmp_path / "absent", raising=False)
     monkeypatch.setattr("gpuwm.case_data.default_case_data_root",

@@ -1561,6 +1561,47 @@
    "after_total": 29563,
    "command": "row removed with its file; no other row touched",
    "reason": "The joined Mu/W acoustic trial (gpuwm/ensemble/batch_acoustic_fusion.py) is removed: no product route selected it, it rebuilt CUDA text under counted audits that went stale twice, and on an RTX 4090 it differed from single runs on 18 of 52 device tests (w_pp 1 to 31 units in the last place). Its CPU audit file goes with it; the packed separate launches users run keep their own word-identity tests (tests/test_ensemble_batch_acoustic_gpu.py)."
+  },
+  {
+   "recorded_on": "2026-11-24",
+   "leg": "stage1",
+   "source_revision": "891cba1452a8baec56ed39fda0fe5e54002922f9 with the 3.0.6 fix batch",
+   "platform": "linux",
+   "markexpr": "not gpu and not slow and not network",
+   "environment": {
+    "GPUWM_NO_LOCAL_GPU": "1"
+   },
+   "counts": {
+    "tests/test_bridge_dir_override.py": 4,
+    "tests/test_card_lock_folder_shared.py": 4,
+    "tests/test_fetch_geog_global_config.py": 7,
+    "tests/test_fetch_geog_wps_geog_env.py": 7,
+    "tests/test_fetch_lock_root_per_account.py": 10,
+    "tests/test_fetch_next_doors.py": 4,
+    "tests/test_fetch_posting_note.py": 4,
+    "tests/test_render_source_label_from_file.py": 7
+   },
+   "before_total": 29563,
+   "after_total": 29610,
+   "command": "GPUWM_NO_LOCAL_GPU=1 python -m pytest --collect-only -q -m \"not gpu and not slow and not network\" tests/test_bridge_dir_override.py tests/test_card_lock_folder_shared.py tests/test_fetch_geog_global_config.py tests/test_fetch_geog_wps_geog_env.py tests/test_fetch_lock_root_per_account.py tests/test_fetch_next_doors.py tests/test_fetch_posting_note.py tests/test_render_source_label_from_file.py",
+   "reason": "The eight test files of the 3.0.6 shared-host and next-step fixes were on no list a release leg runs, so neither public CI nor the release battery ran them (3.0.6 gate run, 23 Nov 2026). They join Stage 1. tests/test_static_highres_international.py stays a Stage 1 row with its count; it joins the native partition (stage1_native_files.txt), so the Windows CPU job no longer selects it."
+  },
+  {
+   "recorded_on": "2026-11-24",
+   "leg": "stage1",
+   "source_revision": "95b03aea35572afdc4dbe30db4ee731bd7c44f78 with the shared-folder open fix",
+   "platform": "linux",
+   "markexpr": "not gpu and not slow and not network",
+   "environment": {
+    "GPUWM_NO_LOCAL_GPU": "1"
+   },
+   "counts": {
+    "tests/test_fetch_lock_root_per_account.py": 16
+   },
+   "before_total": 29610,
+   "after_total": 29616,
+   "command": "GPUWM_NO_LOCAL_GPU=1 python -m pytest --collect-only -q -m \"not gpu and not slow and not network\" tests/test_fetch_lock_root_per_account.py",
+   "reason": "Six tests join tests/test_fetch_lock_root_per_account.py for the lock, slot and card-lock opens of another account's file in a sticky shared folder (gpuwm/shared_files.py); no other row touched."
   }
  ],
  "_staging_repair_followup": {
@@ -1707,7 +1748,7 @@
    "environment": {
     "GPUWM_NO_LOCAL_GPU": "1"
    },
-   "collected_total": 29563,
+   "collected_total": 29616,
    "files": {
     "tests/test_acoustic_adaptation.py": 32,
     "tests/test_acoustic_carrier_lifetime.py": 1,
@@ -2661,7 +2702,15 @@
     "tests/test_static_highres_international.py": 38,
     "tests/test_release_bump_version.py": 11,
     "tests/test_build_drops_release_excluded.py": 2,
-    "tests/test_seal_check.py": 13
+    "tests/test_seal_check.py": 13,
+    "tests/test_bridge_dir_override.py": 4,
+    "tests/test_card_lock_folder_shared.py": 4,
+    "tests/test_fetch_geog_global_config.py": 7,
+    "tests/test_fetch_geog_wps_geog_env.py": 7,
+    "tests/test_fetch_lock_root_per_account.py": 16,
+    "tests/test_fetch_next_doors.py": 4,
+    "tests/test_fetch_posting_note.py": 4,
+    "tests/test_render_source_label_from_file.py": 7
    }
   },
   "always": {

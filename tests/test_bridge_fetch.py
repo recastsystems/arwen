@@ -329,6 +329,26 @@ def test_from_dir_stages_the_verified_subset_with_a_warning(
                                      progress=lambda _line: None)
 
 
+def test_from_takes_the_bundle_archive_path_itself(tmp_path):
+    """``--from <zip>``: the path a user has after downloading the bundle.
+
+    3.0.5 read it as a folder and refused with every pinned name missing.
+    """
+
+    archive, bundle = _synthetic_bundle(tmp_path)
+    dest = tmp_path / "dest"
+    installed = bridge_assets.stage_from_dir(archive, bundle, dest,
+                                             progress=lambda _line: None)
+    assert len(installed) >= len(bundle.binaries)
+    for pin in bundle.binaries:
+        assert bridge_assets.matches_pin(dest / pin.filename, pin)
+
+    archive.write_bytes(archive.read_bytes() + b"appended")
+    with pytest.raises(bridge_assets.BridgeAssetError, match="bytes"):
+        bridge_assets.stage_from_dir(archive, bundle, tmp_path / "dest2",
+                                     progress=lambda _line: None)
+
+
 def test_from_dir_refuses_a_bundle_whose_own_bytes_drifted(tmp_path):
     """``--from`` verifies the archive itself, not only its members."""
 

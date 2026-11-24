@@ -1036,9 +1036,27 @@ def legacy_bridge_dir() -> Path:
     files, breaking the other install that relied on them.  A pinned
     install now only READS a file here, and only when its bytes are the
     ones that install's own release pinned; it never writes here.
+
+    ``GPUWM_BRIDGE_DIR`` (:data:`BRIDGE_DIR_ENV`) moves this folder, and
+    with it every versioned staging folder beneath it.  The breakage it
+    prevents: until 3.0.5 the folder was fixed under each account's
+    home, so a second account sharing one install on a shared host found
+    no bridges (``gpuwm-global doctor`` exit 1, ten gaps) and had to
+    download the same 452 MB again.  One account fetches into a shared
+    folder once, and every account that sets the variable to it reads
+    the same pinned bytes.
     """
 
+    override = (os.environ.get(BRIDGE_DIR_ENV) or "").strip()
+    if override:
+        return Path(override).expanduser()
     return Path.home() / ".gpuwm" / "bridges"
+
+
+#: Override for :func:`legacy_bridge_dir`, the folder ``gpuwm
+#: fetch-bridges`` stages into and every ladder reads.  ``gpuwm doctor``
+#: names it beside the folder in use.
+BRIDGE_DIR_ENV = "GPUWM_BRIDGE_DIR"
 
 
 #: Characters allowed in a versioned staging directory name.  A release
@@ -1102,12 +1120,30 @@ def staging_location_note() -> str:
 
     own = default_bridge_dir()
     if staged_version_tag() is None:
-        return (f"this engine stages bridges in {own} (the flat layout: "
+        note = (f"this engine stages bridges in {own} (the flat layout: "
                 "this install carries no release pins to version it by)")
-    return (f"this engine stages bridges in {own}, its own versioned "
-            f"directory; the shared flat {legacy_bridge_dir()} is read only "
-            "for a file whose bytes are this release's pin, and never "
-            "written")
+    else:
+        note = (f"this engine stages bridges in {own}, its own versioned "
+                f"directory; the shared flat {legacy_bridge_dir()} is read "
+                "only for a file whose bytes are this release's pin, and "
+                "never written")
+    return note + "; " + bridge_dir_override_note()
+
+
+def bridge_dir_override_note() -> str:
+    """Whether ``GPUWM_BRIDGE_DIR`` chose the folder, in one clause.
+
+    For ``gpuwm doctor``: an account on a shared host reads this line to
+    learn it can use another account's copy instead of downloading its
+    own.
+    """
+
+    if (os.environ.get(BRIDGE_DIR_ENV) or "").strip():
+        return (f"{BRIDGE_DIR_ENV} chose this folder; unset it to use "
+                f"{Path.home() / '.gpuwm' / 'bridges'}")
+    return (f"set {BRIDGE_DIR_ENV} to a folder every account can read to "
+            "share one staged copy between the accounts of a shared host "
+            "(one account runs gpuwm fetch-bridges into it)")
 
 
 def legacy_bridge_candidates(filename: str) -> tuple[Path, ...]:
@@ -2723,6 +2759,7 @@ __all__ = [
     "BRIDGE_ABI_MARKERS", "bridge_abi_matches",
     "CheckoutBuildStatus", "StaleCheckoutBuildError", "checkout_build_status",
     "checkout_workspace_of", "require_current_checkout_build",
+    "BRIDGE_DIR_ENV", "bridge_dir_override_note",
     "BRIDGE_ENV", "CARGO_BUILD_HINT", "CLONE_DIR", "CRATE_RELATIVE",  # noqa: F822 -- module __getattr__
     "CPU_BRIDGE_ARTIFACT", "CPU_BRIDGE_ENV", "cpu_bridge_remedy",
     "REPOSITORY_URL", "RUSTWX_CRATE_RELATIVE", "WINDOWS_SHELL",
