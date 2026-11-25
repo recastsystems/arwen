@@ -299,8 +299,10 @@ PHYSICS_FIELD_ALIASES = {
 }
 
 RUC_INPUT_FIELDS = frozenset({"ACRUNOFF", "RHOSNF", "SNOWFALLAC", "SOILT1"})
-from gpuwm.static.orographic import OROGRAPHIC_ROWS, required_static_fields
-OROGRAPHIC_WRFINPUT = frozenset(OROGRAPHIC_ROWS)
+from gpuwm.static.orographic import GWDO_480_EXTRA_FIELDS, OROGRAPHIC_ROWS, required_static_fields
+# GEOGRID-table statistics plus ELVMAX, which real.exe v4.8.0 writes beside them under
+# gwd_opt = 1 and the wrf_480 KIM drag reads (wrfinput_terrain_drag_inputs).
+OROGRAPHIC_WRFINPUT = frozenset(OROGRAPHIC_ROWS) | frozenset(GWDO_480_EXTRA_FIELDS)
 MYNN_QKE_INPUT_FIELDS = frozenset(PHYSICS_FIELD_ALIASES["qke"])
 #: The MYNN subgrid cloud a cycled start (RunConfig.cycling) continues;
 #: restored onto the physics fields of the same lower-case names.
