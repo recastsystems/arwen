@@ -2983,7 +2983,8 @@ class CudaSW:
         self.tab = tab
         packed, defines = _pack_cuda_tables(tab)
         src_path = __import__("pathlib").Path(__file__).parent / "kernels" / "rrtmg_sw.cu"
-        code = defines + src_path.read_text(encoding="ascii")
+        from gpuwm.core.kernels import glibc_fastpath_compose
+        code = defines + glibc_fastpath_compose("rrtmg_sw", "rrtmg_sw.cu", src_path.read_text(encoding="ascii"))
         # CuPy appends -ftz=true to NVRTC options; that reaches even
         # mul.rn.f32 from __fmul_rn and flushes the subnormal
         # transmittance products (1e-20 * 1e-20 = 1e-40) the Fortran

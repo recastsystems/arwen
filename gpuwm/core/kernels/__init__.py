@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from functools import lru_cache
 from gpuwm.core.device_cache import cuda_cache
 from pathlib import Path
@@ -588,6 +589,60 @@ def _sfs_smag_geometry_source(text: str) -> str:
     return "typedef size_t SmagIndex;\n" + text[start:end] + text[shear:shear_end]
 
 
+#: The glibc-exact logf/expf/powf copies, by the file that defines them.  With
+#: GPUWM_GLIBC_FASTPATH=1 the loader composes glibc_fastpath.cuh ahead of a
+#: module and inserts, at the top of each copy it composes, an early-out that
+#: returns the float-float fast path's result when it is certain (otherwise
+#: the copy runs unchanged).  Off by default: every composed source is then
+#: byte-identical to the frozen one.
+GLIBC_FASTPATH_COPIES = {
+    "glibc_flt32.cuh": ("gfk_log", "gfk_exp", "gfk_pow"),
+    "mynn_libm.cuh": ("mynn_glibc_logf", "mynn_glibc_expf", "mynn_glibc_powf"),
+    "mynn_pbl.cu": ("mynn_glibc_logf", "mynn_glibc_expf", "mynn_glibc_powf"),
+    "rrtmg_lw.cu": ("rlw_log", "rlw_exp", "rlw_pow"),
+    "rrtmg_sw.cu": ("rsw_log", "rsw_exp"),
+    "noahmp_fluxprep.cu": ("r_log", "r_exp", "r_pow"),
+    "noahmp_leaves.cu": ("r_log", "r_exp", "r_pow"),
+}
+
+
+def glibc_fastpath_enabled(name: str) -> bool:
+    """Opt-in (GPUWM_GLIBC_FASTPATH=1).  Noah (noah.cu and its variants) keeps
+    the original copies even then: routing noah.cu changes wrfout words even
+    when the fast path is forced to return the original copy's value, a
+    code-generation-dependent result of noah.cu itself."""
+    import os
+    return (os.environ.get("GPUWM_GLIBC_FASTPATH", "0") == "1"
+            and name != "noah" and not name.startswith("noah_"))
+
+
+def route_glibc_copies(text: str, filename: str) -> str:
+    """``text`` (the file ``filename``) with the fast-path early-out at the top
+    of each glibc-exact copy it defines."""
+    family = lambda n: "powf" if n.endswith(("pow", "powf")) else ("logf" if "log" in n else "expf")
+    for copy in GLIBC_FASTPATH_COPIES.get(filename, ()):
+        m = re.search(r"__device__\s+(?:__forceinline__\s+)?(?:real|float)\s+" + copy
+                      + r"\s*\(\s*(?:real|float)\s+(\w+)\s*(?:,\s*(?:real|float)\s+(\w+)\s*)?\)\s*\{\n", text)
+        if m is None:
+            raise RuntimeError(f"glibc fast path: {copy} not found in {filename}")
+        args = m.group(1) + (f", {m.group(2)}" if m.group(2) else "")
+        text = (text[:m.end()]
+                + f"    {{ float gfp_r = glibc_fastpath_{family(copy)}({args});\n"
+                  f"      if (__float_as_uint(gfp_r) != GLIBC_FASTPATH_UNSURE) return gfp_r; }}\n"
+                + text[m.end():])
+    return text
+
+
+def glibc_fastpath_compose(name: str, filename: str, text: str,
+                           kernel_dir: Path = _KDIR, header: bool = True) -> str:
+    """``text`` unchanged unless the fast path is enabled for module ``name``;
+    then routed, preceded by the fast-path header when ``header``."""
+    if filename not in GLIBC_FASTPATH_COPIES or not glibc_fastpath_enabled(name):
+        return text
+    head = (Path(kernel_dir) / "glibc_fastpath.cuh").read_text(encoding=_ENCODING) if header else ""
+    return head + route_glibc_copies(text, filename)
+
+
 def _extra_header_text(name: str, kernel_dir: Path = _KDIR) -> str:
     """Return the allow-listed headers for ``name``, or ``''`` for any other.
 
@@ -654,7 +709,7 @@ def _extra_header_text(name: str, kernel_dir: Path = _KDIR) -> str:
                 header_text = ( _flg_fast_math_aliases() + header_text.replace(
                     stream, rounded + stream, 1).replace(
                     cloud, _flg_fast_math_aliases() + cloud, 1))
-            parts.append(header_text)
+            parts.append(glibc_fastpath_compose(name, header, header_text, kernel_dir))
         if not ENABLED and name == "flg_driver" and header == headers[-1]:
             # Packing retains its ordinary arithmetic.
             parts.append(_flg_fast_math_aliases())
@@ -764,6 +819,12 @@ _DEFAULT_SOURCE_MODULES = frozenset({
     "nssl2_fused_gs", "nssl2_driver_support", "nssl2_diagnostics"})
 
 
+def _routed_unit_text(name: str, kernel_dir: Path = _KDIR) -> str:
+    """:func:`_unit_text`, with the glibc fast path when enabled (opt-in)."""
+    stem = "mynn_pbl" if name in ("mynn_pbl_v61", "mynn_dmp_sibling") else name
+    return glibc_fastpath_compose(name, f"{stem}.cu", _unit_text(name, kernel_dir), kernel_dir)
+
+
 def _unit_text(name: str, kernel_dir: Path = _KDIR) -> str:
     """Read a CUDA unit and apply only the active set's registered literals."""
     from gpuwm.physics_params import edit_kernel_source
@@ -843,7 +904,7 @@ def module_source(name: str, *, kernel_dir: Path = _KDIR) -> str:
         if not is_strict():
             prefix += "#define GPUWM_MSKF_FAST 1\n"
     return (prefix + _preamble(kernel_dir) + _extra_header_text(name, kernel_dir)
-            + _unit_text(name, kernel_dir))
+            + _routed_unit_text(name, kernel_dir))
 
 
 #: Units graded word for word against a WRF column oracle, which needs NVRTC
@@ -1643,16 +1704,16 @@ def module_source_int_defines(
             # header also contains a host-only include, which makes the
             # direct NVRTC cache bypass every lookup.
             return (_preamble(kernel_dir) + prefix + "\n"
-                    + fast_source(_unit_text(name, kernel_dir)))
+                    + fast_source(_routed_unit_text(name, kernel_dir)))
     if name in ("thompson_column", "rcon", "udm"):
         # This tier sizes the generated header's arrays as well as the unit.
         return (_preamble(kernel_dir) + prefix + "\n" + _extra_header_text(name,kernel_dir)
                 + _unit_text(name,kernel_dir))
     if name in _HEADERS_NEED_INT_DEFINES:
         return (_preamble(kernel_dir) + prefix + "\n"
-                + _extra_header_text(name, kernel_dir) + _unit_text(name, kernel_dir))
+                + _extra_header_text(name, kernel_dir) + _routed_unit_text(name, kernel_dir))
     source = (_preamble(kernel_dir) + _extra_header_text(name, kernel_dir)
-              + prefix + "\n" + _unit_text(name, kernel_dir))
+              + prefix + "\n" + _routed_unit_text(name, kernel_dir))
     from gpuwm.core.kernel_shape import specialize_source
     return specialize_source(name, source, tuple(defines))
 
