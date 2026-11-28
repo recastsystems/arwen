@@ -10,6 +10,8 @@ import subprocess
 import csv
 from io import StringIO
 
+from gpuwm.filesystem_paths import replace_file_with_retry
+
 EXTRACT_ABI = b"gpuwm-grib2-extract-index-v1"
 
 #: What a start reads in place of a runtime surface field that its cycle
@@ -381,5 +383,9 @@ def append_runtime_surface_records(path, *, adapter, cycle, lead, host,
                              "sha256": digest, "bytes": field.stat().st_size,
                              "fetch_mode": entry["mode"],
                              "source_file_sha256": entry["sha256"]})
-        os.replace(combined, path)
+        # The surface file was posted the moment its download finished, so
+        # on Windows a reader of it (the posting hash, or a scanner) can
+        # still hold it here, and a bare replace stopped the whole fetch
+        # with "[WinError 5] Access is denied" (issue #6).
+        replace_file_with_retry(combined, path)
     return evidence
