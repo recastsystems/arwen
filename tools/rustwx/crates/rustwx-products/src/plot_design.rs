@@ -1286,6 +1286,25 @@ pub fn fit_scale_to_field(scale: DiscreteColorScale, values: &[f32], row: &Fitte
     DiscreteColorScale { levels: new_levels, colors, ..scale }
 }
 
+/// A temperature fill's fixed ladder as `theme` wants it drawn: fitted to the
+/// field by its fitted-scale row, or kept as it is when the theme names the
+/// product in `colormaps.fixed` (a sequence that must keep one scale) or the
+/// table has no row for it.
+pub fn fit_temperature_scale_for_theme(
+    scale: DiscreteColorScale,
+    values: &[f32],
+    selector: FieldSelector,
+    theme: &rustwx_render::theme::RenderTheme,
+) -> DiscreteColorScale {
+    if theme.keeps_fixed_ladder(&selector.key()) {
+        return scale;
+    }
+    match fitted_scale_row(selector) {
+        Some(row) => fit_scale_to_field(scale, values, row),
+        None => scale,
+    }
+}
+
 /// The largest 1, 2 or 5 times a power of ten that is no more than `x`.
 fn nice_step_at_most(x: f64) -> f64 {
     if !(x > 0.0) || !x.is_finite() {
@@ -1538,6 +1557,43 @@ mod fitted_scale_table_tests {
         let fitted = fit_scale_to_field(fixed.clone(), &values, row_2m());
         assert_eq!(fitted.levels, fixed.levels);
         assert_eq!(fitted.colors, fixed.colors);
+    }
+
+    fn theme(json: &str) -> rustwx_render::theme::RenderTheme {
+        let file = rustwx_render::theme::RenderThemeFile::from_json(json).expect("theme parses");
+        rustwx_render::theme::RenderTheme::from_file_spec(&file, None).expect("theme resolves")
+    }
+
+    #[test]
+    fn a_theme_can_keep_the_fixed_2m_ladder_on_a_narrow_field() {
+        // Issue #9: a nested Florida freeze run spanned about 10 F in most
+        // frames and under 6 F in some, so the scale changed frame to frame.
+        let fixed = ladder_2m();
+        let selector = FieldSelector::height_agl(CanonicalField::Temperature, 2);
+        let narrow: Vec<f32> = (0..1000).map(|i| 30.0 + 3.0 * i as f32 / 999.0).collect();
+        let default = rustwx_render::theme::RenderTheme::default_theme();
+        let fitted = fit_temperature_scale_for_theme(fixed.clone(), &narrow, selector, &default);
+        assert_ne!(fitted.levels, fixed.levels, "the default theme fits a narrow field");
+        let kept = fit_temperature_scale_for_theme(
+            fixed.clone(), &narrow, selector,
+            &theme(r#"{"name": "freeze", "colormaps": {"fixed": ["temperature_2m_agl"]}}"#));
+        assert_eq!(kept.levels, fixed.levels);
+        assert_eq!(kept.colors, fixed.colors);
+        // Naming another product leaves 2 m temperature fitted as before.
+        let other = fit_temperature_scale_for_theme(
+            fixed.clone(), &narrow, selector,
+            &theme(r#"{"name": "other", "colormaps": {"fixed": ["composite_reflectivity"]}}"#));
+        assert_eq!(other.levels, fitted.levels);
+        assert_eq!(other.colors, fitted.colors);
+    }
+
+    #[test]
+    fn a_fixed_entry_must_be_a_product_name() {
+        for json in [r#"{"colormaps": {"fixed": [""]}}"#, r#"{"colormaps": {"fixed": [" temperature_2m_agl"]}}"#] {
+            let file = rustwx_render::theme::RenderThemeFile::from_json(json).expect("parses");
+            let refusal = rustwx_render::theme::RenderTheme::from_file_spec(&file, None).unwrap_err();
+            assert!(refusal.contains("colormaps.fixed[0]"), "{refusal}");
+        }
     }
 
     #[test]
