@@ -105,6 +105,34 @@ def test_published_field_is_still_appended(tmp_path, monkeypatch):
     assert "fallback_id" not in row and row["field"] == "VEGFRA"
 
 
+def test_appended_file_replaces_a_surface_file_a_reader_still_holds(
+        tmp_path, monkeypatch):
+    """Issue #6: on Windows a reader of the just-posted surface file makes
+    the replace fail with "Access is denied" for a moment; the append waits
+    for it instead of stopping the fetch."""
+    import os
+    from gpuwm import filesystem_paths
+
+    _fake_fetch(monkeypatch, published=True)
+    real_replace = os.replace
+    refusals = []
+
+    def held_once(source, destination):
+        if not refusals:
+            refusals.append(destination)
+            raise PermissionError(13, "Access is denied", str(destination))
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", held_once)
+    monkeypatch.setattr(filesystem_paths, "_windows_posix_replace", lambda *args: False)
+    monkeypatch.setattr(filesystem_paths.time, "sleep", lambda _: None)
+    soil, rows = _append(tmp_path, declared=frozenset({"VEGFRA"}))
+    assert len(refusals) == 1
+    assert soil.read_bytes() == b"GRIB-soil" + b"GRIB-veg"
+    (row,) = rows
+    assert row["field"] == "VEGFRA"
+
+
 def test_zero_matches_are_absence_not_ambiguity(tmp_path, monkeypatch):
     from gpuwm import bridges
     inventory = tmp_path / "grib2_inventory"
