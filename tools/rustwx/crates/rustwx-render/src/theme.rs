@@ -75,6 +75,12 @@
 //! physical boundaries in displayed units. It preserves the palette and leaves
 //! unnamed products unchanged. Use it for a common range across a sequence.
 //!
+//! `colormaps.fixed` lists products whose operational ladder is drawn as it
+//! is on every frame: the renderer does not fit it to the field
+//! (`rustwx-products/data/fitted-scales.json`), so a sequence of 2 m
+//! temperature maps (`["temperature_2m_agl"]`) keeps one scale even where a
+//! frame's field is narrow.  Unnamed products keep the fitting.
+//!
 //! `colormaps.products` keys are the field product names the renderer sees
 //! (canonical field keys for direct products, recipe slugs for derived ones);
 //! `sequential` replaces
@@ -111,7 +117,7 @@ use crate::color::Rgba;
 use crate::request::{Color, ColorScale, DiscreteColorScale};
 use crate::request::ProductKey;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -357,6 +363,10 @@ pub struct ColormapSpec {
     /// Explicit physical colour boundaries, in the product's displayed units.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub levels: BTreeMap<String, Vec<f64>>,
+    /// Products whose operational ladder is kept on every frame instead of
+    /// being fitted to the field it colours.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fixed: Vec<String>,
 }
 
 /// Contour overlays a theme sets, keyed by contoured field (`mslp`).
@@ -692,6 +702,8 @@ pub struct RenderTheme {
     pub diverging: Vec<Rgba>,
     pub products: BTreeMap<String, Vec<Rgba>>,
     pub levels: BTreeMap<String, Vec<f64>>,
+    /// `colormaps.fixed`: products drawn on their operational ladder as is.
+    pub fixed: BTreeSet<String>,
     /// `contours.*`: per-field contour levels, major interval and smoothing.
     pub contours: ContourSpec,
     /// The right-hand subtitle drawn in place of the derived provenance
@@ -866,6 +878,7 @@ impl RenderTheme {
                 ],
                 products: BTreeMap::new(),
                 levels: BTreeMap::new(),
+                fixed: Vec::new(),
             }),
             contours: None,
             // The hairline and the empty-cell fill from the dark surface's
@@ -1059,6 +1072,11 @@ impl RenderTheme {
                 return Err(format!("colormaps.levels.{slug}: need 2..4096 finite, strictly increasing boundaries"));
             }
         }
+        for (index, product) in colormaps.fixed.iter().enumerate() {
+            if product.trim().is_empty() || product.trim() != product {
+                return Err(format!("colormaps.fixed[{index}]: a product name, without surrounding spaces"));
+            }
+        }
         let contours = file.contours.clone().unwrap_or_default();
         for (field, levels) in &contours.levels {
             if levels.is_empty() || levels.len() > 4096
@@ -1174,6 +1192,7 @@ impl RenderTheme {
             diverging,
             products,
             levels: colormaps.levels.clone(),
+            fixed: colormaps.fixed.iter().cloned().collect(),
             contours,
             source_label,
             model_label,
@@ -1193,6 +1212,7 @@ impl RenderTheme {
             && self.diverging.is_empty()
             && self.products.is_empty()
             && self.levels.is_empty()
+            && self.fixed.is_empty()
             && self.contours == ContourSpec::default()
             && self.source_label.is_none()
             && self.model_label.is_none()
@@ -1277,6 +1297,12 @@ impl RenderTheme {
             _ => {}
         }
         Some(ColorScale::Discrete(discrete))
+    }
+
+    /// True when the theme keeps `product`'s operational ladder on every
+    /// frame (`colormaps.fixed`) instead of letting it be fitted to the field.
+    pub fn keeps_fixed_ladder(&self, product: &str) -> bool {
+        self.fixed.contains(product)
     }
 
     /// True when the theme names both band edges and band colours for
